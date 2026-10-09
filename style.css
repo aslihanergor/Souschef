@@ -1,0 +1,2453 @@
+:root {
+  color-scheme: light;
+  --toque-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%225%203.5%2022%2025.5%22%3E%3Cg%20fill%3D%22%23000%22%3E%3Ccircle%20cx%3D%2211%22%20cy%3D%2215%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2210.5%22%20r%3D%226.5%22%2F%3E%3Ccircle%20cx%3D%2221%22%20cy%3D%2215%22%20r%3D%225.5%22%2F%3E%3Crect%20x%3D%229.5%22%20y%3D%2212%22%20width%3D%2213%22%20height%3D%2211%22%20rx%3D%224.5%22%2F%3E%3Crect%20x%3D%2210.5%22%20y%3D%2221%22%20width%3D%2211%22%20height%3D%227.6%22%20rx%3D%222%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
+
+  --bg: #f7f6f3;
+  --surface: #ffffff;
+  --ink: #1c1d22;
+  --ink-soft: #6b6f76;
+  --line: #ecebe6;
+  --accent: #2f8f6b;
+  --accent-soft: #e8f3ee;
+  --accent-active: #266f53;
+  --accent-disabled: #9ec9b9;
+  --faint: #b0b4bb;
+  --danger: #c0392b;
+  --danger-ink: #a13f2e;
+  --danger-bg: #fdf2f0;
+  --media-bg: #dfe3e6;
+  --press: #eee;
+  --player-bg: #11131a;
+  --player-ink: #9aa0a8;
+  --switch-off: #d8d6cf;
+  --btn-strong-bg: #1c1d22;
+  --btn-strong-ink: #ffffff;
+  --btn-strong-active: #3a3c44;
+  --toast-action: #6fd3ab; /* bright mint — the Undo action on the dark toast pill (TASK-016) */
+
+  --radius-card: 18px;
+  --radius-btn: 11px;
+
+  /* [TASK-099] The bloom's gold, stored as BARE RGB CHANNELS so `rgb(var(--shine) / a)` can vary the
+     alpha per keyframe from one token. A DELIBERATE FIRST for this file — `rgb(… / …)` appears
+     nowhere else (color-mix is landing-only) — flagged so it reads as a considered choice rather than
+     as precedent. The alternative was the colour inlined as six rgba() literals per keyframe: twelve
+     places, and the light/dark pair no longer expressible as a single token. */
+  --shine: 201 154 47;
+
+  /* [TASK-101] The ready note's surface, BARE RGB CHANNELS for the same reason `--shine` is: the
+     note has to be translucent (a user's one hard requirement — explicitly NOT the toast's solid
+     `--btn-strong-bg`, "too black and solid"), and `opacity` is the wrong tool because it would
+     wash out the sentence along with the panel. Second user of this idiom, following the precedent
+     flagged above rather than setting a new one. */
+  --note-bg: 255 255 255;
+
+  /* [TASK-092] The first-run tour: the dim, the ring's glow and the card's shadow. The dim is 58%
+     here and 66% in dark (UI & states), so the cut-out still reads against a dark page. */
+  --tour-scrim: rgba(10, 12, 16, .58);
+  --tour-glow: rgba(47, 143, 107, .22);
+  --tour-shadow: 0 10px 30px rgba(0, 0, 0, .16);
+}
+
+/* Dark theme — applied via <html data-theme="dark">. Only a reader's stored choice
+   sets it: the inline <head> script paints it before first paint when this browser
+   was signed in last time, and showView applies it on every screen except the
+   sign-in page, which is always light. The phone's setting is never read, so the
+   app is light unless its reader chose Dark. [TASK-109] Same variables, dark values. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Lifted and desaturated: the same gold reads muddy against #131419. */
+  --shine: 232 190 96;
+  --note-bg: 28 30 37;   /* --surface, as channels */
+  --tour-scrim: rgba(0, 0, 0, .66);
+  --tour-glow: rgba(63, 163, 125, .30);
+  --tour-shadow: 0 10px 30px rgba(0, 0, 0, .5);
+
+  --bg: #131419;
+  --surface: #1c1e25;
+  --ink: #e8e9ec;
+  --ink-soft: #9498a1;
+  --line: #2a2d36;
+  --accent: #3fa37d;
+  --accent-soft: #1b2f27;
+  --accent-active: #4fb98f;
+  --accent-disabled: #2f5346;
+  --faint: #6b7079;
+  --danger: #e06b5c;
+  --danger-ink: #e59486;
+  --danger-bg: #2a1a17;
+  --media-bg: #23262e;
+  --press: #262932;
+  --player-bg: #0c0d12;
+  --player-ink: #8b909a;
+  --switch-off: #3a3d47;
+  --btn-strong-bg: #e8e9ec;
+  --btn-strong-ink: #131419;
+  --btn-strong-active: #cfd2d8;
+  --toast-action: #196049; /* deep green — Undo action on the light toast pill in dark mode (TASK-016) */
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: contain; /* our pull-to-refresh replaces the browser's */
+}
+
+/* ── Views ── */
+.view { min-height: 100dvh; display: flex; flex-direction: column; }
+.hidden { display: none !important; }
+
+/* ── Setup ── */
+/* Fixed-height app-shell: header + CTA stay pinned and only the channel list scrolls (TASK-045) — WHEN
+   IT FITS. The list never shrinks below one channel row (`.setup-scroll`'s 68px floor); on a screen too
+   short for the pinned parts plus that row, the whole view scrolls instead. This was `overflow: hidden`,
+   which on an SE-sized screen clipped Open my feed below the edge with nothing able to scroll. [TASK-111] */
+#view-setup { height: 100dvh; overflow-y: auto; }
+
+.setup-wrap {
+  position: relative;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 56px 24px 24px;
+  width: 100%;
+  /* Fills the view, but never shrinks below its content's minimum — which, with the list's 68px floor,
+     is what makes a short screen scroll the view rather than clip it. [TASK-111] */
+  flex: 1 0 auto;
+  min-height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+/* Phones: the stack starts 16px below the page top — the gap the feed's appbar uses — plus any top
+   inset, so it never touches the status bar. It was 56px, and every pixel of that came out of the one
+   region that scrolls. Desktop keeps 56px: there the gear is fixed in the corner (`.profile-btn`,
+   min-width 760px), so this boundary mirrors that one. [TASK-111] */
+@media (max-width: 759px) {
+  .setup-wrap { padding-top: calc(16px + env(safe-area-inset-top, 0px)); }
+}
+
+.setup-head { flex: 0 0 auto; }
+
+/* The list's scroll region. A zero basis plus grow fills whatever the pinned parts leave; the 68px floor
+   (one channel row and its gap) is what the view scrolls to protect on a short screen. [TASK-111] */
+.setup-scroll {
+  flex: 1 1 0;
+  min-height: 68px;
+  overflow-y: auto;
+}
+
+/* While "Is this the right channel?" is open, Shorts steps aside and Import slides up under the tabs, the
+   way the add box already hides. The panel's "Add this channel" is the last thing in the one region that
+   scrolls, and in a Safari tab on an iPhone 17 Pro it still sat 27-67px below the cut after the header
+   moved up. `#add-form.hidden` means exactly "the panel is open": app.js hides the form only as it opens
+   the panel (handleAddChannel) and shows it only as it closes it (showAddForm). A browser without :has()
+   keeps Shorts in view, which is the old layout. Shorts is not a tour card, and handleAddChannel's
+   `finally` re-places the tour after this reflow. Phones only, like the padding above: desktop is
+   unchanged. [TASK-111] */
+@media (max-width: 759px) {
+  .setup-head:has(#add-form.hidden) #pref-shorts { display: none; }
+}
+
+.setup-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 14px;
+}
+
+.setup-brand h1 { font-size: 22px; font-weight: 700; letter-spacing: -.3px; }
+
+.setup-sub {
+  color: var(--ink-soft);
+  font-size: 14.5px;
+  line-height: 1.55;
+  margin-bottom: 22px;
+}
+
+.add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+/* 16px is a FLOOR for every field you can type in, not a type choice: iOS Safari zooms the whole
+   page in when a focused input's text is smaller, and leaves it zoomed — so a reader who adds a
+   channel then reads the rest of the app magnified and cropped. Keep new fields at 16px. [BUG-125] */
+.add-form input {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-btn);
+  font-size: 16px;
+  color: var(--ink);
+  background: var(--surface);
+  outline: none;
+  transition: border-color .15s;
+}
+
+.add-form input:focus { border-color: var(--accent); }
+.add-form input::placeholder { color: var(--faint); }
+
+.add-form button {
+  padding: 13px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-btn);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.add-form button:active { background: var(--accent-active); }
+.add-form button:disabled { background: var(--accent-disabled); cursor: default; }
+
+.add-hint {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  padding: 0 4px;
+}
+.add-hint b { color: var(--ink); font-weight: 600; }
+
+.add-error {
+  font-size: 13px;
+  color: var(--danger);
+  padding: 2px 4px;
+}
+
+.channel-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+/* TASK-032: shown when the active source tab has no channels/accounts yet. */
+.channel-list-empty {
+  color: var(--ink-soft);
+  font-size: 14px;
+  padding: 8px 2px;
+}
+
+.channel-list-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 12px 14px;
+}
+
+.channel-list-item .avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.channel-list-item .info { flex: 1; min-width: 0; }
+.channel-list-item .ch-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.channel-list-item .ch-rule { font-size: 12px; color: var(--accent); margin-top: 2px; }
+.channel-list-item .ch-rule-none { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+
+.btn-remove {
+  background: none;
+  border: none;
+  color: var(--faint);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.btn-remove:hover { color: var(--danger); }
+
+.ch-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.btn-edit {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  display: flex;
+}
+.btn-edit svg { width: 16px; height: 16px; }
+.btn-edit:hover { color: var(--ink); }
+
+/* ── Inline filter editor (expanded channel row) ── */
+.channel-list-item.editing {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  border-color: var(--accent);
+  overflow: hidden;
+}
+
+.ch-edit-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.ch-editing-label { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+
+.btn-edit-close {
+  background: none;
+  border: none;
+  color: var(--faint);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.btn-edit-close:hover { color: var(--ink); }
+
+.ch-edit-body { padding: 14px; }
+
+.ch-edit-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+.btn-edit-save {
+  flex: 1;
+  padding: 11px 0;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-btn);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-edit-save:active { background: var(--accent-active); }
+
+.btn-edit-cancel {
+  padding: 11px 18px;
+  background: none;
+  border: 1.5px solid var(--line);
+  color: var(--ink-soft);
+  border-radius: var(--radius-btn);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-edit-cancel:active { background: var(--press); }
+
+.btn-go {
+  flex: 0 0 auto;
+  margin-top: 12px;
+  width: 100%;
+  padding: 15px;
+  background: var(--btn-strong-bg);
+  color: var(--btn-strong-ink);
+  border: none;
+  border-radius: var(--radius-btn);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+}
+.btn-go:active { background: var(--btn-strong-active); }
+
+/* ── Account / sign-in (TASK-025) ── one block, three states, at the foot of setup ── */
+.acct-block {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 15px;
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.acct-title { font-size: 14px; font-weight: 600; }
+.acct-desc { font-size: 12.5px; color: var(--ink-soft); line-height: 1.45; margin: -4px 0 0; }
+.acct-google {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; margin-top: 10px; padding: 11px 16px;
+  border: 1px solid var(--line); border-radius: var(--radius-btn);
+  background: var(--surface); color: var(--ink);
+  font-size: 14.5px; font-weight: 600; text-decoration: none; cursor: pointer;
+}
+.acct-google:hover { background: var(--bg); }
+.acct-google:active { background: var(--press); }
+.acct-google svg { flex: 0 0 auto; }
+.acct-or {
+  display: flex; align-items: center; gap: 10px;
+  margin: 12px 0 2px; color: var(--faint); font-size: 12px;
+}
+.acct-or::before, .acct-or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+.acct-form { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.acct-input {
+  width: 100%;
+  padding: 12px 13px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-btn);
+  font-size: 16px;  /* the 16px floor — see .add-form input [BUG-125] */
+  color: var(--ink);
+  background: var(--surface);
+  outline: none;
+  transition: border-color .15s;
+}
+.acct-input:focus { border-color: var(--accent); }
+.acct-input::placeholder { color: var(--faint); }
+
+.acct-btn {
+  padding: 12px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-btn);
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+}
+.acct-btn:active { background: var(--accent-active); }
+.acct-btn:disabled { background: var(--accent-disabled); cursor: default; }
+
+.acct-msg { font-size: 12.5px; color: var(--danger-ink); margin: 0; }
+
+/* link-sent */
+.acct-sent-panel {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  background: var(--accent-soft);
+  border-radius: 10px;
+  padding: 12px 13px;
+}
+.acct-sent-panel svg { width: 20px; height: 20px; color: var(--accent); flex-shrink: 0; margin-top: 1px; }
+.acct-sent-h { font-size: 13.5px; font-weight: 600; color: var(--accent-active); }
+.acct-sent-p { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; line-height: 1.45; }
+.acct-link {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+/* signed-in */
+.acct-who { display: flex; align-items: center; gap: 11px; }
+.acct-avatar {
+  width: 38px; height: 38px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.acct-email { font-size: 14px; font-weight: 600; word-break: break-all; }
+.acct-sync { font-size: 12px; color: var(--accent); margin-top: 2px; display: flex; align-items: center; gap: 4px; }
+.acct-sync svg { width: 13px; height: 13px; }
+.acct-btn-quiet {
+  padding: 11px;
+  background: transparent;
+  color: var(--danger-ink);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-btn);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.acct-btn-quiet:active { background: var(--danger-bg); }
+
+/* ── Account data controls (TASK-028b) ── export + delete, in the signed-in panel state.
+   Divider off the Sign-out button above; Export reads neutral (safe), Delete reads danger. ── */
+.acct-data {
+  display: flex; flex-direction: column; gap: 9px;
+  margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+/* Privacy disclosure for identified analytics (TASK-070) — a quiet note under the account block. */
+.acct-privacy {
+  margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.acct-privacy-title { font-size: 13px; font-weight: 600; color: var(--ink-soft); margin-bottom: 5px; }
+.acct-privacy p { font-size: 12px; color: var(--ink-soft); line-height: 1.5; margin: 0; }
+.acct-btn-neutral {
+  padding: 11px;
+  background: transparent;
+  color: var(--ink-soft);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-btn);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.acct-btn-neutral:active { border-color: var(--ink-soft); }
+.acct-btn-danger {
+  padding: 11px;
+  background: transparent;
+  color: var(--danger);
+  border: 1.5px solid var(--danger);
+  border-radius: var(--radius-btn);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.acct-btn-danger:active { background: var(--danger-bg); }
+.acct-confirm {
+  display: flex; flex-direction: column; gap: 9px;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-btn);
+  padding: 13px;
+}
+.acct-confirm-note { font-size: 12.5px; color: var(--danger-ink); line-height: 1.45; margin: 0; }
+.acct-confirm-label { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.acct-confirm-actions { display: flex; gap: 8px; }
+.acct-confirm-actions button { flex: 1; }
+.acct-btn-danger-solid {
+  padding: 11px;
+  background: var(--danger);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-btn);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.acct-btn-danger-solid:disabled { opacity: .5; cursor: default; }
+.acct-btn-danger-solid:active:not(:disabled) { filter: brightness(.92); }
+
+/* ── Profile panel (TASK-028a) ── the account/identity surface as a left slide-in drawer. The
+   .acct-* block above is relocated inside; the identity header carries the name/state. ── */
+.profile-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  cursor: pointer; margin: 0 0 16px; padding: 0;
+  transition: border-color .15s, background .15s;
+}
+.profile-btn svg { width: 22px; height: 22px; }
+.profile-btn:hover { border-color: var(--accent); }
+.profile-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Desktop: pin to the screen's top-left corner. Mobile: stays in-flow above ● Focus. */
+@media (min-width: 760px) {
+  .profile-btn { position: fixed; top: 18px; left: 18px; margin: 0; z-index: 30; }
+}
+
+.profile-scrim {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, .46);
+  opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 60;
+}
+.profile-scrim.show { opacity: 1; pointer-events: auto; }
+
+.profile-panel {
+  position: fixed; top: 0; bottom: 0; left: 0;
+  width: min(340px, 86%);
+  display: flex;
+  background: var(--bg);
+  border-right: 1px solid var(--line);
+  box-shadow: 8px 0 40px rgba(0, 0, 0, .28);
+  transform: translateX(-102%);
+  /* Off-screen must also mean out of the tab order (TASK-084). This panel is body-level, so
+     `transform` alone left all 14 of its controls focusable while the sign-in wall was the only
+     visible view — four Tab presses from the landing reached "Manage channels". `display:none`
+     would kill the slide, so visibility is switched instead, delayed by the transition duration so
+     the panel is still painted while it slides out. */
+  visibility: hidden;
+  transition: transform .33s cubic-bezier(.4, 0, .2, 1), visibility 0s .33s;
+  z-index: 61;
+}
+.profile-panel.open { transform: translateX(0); visibility: visible; transition: transform .33s cubic-bezier(.4, 0, .2, 1), visibility 0s 0s; }
+.profile-panel:focus { outline: none; }
+.profile-body { flex: 1; overflow-y: auto; padding: 26px 16px 24px; }
+
+.profile-rail {
+  width: 44px; flex: 0 0 auto;
+  border: 0; border-left: 1px solid var(--line);
+  background: var(--surface); color: var(--ink-soft);
+  cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  transition: color .15s;
+}
+.profile-rail:hover { color: var(--accent); }
+.profile-rail:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.profile-rail-arrow { font-size: 20px; line-height: 1; }
+.profile-rail-label { font-size: 10px; letter-spacing: .6px; text-transform: uppercase; writing-mode: vertical-rl; transform: rotate(180deg); }
+
+.profile-id {
+  display: flex; align-items: center; gap: 12px;
+  padding-bottom: 16px; margin-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.profile-id-av {
+  width: 48px; height: 48px; flex: 0 0 auto; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); color: var(--ink-soft);
+  font-weight: 700; font-size: 18px;
+}
+.profile-id-av svg { width: 24px; height: 24px; }
+.profile-id-av.is-signed { background: var(--accent); border-color: var(--accent); color: #fff; }
+.profile-id-name { font-weight: 700; font-size: 16px; letter-spacing: -.2px; word-break: break-all; }
+.profile-id-sub { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; line-height: 1.35; }
+
+/* the relocated account block sits flush inside the panel; the identity header names the state */
+.profile-panel .acct-block { background: transparent; border: 0; border-radius: 0; padding: 0; margin: 20px 0 0; }
+.profile-panel .acct-title { display: none; }
+/* The "Account" title is hidden in the drawer, so cancel the -4px that snugged the
+   description under it — otherwise it rides up against the Manage-channels divider. */
+.profile-panel .acct-desc { margin-top: 0; }
+
+/* Preferences block in the Settings drawer (TASK-071) — theme + manage-channels, above Account. */
+.pref-block { display: flex; flex-direction: column; gap: 16px; padding-bottom: 20px; margin-bottom: 2px; border-bottom: 1px solid var(--line); }
+.pref-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pref-label { font-size: 14px; font-weight: 600; color: var(--ink); }
+.pref-theme { display: flex; background: var(--line); border-radius: 999px; padding: 3px; }
+/* ⚠️ These rows are ~17px tall (14px/600 type, `padding: 0`), well under the 44px minimum tap
+   target. [BUG-106] fixed that for `.btn-mark-all` ONLY, and the narrowness of that fix is
+   deliberate rather than an oversight — recorded here because the next person to touch this rule
+   will wonder. Enlarging BOTH rows is not a bigger version of the same fix: at a 33px pitch (17px
+   tall, 16px gap) two 44px hit areas overlap by 11px, so widening the second one re-opens the
+   ambiguity the first one closed. `#btn-drawer-manage` was left alone on merit — its worst case is
+   landing on a screen you did not want and tapping back, where the bulk control's was marking your
+   whole feed read on every device. Judged 2026-08-29 as below /log-task's bar and routed here
+   instead of onto a 133-item Inbox. If this row ever fronts something destructive, that judgement
+   expires. */
+.pref-manage {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; background: none; border: none; padding: 0; cursor: pointer;
+  font-size: 14px; font-weight: 600; color: var(--ink); text-align: left;
+}
+.pref-manage .pref-arrow { color: var(--ink-soft); font-size: 17px; line-height: 1; transition: color .15s ease, transform .15s ease; }
+.pref-manage:hover .pref-arrow { color: var(--accent); transform: translateX(2px); }
+.pref-manage:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.profile-panel #acct-in .acct-who { display: none; }
+
+body.profile-open { overflow: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* .profile-panel.open must be listed explicitly: a media query adds no specificity, so the
+     one-class rule here would lose to it and the drawer would animate for someone who asked it not
+     to. With no transition the visibility switch is instant in both directions, which is right —
+     there is no slide left to keep the panel painted for. */
+  .profile-panel, .profile-panel.open, .profile-scrim { transition: none; }
+}
+
+/* ── First-run landing (TASK-027) ── soft account-first welcome; its own view, built on the
+   existing tokens. The sign-in controls reuse the .acct-* classes above. ── */
+.landing-wrap {
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+  flex: 1;
+  padding: 56px 24px calc(28px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* center the lean sign-in block (TASK-069 M5 trimmed the hero) */
+}
+.landing-brand { display: flex; align-items: center; gap: 9px; }
+.landing-brand .dot { width: 15px; height: 16px; background: var(--accent); -webkit-mask: var(--toque-mask) center/contain no-repeat; mask: var(--toque-mask) center/contain no-repeat; flex-shrink: 0; }
+.landing-brand h1 { font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
+
+.landing-hero { margin-top: 38px; }
+.landing-headline {
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -.6px;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+.landing-sub {
+  margin-top: 14px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.landing-caught { color: var(--accent); font-weight: 600; white-space: nowrap; }
+.landing-sources {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+  color: var(--ink-soft);
+}
+.landing-sources svg { width: 19px; height: 19px; display: block; }
+
+/* Sits a comfortable gap below the lean welcome (the wrap centers the whole block — TASK-069 M5). */
+.landing-auth { margin-top: 36px; }
+
+/* The skip button's rules were deleted with the button itself (TASK-084). .landing-reassure
+   survives — it now reassures about your data, not about bypassing sign-in. */
+.landing-reassure {
+  align-self: center;
+  max-width: 320px;
+  margin-top: 22px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--faint);
+}
+
+/* ── App bar ── */
+.appbar {
+  padding: env(safe-area-inset-top, 16px) 20px 14px;
+  padding-top: max(env(safe-area-inset-top, 0px), 16px);
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* [TASK-104] Row 1 of the FEED bar: gear left, grouping switch right. `justify-content` does all of
+   the work and there is NO auto margin anywhere in this row — `.appbar-actions` lost the one it
+   carried under [TASK-099] (see its rule, and `.btn-feed-manage`). Keep it that way: an auto margin
+   on either child consumes the free space before `justify-content` can distribute it, so a third
+   control added here would collapse against the gear instead of spacing evenly.
+   ⚠️ An earlier version of this comment said `.appbar-actions` "keeps the one it already had", which
+   the same change had already removed — corrected 2026-08-29 after review measured its computed
+   `margin-left` as 0px. */
+.appbar-controls { display: flex; align-items: center; justify-content: space-between; }
+
+.brand { display: flex; align-items: center; gap: 8px; }
+.dot { width: 15px; height: 16px; background: var(--accent); -webkit-mask: var(--toque-mask) center/contain no-repeat; mask: var(--toque-mask) center/contain no-repeat; flex-shrink: 0; }
+/* `color` is EXPLICIT since [TASK-104], and that is a fix rather than tidying: `.brand` moved into
+   `.appbar-sub`, which sets `color: var(--ink-soft)`, and this rule declared no colour — so the feed
+   wordmark silently inherited the muted token. ⚠️ THE MEASUREMENT BELOW DESCRIBES AN INTERMEDIATE
+   STATE THAT NO LONGER EXISTS, and is kept only because it is what found the bug: it was taken while
+   the archive brand was still in row 1, so the two screens disagreed — feed rgb(148,152,161) vs
+   archive rgb(232,233,236) in dark. Asli then had the archive bar mirror the feed bar, so BOTH
+   brands now sit inside `.appbar-sub` and both would be muted without this rule. The fix is more
+   load-bearing than when it was written, not less; only the two-colour symptom is historical.
+   Declared here rather than as an `.appbar-sub .brand h1` override so the wordmark cannot inherit a
+   container's colour again wherever it is moved next. */
+.brand h1 { font-size: 19px; font-weight: 700; letter-spacing: -.3px; color: var(--ink); }
+
+.appbar-sub {
+  display: flex;
+  justify-content: space-between;
+  /* `center`, not `baseline`, since [TASK-104]: the feed's row 2 now holds the toque mark and the
+     wordmark on its left, and a mask-image span has no baseline to align the count against. */
+  align-items: center;
+  margin-top: 6px;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+
+.count { font-weight: 600; color: var(--ink); }
+
+/* Mark-all-done (TASK-016) now sits in the Settings drawer as a preference row ([TASK-104]), so it
+   takes `.pref-manage`'s layout and only tints itself: a bulk action over the whole feed should not
+   read as one more navigation item. `.sub-right` went with it — the feed's row 2 is the wordmark
+   and the count, and nothing else needed a wrapper.
+   `.hidden` is `display: none !important` (line 93), so it still beats `.pref-manage`'s `display:
+   flex` here — checked rather than assumed, because a tie on specificity would have been decided by
+   source order and silently shown a button updateCount believes is hidden. */
+.btn-mark-all {
+  color: var(--accent);
+  /* [BUG-106] The tint above was the ONLY thing separating this from `#btn-drawer-manage` 16px
+     above it — same `.pref-manage` shape, same 14px/600 type, same trailing glyph — and
+     `.pref-manage` is `padding: 0`, so the control was its bare line box: 17px measured in Chrome,
+     against a 44px minimum. A slip on a 17px strip fires a bulk write over the whole feed, synced
+     everywhere, with a 5s Undo (~1.5s for a halted reader, [BUG-105]).
+     24 + 17 + 4 + 1px border = 46px.
+     ⚠️ NOT SYMMETRIC, and that is the point rather than an oversight. The band a reader sees runs
+     between two RULES — this `border-top` and `.pref-block`'s `border-bottom` — and the block puts
+     its own `padding-bottom: 20px` between this label and that lower line. Symmetric 14/14 padding
+     therefore RENDERS off-centre: 14px above the label, 34px below, which is what it looked like on
+     localhost (Asli, 2026-08-29: "it is closer to the top one right now and looks bad"). 24 above
+     and 4 + 20 = 24 below is what actually centres it. If `.pref-block`'s padding changes, this
+     number must change with it — T42 asserts the coupling so that cannot drift silently.
+     ⚠️ NOT the `::before` overlay `.switch-grouping` uses (line ~2074). That restores a hit area
+     AROUND a small painted control by extending past its box; these rows sit at a 33px pitch (17px
+     tall, 16px gap), so two 44px overlays would collide by 11px and resolve by stacking order —
+     the fix would have made the mis-tap less predictable rather than less likely. Growing the real
+     box is safe here because `.pref-block`'s flex `gap` is preserved BETWEEN border boxes, so the
+     16px separation survives the box getting taller; `margin-top` adds 4 on top of it.
+     The border is on the BUTTON, deliberately: painted from a parent or a pseudo-element it would
+     survive `display: none` and leave a hairline floating over the Account block at zero unread.
+     T42/T43/T44. */
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+  padding: 24px 0 4px;
+}
+.btn-mark-all .pref-arrow { color: var(--accent); }
+.btn-mark-all:active { color: var(--accent-active); }
+
+/* ── Toast (TASK-016) ── reusable pill with one optional action; floats above the bottom nav. */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(64px + env(safe-area-inset-bottom));
+  transform: translateX(-50%) translateY(8px);
+  /* Above the Settings drawer (61) AND its scrim (60), not merely above the bottom nav (50).
+     At 60 this TIED with `.profile-scrim` and lost on DOM order — #toast is declared at
+     index.html:291, the scrim at :323 — so the scrim laid rgba(0,0,0,.46) over every toast raised
+     while the drawer was open. Harmless for "Marked done"; not harmless for [BUG-047]'s sync notice,
+     whose two triggers (the theme toggle and Sign out) BOTH live inside the drawer, so it was
+     dimmed every time it appeared in the flow it exists for. Found by looking, 2026-08-24 — no unit
+     test can see a stacking order. Kept below the import modal (70/71) so nothing else moves. */
+  z-index: 62;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: calc(100% - 32px);
+  padding: 12px 16px;
+  background: var(--btn-strong-bg);
+  color: var(--btn-strong-ink);
+  border-radius: 12px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, .22);
+  font-size: 14px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .2s, transform .2s;
+}
+.toast.show { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
+.toast-msg { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The one notice that is allowed more than a line ([BUG-047]). The default pill is deliberately a
+   single truncated line — fine for "Marked as done", useless for a notice that has to say both what
+   pressing does AND what not pressing does. Asli's call 2026-08-23, after the one-line limit turned
+   out to be load-bearing for her "no second button" decision: the notice carries the wording that
+   decision assigns to it, or the decision is not met. Scoped to a modifier so every other toast is
+   unchanged; the pill still bounds itself with max-width. (The general fix is CHR-032.) */
+.toast.toast-wrap { flex-direction: column; align-items: stretch; gap: 8px; }
+.toast.toast-wrap .toast-msg { white-space: normal; overflow: visible; text-overflow: clip; }
+.toast.toast-wrap .toast-action { align-self: flex-end; }
+.toast-action {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--toast-action);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px;
+}
+
+/* ── Feed load error ── */
+.feed-error {
+  max-width: 600px;
+  width: calc(100% - 32px);
+  margin: 12px auto 0;
+  padding: 10px 16px;
+  background: var(--danger-bg);
+  color: var(--danger-ink);
+  font-size: 13px;
+  line-height: 1.4;
+  border-radius: 10px;
+}
+
+/* Informational skip-note (TASK-040) — softer than .feed-error: no alarm color, just muted text. */
+.feed-note {
+  max-width: 600px;
+  width: calc(100% - 32px);
+  margin: 12px auto 0;
+  padding: 8px 16px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* ── Loading ── */
+.loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Feed ── */
+.feed {
+  flex: 1;
+  padding: 14px 16px 40px;
+  max-width: 600px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ── Card ── */
+/* The `.group-grid` that sat here went with [TASK-098]: topics are cards inside `#feed` now, so they
+   inherit the feed's 600px centered column instead of needing their own. `.group-note` stays — it is
+   the capped-classify signal (criterion 13), now revealed by `renderTopicCards`. */
+.group-note { font-size: 12.5px; color: var(--ink-soft); max-width: 600px; width: 100%; margin: 0 auto 10px; padding: 0 16px; }
+.group-note.hidden { display: none; }
+
+/* Screen-reader-only text: in the accessibility tree, out of the visual layout. Added for
+   [TASK-101] — the deleted pill announced "Gathering the topics…" through `role="status"`, and a
+   bare ring would have left a non-sighted reader with strictly less than before. */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The busy indicator beside the grouping switch while /api/group runs ([TASK-101], replacing
+   [TASK-073]'s `.g-spinner` inside the pill). */
+.g-busy {
+  flex: none;
+  width: 13px; height: 13px;
+  border: 2px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: g-spin 0.7s linear infinite;
+}
+.g-busy.hidden { display: none; }
+@keyframes g-spin { to { transform: rotate(360deg); } }
+/* The trough is .45, not the .3 this first shipped with. At .3 the ring composites to roughly
+   1.3:1 against `--bg` at the bottom of every cycle — visible at the peak, gone at the trough, which
+   is a slower version of the same disappearing act [BUG-095] is about. */
+@keyframes g-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+
+/* ⚠️ [BUG-095] LIVES HERE. Do NOT "simplify" this to `animation: none`.
+   That was the previous rule, and it is the defect: killing the only motion left a ring with one
+   differently-coloured quarter — a shape that reads as a SPINNER — sitting perfectly still, on the
+   one screen that already takes 15-20s. Dead, not calm. It reads as a hang, which is worse than no
+   indicator at all, and it does so for the people who asked for the accommodation.
+   The accessibility need is NO SPINNING, not NO FEEDBACK. So: the rotation goes and an opacity
+   pulse takes over.
+
+   ⚠️ AND THE RING IS LEVELLED **UP**, TO `--accent`, NOT DOWN TO `--accent-soft`. The first version
+   of this fix did the latter and it was WRONG in the most embarrassing possible way — found by an
+   independent accessibility review, 2026-08-27, and confirmed by computing the ratios rather than by
+   looking. Measured against `--bg`: `--accent-soft` is **1.05:1** in light and 1.30:1 in dark, i.e.
+   three quarters of this ring were NEVER visible to anyone. The single perceivable part was the
+   `--accent` top border at 3.69:1 / 5.91:1 — and levelling down deleted exactly that. It turned
+   "a ring that looks frozen" into "no ring at all", for the one group of people this rule exists to
+   serve. Levelling UP still destroys the differently-coloured quarter that makes the shape read as a
+   spinner, which was the real goal, and keeps the contrast.
+   [BUG-081] is the precedent for a reduced-motion accommodation working AGAINST the people it
+   exists for. This was the second instance; the version above was very nearly the third.
+   test/docs.test.mjs is the tripwire, and it did NOT catch this — a string assertion cannot see a
+   colour. It has since been tightened; it is still not a substitute for the handset walk. */
+@media (prefers-reduced-motion: reduce) {
+  .g-busy {
+    animation: g-pulse 1.6s ease-in-out infinite;
+    border-color: var(--accent);
+  }
+}
+
+/* The ready note ([TASK-101]): one sentence under the switch, at the moment it blooms. */
+.toggle-note {
+  position: absolute;
+  top: 100%;
+  right: 20px;                /* the appbar's own side padding, so the note's right edge lines up */
+  margin: 8px 0 0;
+  max-width: min(270px, calc(100vw - 40px));
+  padding: 9px 12px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink);
+  /* Translucent, which is the requirement — the feed reads through it, so it sits ON the screen
+     rather than replacing part of it. */
+  background: rgb(var(--note-bg) / .93);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .10);
+  /* It is an aside, not a dialog: the reader can tap straight through it to the feed underneath,
+     and it never takes focus. Criterion 8. */
+  pointer-events: none;
+  animation: note-in .22s ease-out;
+}
+.toggle-note.hidden { display: none; }
+
+/* KNOWN, NOT FIXED ([TASK-101] review, 2026-08-27): `.ptr` is `position: fixed; z-index: 30` and is
+   offset down by the appbar height, so a pull-to-refresh started while the note is up paints the
+   throbber over it. Cosmetic, bounded by the note's six seconds, and both elements are
+   `pointer-events: none`, so nothing is blocked — below /log-task's threshold, recorded here at the
+   rule a fix would touch. Raising `.toggle-note` above 30 would put it over the bottom nav too;
+   lowering `.ptr` is the safer half if this ever matters. */
+
+/* The caret, pointing at the SWITCH rather than at the note's own edge. The offset is MEASURED in a
+   real browser, not derived on paper, and the two disagreed: the gear renders 26px wide, not the
+   22px its `svg` rule declares (`.btn-feed-manage` adds to it), so the paper figure was 55px and the
+   real one was 53 while the gear sat to the switch's right.
+   ⚠️ RE-DERIVED FOR [TASK-104], 2026-08-29. The gear has moved to the far LEFT of row 1, so the
+   switch is now the rightmost thing on the bar and the gear + gap terms are gone: right to left from
+   the note's shared right edge (both are at the appbar's 20px padding) it is half the 38px switch =
+   19px to its centre, less the caret's own 6px half-width, so 13px.
+   The old 53px is measured from the NOTE's right edge, not the viewport's — getting that frame
+   wrong gives 33px, which is where this was first written down and corrected before it shipped.
+   ⚠️ CORRECTED AGAIN to 12px by independent review, 2026-08-29, and this is the SAME 1px the old
+   53px carried (its own reading above records a 2px miss). An absolutely-positioned pseudo-element
+   resolves against its ancestor's PADDING box, not its border box, and `.toggle-note` has a 1px
+   border — so the note's padding-box right is 1491, not 1492. 1491 - 1473 (switch centre) - 6 (the
+   caret's half-width) = 12. Verified live at 1512px: at 13px the delta was -1px; at 12px it is 0.
+   CONFIRMED ON A HANDSET 2026-08-29 (criterion 9), which this line spent two days saying was still
+   owed. WALKED BY ASLI on her own iPhone (a Pro Max), reading the values out of Safari's Web
+   Inspector — attribution recorded because CLAUDE.md makes the handset walk hers, and a measurement
+   with no owner is the kind of claim this file has already been wrong about twice.
+   THE WIDTHS ARE THE FACT, not the model name: the device reported 402 CSS px portrait and 874
+   landscape, and those are what the arithmetic below is checked against. A reviewer noted 402x874 is
+   narrower than a Pro Max's native 440x956 — Display Zoom would explain it — but that was not
+   confirmed and is deliberately NOT asserted here. Nothing depends on the model; everything depends
+   on the two numbers, which were read off the device. Safari: caret centre and switch centre coincide at BOTH 402px and 874px — delta 0.0,
+   not a tolerance. The reading carries a control: forcing this rule to `right: 60px` moved the delta
+   to -48.0 and restoring it returned 0.0, so the zero is a measurement rather than an instrument
+   echoing a constant back. Width-independent as the arithmetic above predicts, because the note and
+   the switch share the appbar's right edge — the two readings are 472px apart and identical.
+   T15 now derives 38/2 - 1 from this stylesheet instead of allowing a +/-2px window, so 13 reds. */
+.toggle-note::after {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  right: 12px;
+  border: 6px solid transparent;
+  border-bottom-color: rgb(var(--note-bg) / .93);
+  /* The caret's FILL is the note's surface, which against `--bg` is 1.07:1 in light and 1.09:1 in
+     dark — the bubble itself reads (its shadow and its text carry it) but the pointer connecting the
+     sentence to the switch did not, so the alignment measured so carefully above pointed with
+     something nobody could see. Found by an independent accessibility review, 2026-08-27.
+     `box-shadow` on `.toggle-note` is drawn on its border box and never reaches a pseudo-element;
+     `drop-shadow` follows the rendered alpha, so it outlines the triangle's two upper edges and
+     continues the note's own 1px border across the notch. */
+  filter: drop-shadow(0 -1px 0 var(--line));
+}
+
+@keyframes note-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+/* The note is INFORMATION, so it still appears — only its entrance goes. That is the same split as
+   the busy indicator above and the deliberate opposite of the switch's bloom below, which is
+   decoration and vanishes entirely. Nothing here may become `display: none`. */
+@media (prefers-reduced-motion: reduce) {
+  .toggle-note { animation: none; }
+}
+
+/* X posts awaiting classification are held out of the stream so they don't flash under "Posts"
+   before being grouped (TASK-073). Revealed by revealPendingText() if grouping leaves them. */
+.card.grouping-pending { display: none; }
+
+/* "Topics" / "Posts" section headers (TASK-068; "Videos" until TASK-094) — small uppercase labels that pin the two
+   sections and hide when their section is empty. */
+.section-head {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  max-width: 600px;
+  width: 100%;
+  margin: 8px auto 12px;
+  padding: 0 16px;
+}
+/* [TASK-104] The `#videos-head { margin-top: 2px }` override is GONE. It was written for the case
+   where the head sits below the group grid — but ungrouped is the DEFAULT view ([TASK-099]), the
+   grid is hidden there, and the head was left 2px under the appbar, which is the complaint. The
+   section head's own 8px applies in both views now. */
+.section-head.hidden { display: none; }
+
+/* [TASK-098] ONE STREAM. A topic is a card among the posts, always expanded: a pinned header, a
+   summary as the rail's own first slide since [TASK-107], a horizontal scroll-snap rail of the
+   topic's posts, and a 28px dot row. 530px tall so ~127px of the next card peeks — enough to show
+   its title, count and first bullet. Geometry from the agreed artboards, not chosen round.
+
+   THE HEIGHT IS FIXED ON PURPOSE. `liveBullets` drops a bullet once its posts are read, so the
+   bullet count SHRINKS as you read; a height that followed it would restructure the card mid-session
+   under the reader's thumb. Ungrouped items keep their natural height — only a carousel needs to be
+   kept stable.
+
+   NO `.card` CLASS ANYWHERE IN HERE, deliberately: `updateCount` counts `#feed .card` and adds the
+   grouped posts from storage, so a topic card or a rail slide wearing it is counted twice. That is a
+   layout rule with an arithmetic consequence, which is why it is pinned by a test and not a comment. */
+.topic-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  height: 530px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: opacity .2s ease, transform .2s ease;
+}
+.topic-card.removing { opacity: 0; transform: translateX(40px) scale(.97); pointer-events: none; }
+
+/* Pinned: the rail and the bullets scroll under it, the header does not move. */
+.topic-card .tc-head { display: flex; align-items: center; gap: 10px; padding: 14px 14px 10px; flex: none; }
+.topic-card .tc-label { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+.topic-card .tc-count { flex: none; font-size: 12.5px; color: var(--ink-soft); white-space: nowrap; }
+.topic-card .tc-done {
+  flex: none;
+  /* 44px, which is [BUG-106]'s NUMBER and not merely its lesson. This was WRITTEN at 34px under a comment
+     citing that task — the same shape as the bug itself: a control fronting a bulk mark-read at a
+     target below the minimum. This one marks every post in its topic read on every device. */
+  min-height: 44px;
+  background: var(--accent); color: #fff; border: 1px solid var(--accent);
+  border-radius: 999px; padding: 7px 12px;
+  font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.topic-card .tc-done:active { background: var(--accent-active); }
+
+/* [TASK-107] THE 190px IS GONE. The summary is the rail's first slide now, so it takes the slide's
+   full 432px instead of a third of the card. The scroll and the fade STAY — they were the normal
+   reading path at 190px and they become the exception they were always meant to be, for the rare
+   summary that outgrows even 432px. `flex: 1` + `min-height: 0` is the same pair `.tc-rail` and
+   `.tc-text` already carry: without the min-height a flex child refuses to shrink, the list overflows
+   the slide, and the fade lands somewhere other than the bottom of the visible box. */
+.topic-card .tc-bullets {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0 14px 0 32px;
+  font-size: 13.5px; line-height: 1.5; color: var(--ink-soft);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
+}
+.topic-card .tc-bullets li { margin: 4px 0; }
+/* Shown only when the list painted nothing (`paintBullets` toggles `.hidden`). A blank full-bleed
+   page reads as a broken card; this reads as a card whose summary has not arrived — which is what is
+   actually true, both while a classify runs and once every post a bullet named has been read. */
+.topic-card .tc-empty {
+  flex: 1; min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 14px;
+  /* `--ink-soft`, NOT `--faint`, which is what this was written with. `--faint` on `--bg` measures
+     1.92:1 in the light theme and 3.70:1 in dark, against AA's 4.5:1 for 13.5px text — and this is
+     the worst placement for it: when the note shows it is the ONLY content on the page the card
+     opens on, and telling the reader why the page is empty is the entire point of it. The bullets it
+     stands in for use `--ink-soft`. Found by an independent review, 2026-09-08. */
+  font-size: 13.5px; color: var(--ink-soft);
+}
+
+/* The rail reuses [TASK-037]'s mechanism verbatim — scroll-snap on x with dots synced by an
+   IntersectionObserver, and NO touch handler, which is why this task needed no new gesture code. */
+.topic-card .tc-rail {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  padding: 0 14px;
+  scrollbar-width: none;
+  /* [TASK-037]'s `.tweet-media-carousel` carries this and the first version of this rule did not —
+     found by an independent battery checking whether "reuses the mechanism verbatim" was true of the
+     CSS as well as the JS. Without it an iOS swipe stops dead instead of coasting. */
+  -webkit-overflow-scrolling: touch;
+}
+.topic-card .tc-rail::-webkit-scrollbar { display: none; }
+.topic-card .tc-slide {
+  flex: 0 0 356px; max-width: 86%; scroll-snap-align: start; display: flex;
+  transition: opacity .3s ease, transform .3s ease;
+}
+/* [TASK-107] SLIDE ONE — THE SUMMARY, AS ITS OWN CARD. It wears the same treatment as `.tc-post`
+   below (Asli, 2026-09-08): same surface, same 1px line, same 14px radius, so the thing you read to
+   decide about a topic looks like the things it describes.
+
+   THE GUTTERS ARE THE WHOLE REASON THIS RULE IS SHAPED THIS WAY, and the shape is not obvious.
+   `scroll-padding-left` on the rail is what makes a card possible at all: without it the rail comes
+   to rest with its own 14px left padding scrolled out of view, so a bordered slide sits FLUSH against
+   the topic card's edge — measured at 0px left against 14px right, which reads as a mistake rather
+   than a design. Three widths were built and measured before this one was chosen; a post-width card
+   brought back the 65px peek that was already rejected, and the naive card was the lopsided one.
+
+   With the rail snapping past its padding, `100%` is exactly the right width — it resolves against
+   the CONTENT box, which is the visible box minus both paddings, which is precisely a card with
+   matching gutters. The earlier `calc(100% + 14px)` existed to reach the right EDGE, which is what a
+   full-bleed page wants and a card does not: WITH the scroll-padding in force it costs the right
+   gutter (0px against the left's 14px), and it is the lopsided variant. The 4px of post 1 it also
+   showed belongs to the layout BEFORE the scroll-padding existed — a measurement from the first
+   variant, correct there and not here, corrected 2026-09-08 after an independent review caught it
+   standing in two records.
+
+   `margin-right: 10px` rides on top of that gap so post 1 clears the viewport entirely: 0px, not 4px.
+   `max-width: none` is load-bearing and easy to miss — the base rule above caps every slide at 86%,
+   which would clamp this straight back to a peek and the rule would read correct and do nothing.
+   `column` because this slide stacks the list over its empty-state note rather than holding a post. */
+.topic-card .tc-slide.tc-summary {
+  flex: 0 0 100%;
+  /* [TASK-107] THE GUTTER, AND IT BELONGS TO THIS SLIDE ALONE. A snapped slide otherwise rests with
+     the rail's left padding scrolled out of view and sits flush against the card's edge — fine for
+     bare text, wrong for a bordered card: measured at 0px left against 14px right, which reads as a
+     misalignment rather than a design.
+
+     `scroll-margin-left` HERE, not `scroll-padding-left` on the rail, which is where this started.
+     The rail-level property applies to every slide, and Asli's reading of it was that a post should
+     show nothing at all to its left when you swipe to it ("i dont see the summary card on the left
+     of the post's card", 2026-09-08). Rail-level left 5px of the PREVIOUS POST showing at each snap;
+     this leaves 0px, measured, and returns the post slides to exactly what `main` does. */
+  scroll-margin-left: 14px;
+  max-width: none;
+  flex-direction: column;
+  margin-right: 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 0;
+  overflow: hidden;
+}
+/* A cleared post leaves the rail the way a feed card leaves the stream (Asli, 2026-08-31).
+   `finishGroupCardAction` ALREADY calls `slideOutCard`, which adds `.removing` and removes the node
+   320ms later — but the reduced post deliberately carries no `.card` (criterion 7, so the badge
+   cannot count it twice), so `.card.removing` never applied and the post sat still for 320ms and
+   then blinked out. The animation was asked for by the code and never written.
+
+   MOVES ON Y, not X. `.card.removing` slides right, but the rail's own axis IS X, so the same
+   animation here reads as the carousel PAGING rather than the post being cleared. Up is free: the
+   rail sets `overflow-y: hidden`, so the post is CLIPPED as it lifts rather than extending
+   any scroll region — which is the hazard that ruled out the horizontal slide.
+
+   ⚠️ THE FIRST VERSION OF THIS RULE WAS `scale(.97)` AND NO TRANSLATE, AND ASLI COULD NOT SEE IT.
+   A 3% shrink over 200ms is not a perceptible animation, so the post still read as blinking out —
+   the reported defect, unfixed, behind a green T33 that asserted a transform EXISTED without
+   asserting anything MOVED. The lesson is the CLAUDE.md one about a test measuring the wrong
+   quantity; T33 now requires a translate.
+
+   The .3s MUST stay inside `slideOutCard`'s 320ms or the node is removed mid-animation — a coupling
+   across two files that nothing else states, which is why T33 pins both halves. `.card` runs the
+   same 300ms against the same 320ms. */
+.topic-card .tc-slide.removing { opacity: 0; transform: translateY(-14px) scale(.96); pointer-events: none; }
+.topic-card .tc-post {
+  width: 100%;
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  overflow: hidden;
+}
+/* The text takes what the fixed regions leave and clips. A long post truncating is ACCEPTED — the
+   X link in the header is the way out, which is why it is required rather than decorative. */
+.topic-card .tc-text { flex: 1; min-height: 0; overflow: hidden; font-size: 14px; line-height: 1.45; color: var(--ink); }
+.topic-card .tc-link { color: var(--accent); text-decoration: none; }
+.topic-card .tc-post .actions { flex: none; }
+
+/* 28px. One dot per SLIDE since [TASK-107], so a one-post topic shows two.
+
+   THE "Swipe →" HINT IS GONE, PROVISIONALLY — and NOT because Asli asked for it. ⚠️ MISREAD, corrected 2026-09-08. Asli's words were "no hints shown at the right... just make them all look same regardless of how many cards there are", and the author read them as a decision about the "Swipe →" LABEL. She confirmed the same day that she meant the SLIVER of the previous slide showing to the left of a post card — a different thing, already fixed separately by the summary slide's `scroll-margin-left` (0px, measured). So the removal is the author's misreading, NOT her decision, and it is PROVISIONAL: she is considering restoring it on multi-post cards and will decide after the handset walk.
+
+   What is true either way: it was the one element on the card whose presence depended on how many
+   posts a topic held, so removing it is what makes every topic card render identically, and the dots
+   now carry the "there is more sideways" cue alone. Whether that trade is right is exactly what the
+   handset walk answers. Criteria 3 and 7 are retired pending that. */
+.topic-card .tc-dots { flex: none; height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 14px; }
+.topic-card .tc-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--line); transition: background .15s ease; }
+.topic-card .tc-dot.active { background: var(--accent); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 14px;
+  margin-bottom: 14px;
+  transition: opacity .3s ease, transform .3s ease;
+}
+
+.card.removing {
+  opacity: 0;
+  transform: translateX(40px) scale(.97);
+  pointer-events: none;
+}
+
+.chan {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 11px;
+}
+
+.avatar {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.chan-name { font-size: 13.5px; font-weight: 600; }
+.chan-meta { font-size: 12px; color: var(--ink-soft); }
+
+/* "New" badge: videos that arrived since the last feed load. Red dot + pill,
+   top-right of the card header; margin-left:auto pushes it to the right. */
+.new-badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--danger-bg);
+  color: var(--danger-ink);
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.new-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+/* ── Media / player ── */
+.media {
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 11px;
+  position: relative;
+  background: var(--media-bg);
+  cursor: pointer;
+}
+
+.thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--media-bg);
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.play-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.play-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(0,0,0,.55);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.play-btn svg { width: 18px; height: 18px; margin-left: 2px; }
+
+/* Playing state */
+.media.playing .thumb { display: none; }
+
+.player-wrap {
+  display: none;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--player-bg);
+}
+
+.media.playing .player-wrap { display: block; }
+
+.player-wrap iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+
+/* ── Title + actions ── */
+.video-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  margin-bottom: 12px;
+}
+
+/* Substack card body (TASK-022): the article headline links out; the subtitle is muted. */
+.substack-title {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--ink);
+  text-decoration: none;
+  margin-bottom: 5px;
+}
+.substack-title:hover { text-decoration: underline; }
+.substack-sub {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  line-height: 1.45;
+  margin-bottom: 12px;
+}
+.substack-link, .substack-link:hover { color: #ff6719; } /* Substack brand orange (overrides .tweet-x) */
+
+/* Post cover image (TASK-058): a banner below the subtitle on the collapsed card, hidden on
+   expand (the full article leads with the same image). Styled to match .tweet-media. */
+.substack-cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--media-bg);
+  margin-bottom: 12px;
+}
+.substack-cover[hidden] { display: none; } /* display:block above would otherwise override [hidden] */
+
+/* In-app reader (TASK-059): one preview paragraph, then "…read more" expands the full post. */
+.substack-reader { margin-bottom: 12px; }
+.substack-preview {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink);
+  margin: 0 0 8px;
+}
+.substack-more {
+  display: inline-block;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #ff6719; /* Substack brand orange */
+  cursor: pointer;
+}
+.substack-more:hover { text-decoration: underline; }
+.substack-more:disabled { opacity: 0.6; cursor: default; text-decoration: none; }
+
+/* The expanded article. Sanitised server-side (api/_sanitize.js) to this small tag vocabulary. */
+.substack-body { font-size: 14.5px; line-height: 1.62; color: var(--ink); }
+.substack-body p { margin: 0 0 13px; }
+.substack-body h1, .substack-body h2, .substack-body h3,
+.substack-body h4, .substack-body h5, .substack-body h6 {
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 20px 0 8px;
+}
+.substack-body h1 { font-size: 19px; }
+.substack-body h2 { font-size: 17px; }
+.substack-body h3, .substack-body h4 { font-size: 15px; }
+.substack-body a { color: var(--accent); text-decoration: underline; }
+.substack-body img { max-width: 100%; height: auto; display: block; border-radius: 6px; }
+.substack-body figure { margin: 14px 0; }
+.substack-body figcaption {
+  font-size: 12px;
+  color: var(--ink-soft);
+  text-align: center;
+  margin-top: 5px;
+}
+.substack-body blockquote {
+  margin: 14px 0;
+  padding: 2px 0 2px 14px;
+  border-left: 3px solid var(--line);
+  color: var(--ink-soft);
+}
+.substack-body ul, .substack-body ol { margin: 0 0 13px; padding-left: 22px; }
+.substack-body li { margin: 4px 0; }
+.substack-body hr { border: none; border-top: 1px solid var(--line); margin: 18px 0; }
+.substack-body pre {
+  overflow-x: auto;
+  background: var(--accent-soft);
+  padding: 10px 12px;
+  border-radius: 6px;
+  margin: 0 0 13px;
+}
+.substack-body code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+
+.substack-readout {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.substack-readout-link a { color: #ff6719; font-weight: 600; text-decoration: none; }
+.substack-readout-link a:hover { text-decoration: underline; }
+
+.actions { display: flex; gap: 9px; align-items: center; }
+
+.btn-done {
+  flex: 1;
+  border: none;
+  border-radius: var(--radius-btn);
+  padding: 11px 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--accent);
+  color: #fff;
+  transition: background .15s;
+}
+
+.btn-done:active { background: var(--accent-active); }
+
+.btn-done svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+/* Archive ("save for later") — secondary action beside the primary Done (TASK-008) */
+.btn-archive {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-btn);
+  padding: 11px 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: transparent;
+  color: var(--ink-soft);
+  transition: background .15s, color .15s, border-color .15s;
+}
+.btn-archive:active { background: var(--press); color: var(--ink); }
+.btn-archive svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+/* Bottom nav — Feed / Archive (TASK-008). Fixed to the bottom on the feed-side views. */
+.bottom-nav {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  display: flex;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 50;
+}
+.nav-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 0 7px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color .15s;
+}
+.nav-tab svg { width: 22px; height: 22px; }
+.nav-tab.is-active { color: var(--accent); }
+
+/* Archive empty state (TASK-008) */
+.archive-empty { text-align: center; padding: 60px 28px; color: var(--ink-soft); }
+.archive-empty h2 { font-size: 17px; color: var(--ink); margin-bottom: 8px; }
+.archive-empty p { font-size: 14px; line-height: 1.5; }
+
+/* Caught-up → Archive nudge link (TASK-008) */
+.archive-nudge {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 4px;
+  margin-bottom: 4px;
+}
+
+/* ── Caught-up ── */
+.caughtup {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 36px 60px;
+}
+
+.seal {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.seal svg { width: 44px; height: 44px; }
+
+.caughtup h2 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -.4px;
+  margin-bottom: 10px;
+}
+
+.caughtup p {
+  color: var(--ink-soft);
+  font-size: 14.5px;
+  line-height: 1.55;
+  max-width: 260px;
+}
+
+.btn-manage {
+  margin-top: 32px;
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  padding: 10px 20px;
+  border-radius: var(--radius-btn);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-manage:active { background: var(--press); }
+
+/* ── Feed app bar manage button ── */
+.btn-feed-manage {
+  /* `margin-left: auto` is deliberately ABSENT here. Removed for [TASK-099] because the feed's gear
+     then sat inside `.appbar-actions`, which carried the auto margin for that whole group.
+     ⚠️ REWRITTEN FOR [TASK-104], 2026-08-29 — the old wording described a structure that no longer
+     exists and was the only thing stopping someone restoring this property. NEITHER user is inside
+     `.appbar-actions` now, and neither needs an auto margin: BOTH gears are direct children of an
+     `.appbar-controls` row that pins them left with `justify-content: space-between` (the archive
+     bar was brought into the same shape on 2026-08-29).
+     Do not put it back on the shared class: `.appbar-controls` would then hold an auto margin on its
+     first child, which consumes the free space BEFORE `justify-content` can distribute it. */
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 26px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.btn-feed-manage:active { color: var(--ink); }
+.btn-feed-manage svg { width: 22px; height: 22px; display: block; }
+.btn-feed-manage:hover { color: var(--accent); }
+.btn-feed-manage:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+/* ── Confirm card (resolve → confirm before add) ── */
+.add-confirm { margin-bottom: 28px; }
+
+.confirm-label {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-bottom: 10px;
+}
+
+.confirm-card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  background: var(--surface);
+  border: 1.5px solid var(--accent);
+  border-radius: 13px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.confirm-card .avatar {
+  width: 40px;
+  height: 40px;
+  font-size: 16px;
+}
+
+.confirm-info { flex: 1; min-width: 0; }
+.confirm-name { font-size: 14px; font-weight: 600; }
+.confirm-meta { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+
+/* When the panel is taller than the list region, Add and Cancel pin to the region's bottom edge and the rest
+   of the panel scrolls under them. On a 393-wide iPhone in a Safari tab the button sat 16px below the cut
+   once a channel was added, and every size hid it with "See N more" open. `sticky` sticks to the nearest
+   scroller, `.setup-scroll`, and only engages when the panel overflows, so where it fits nothing moves, and
+   scrolled to the end the row sits in its own place. The background and the fade are the PAGE colour, so they
+   are invisible when the row is not pinned; if setup ever gets its own background they show as a band. No
+   z-index: the row covers earlier panel content by DOM order, so anything positioned placed AFTER it in the
+   panel would paint over it. [BUG-126] */
+.confirm-actions {
+  display: flex;
+  gap: 8px;
+  position: sticky;
+  bottom: 0;
+  background: var(--bg);
+}
+.confirm-actions::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 16px;
+  background: linear-gradient(to bottom, transparent, var(--bg));
+  pointer-events: none;
+}
+
+.btn-confirm-add {
+  flex: 1;
+  padding: 11px 0;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-btn);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-confirm-add:active { background: var(--accent-active); }
+
+.btn-confirm-cancel {
+  padding: 11px 18px;
+  background: none;
+  border: 1.5px solid var(--line);
+  color: var(--ink-soft);
+  border-radius: var(--radius-btn);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-confirm-cancel:active { background: var(--press); }
+
+/* ── Alternatives (pick a different search match) ── */
+.btn-show-alternatives {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+  margin-bottom: 10px;
+}
+
+.confirm-alternatives {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.alt-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+
+.alt-item:active { background: var(--bg); }
+.alt-item:hover { border-color: var(--accent); }
+
+.alt-item .avatar { width: 34px; height: 34px; font-size: 14px; }
+
+.alt-info { flex: 1; min-width: 0; }
+.alt-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.alt-note { font-size: 11.5px; color: var(--ink-soft); margin-top: 1px; }
+
+.alt-added { cursor: default; opacity: .55; }
+.alt-added:hover { border-color: var(--line); }
+
+/* Keyword filter now lives in the confirm step (pick channel, then filter) */
+.confirm-keyword { margin-bottom: 14px; }
+
+/* Keyword filter chips input (TASK-044) — used in the add flow (#keyword-chips) and the
+   inline channel editor (.ch-edit-chips). Reads like the text inputs above, but wraps pills. */
+.chips-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-btn);
+  background: var(--surface);
+  cursor: text;
+  transition: border-color .15s;
+  margin-bottom: 8px;
+}
+.chips-input:focus-within { border-color: var(--accent); }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 4px 5px 4px 11px;
+}
+.chip > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--accent);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.chip-remove:hover, .chip-remove:active { background: var(--accent); color: #fff; }
+
+.chips-text {
+  flex: 1;
+  min-width: 90px;
+  width: auto;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 5px 3px;
+  font-size: 16px;  /* the 16px floor — see .add-form input [BUG-125] */
+  color: var(--ink);
+}
+.chips-text::placeholder { color: var(--faint); }
+
+/* ── Embed fallback ── */
+.embed-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--player-bg);
+  gap: 14px;
+  padding: 20px;
+  border-radius: 12px;
+}
+
+.embed-note {
+  color: var(--player-ink);
+  font-size: 13px;
+  text-align: center;
+}
+
+.btn-yt-link {
+  display: inline-block;
+  color: var(--accent);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 8px 18px;
+  border: 1.5px solid var(--accent);
+  border-radius: 9px;
+}
+
+.btn-yt-link:active { background: var(--accent-soft); }
+
+/* ── Theme toggle (top-right of setup) ── */
+.theme-toggle {
+  position: absolute;
+  top: 54px;
+  right: 24px;
+  display: flex;
+  background: var(--line);
+  border-radius: 999px;
+  padding: 3px;
+}
+.theme-opt {
+  width: 30px;
+  height: 28px;
+  border: none;
+  background: none;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 0;
+}
+.theme-opt svg { width: 15px; height: 15px; }
+.theme-opt.is-active {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0,0,0,.08);
+}
+
+/* ── Source toggle (YouTube | X, inside the add form) — segmented control ── */
+.source-toggle {
+  display: flex;
+  background: var(--line);
+  border-radius: 999px;
+  padding: 3px;
+  margin-bottom: 10px;
+}
+.source-opt {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  border: none;
+  background: none;
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+.source-opt svg { width: 15px; height: 15px; }
+.source-opt.is-active {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0,0,0,.08);
+}
+
+/* ── Preference row (Shorts) ── */
+.pref-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 13px 15px;
+  margin-bottom: 28px;
+}
+.pref-text { flex: 1; min-width: 0; }
+.pref-title { font-size: 14px; font-weight: 600; }
+.pref-desc {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+
+/* ── Switch ── */
+.switch {
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  border: none;
+  background: var(--switch-off);
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  transition: background .15s;
+}
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.15);
+  transition: left .15s;
+}
+.switch.is-on { background: var(--accent); }
+.switch.is-on .switch-knob { left: 20px; }
+
+/* ── Pull-to-refresh ── */
+/* Everything below the appbar (#feed-body) stretches down as you pull (JS sets a
+   translateY on it); the appbar stays pinned, and the spinner sits in the gap
+   that opens just below it. #ptr lives at body level — outside the transformed
+   #feed-body — so its position stays independent of the pull; JS offsets it down
+   by the appbar height. `.snapping` animates the spring-back and the hold-open. */
+.feed-body { flex: 1; display: flex; flex-direction: column; padding-bottom: 76px; } /* clear the fixed bottom nav (TASK-008) */
+#feed-body.snapping { transition: transform .3s ease; }
+
+.ptr {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  z-index: 30;
+  width: 32px;
+  height: 32px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -40px);
+}
+.ptr.snapping { transition: transform .3s ease, opacity .3s ease; }
+
+/* 12-spoke throbber: rounded bars fading around a ring. Rebuilt in CSS (not the
+   stock image) so it stays crisp at any size and themes light/dark. */
+.ptr i {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 3px;
+  height: 8px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--ink-soft);
+  transform-origin: center 16px;
+  animation: ptr-fade 1s linear infinite;
+}
+.ptr i:nth-child(1)  { transform: rotate(0deg);   animation-delay: -.9167s; }
+.ptr i:nth-child(2)  { transform: rotate(30deg);  animation-delay: -.8333s; }
+.ptr i:nth-child(3)  { transform: rotate(60deg);  animation-delay: -.75s; }
+.ptr i:nth-child(4)  { transform: rotate(90deg);  animation-delay: -.6667s; }
+.ptr i:nth-child(5)  { transform: rotate(120deg); animation-delay: -.5833s; }
+.ptr i:nth-child(6)  { transform: rotate(150deg); animation-delay: -.5s; }
+.ptr i:nth-child(7)  { transform: rotate(180deg); animation-delay: -.4167s; }
+.ptr i:nth-child(8)  { transform: rotate(210deg); animation-delay: -.3333s; }
+.ptr i:nth-child(9)  { transform: rotate(240deg); animation-delay: -.25s; }
+.ptr i:nth-child(10) { transform: rotate(270deg); animation-delay: -.1667s; }
+.ptr i:nth-child(11) { transform: rotate(300deg); animation-delay: -.0833s; }
+.ptr i:nth-child(12) { transform: rotate(330deg); animation-delay: 0s; }
+@keyframes ptr-fade { 0% { opacity: 1; } 100% { opacity: .15; } }
+
+/* ── Tweet card (TASK-020) ──
+   Reuses the .card shell + .chan header from the video card. The body inverts:
+   the post text is the hero; media is optional and secondary. No new tokens. */
+
+/* Display name over "@handle · 2h" in the header's flexible column */
+.tweet-id { display: flex; flex-direction: column; min-width: 0; }
+.tweet-id .chan-name { line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tweet-id .chan-meta { margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Subtle "view on X" escape hatch — outline glyph, not a CTA. Sits last in the
+   header. A New/keyword pill (margin-left:auto) pushes the right cluster over and
+   the 9px header gap spaces them; alone, the logo takes the auto-margin itself. */
+.tweet-x { margin-left: auto; flex-shrink: 0; display: flex; color: var(--faint); text-decoration: none; padding: 2px; line-height: 0; transition: color .15s; }
+.tweet-x:hover { color: var(--ink-soft); }
+.tweet-x svg { width: 16px; height: 16px; }
+.new-badge ~ .tweet-x { margin-left: 0; }
+
+/* The post text — read-only, wraps freely, never truncated */
+.tweet-text {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin-bottom: 12px;
+}
+.tweet-text:last-child { margin-bottom: 0; }
+.tweet-text a { color: var(--accent); text-decoration: none; }
+
+/* Media below the text. Aspect ratio is clamped to [4/5, 2/1] inline per image (TASK-037), so
+   portrait shows ~whole and one image can't dominate; hairline keeps it crisp in light. */
+.tweet-media { border-radius: 12px; overflow: hidden; margin-bottom: 12px; background: var(--media-bg); border: 1px solid var(--line); }
+.tweet-media img { display: block; width: 100%; object-fit: cover; } /* aspect-ratio set inline */
+.tweet-video { display: block; width: 100%; object-fit: cover; background: var(--media-bg); } /* aspect-ratio inline (TASK-038) */
+
+/* Swipeable carousel for 2–4 photos (TASK-037): one scroll-snap row; a peek + dots signal more. */
+.tweet-media-carousel {
+  display: flex; gap: 4px; overflow-x: auto; scroll-snap-type: x mandatory;
+  border-radius: 12px; background: var(--media-bg); border: 1px solid var(--line);
+  margin-bottom: 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.tweet-media-carousel::-webkit-scrollbar { display: none; }
+.tweet-slide { flex: 0 0 92%; min-width: 0; height: 100%; object-fit: cover; scroll-snap-align: start; display: block; }
+.tweet-dots { display: flex; justify-content: center; gap: 6px; margin-bottom: 12px; }
+.tweet-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line); transition: background .2s; }
+.tweet-dot.active { background: var(--accent); }
+
+/* Quoted (referenced) tweet — a compact read-only card under the author's text/media; the whole
+   box links out to the quoted tweet on X. Text-only (quoted media isn't fetched). (TASK-034) */
+.tweet-quoted {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color .15s;
+}
+.tweet-quoted:last-child { margin-bottom: 0; }
+.tweet-quoted:hover { border-color: var(--ink-soft); }
+.quoted-head { font-size: 13px; margin-bottom: 3px; overflow-wrap: anywhere; }
+.quoted-name { font-weight: 600; color: var(--ink); }
+.quoted-handle { color: var(--ink-soft); }
+.quoted-text {
+  font-size: 14px; line-height: 1.45; color: var(--ink);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+
+/* ── Connect YouTube: import subscriptions (TASK-015) ── */
+.btn-connect-yt {
+  margin-top: 10px;
+  margin-bottom: 28px;
+  width: 100%;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px;
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--radius-btn);
+  font-size: 14.5px; font-weight: 600; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.btn-connect-yt:hover { border-color: var(--accent); }
+.btn-connect-yt svg { width: 18px; height: 18px; color: #ff0033; flex: 0 0 auto; }
+
+.import-scrim {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, .5);
+  opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 70;
+}
+.import-scrim.show { opacity: 1; pointer-events: auto; }
+
+.import-modal {
+  position: fixed; z-index: 71;
+  left: 50%; top: 50%; transform: translate(-50%, -46%);
+  width: min(440px, 92vw); max-height: 82vh;
+  display: none; flex-direction: column;
+  background: var(--bg); border: 1px solid var(--line);
+  border-radius: 16px; box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+  opacity: 0; transition: opacity .25s, transform .25s;
+}
+.import-modal.open { display: flex; opacity: 1; transform: translate(-50%, -50%); }
+
+.import-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 20px 20px 12px;
+}
+.import-title { font-size: 18px; font-weight: 700; letter-spacing: -.2px; }
+.import-sub { font-size: 13px; color: var(--ink-soft); margin-top: 3px; }
+.import-close {
+  flex: 0 0 auto; width: 30px; height: 30px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--ink-soft); font-size: 22px; line-height: 1; cursor: pointer;
+}
+.import-close:hover { background: var(--press); color: var(--ink); }
+
+.import-tools { display: flex; gap: 8px; padding: 0 20px 12px; }
+.import-search {
+  flex: 1; padding: 9px 12px; font-size: 16px;  /* the 16px floor — see .add-form input [BUG-125] */
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 9px;
+}
+.import-search:focus { outline: none; border-color: var(--accent); }
+.import-selectall {
+  flex: 0 0 auto; padding: 9px 12px; font-size: 13px; font-weight: 600;
+  background: transparent; color: var(--accent);
+  border: 1px solid var(--line); border-radius: 9px; cursor: pointer;
+}
+.import-selectall:hover { border-color: var(--accent); }
+
+.import-note {
+  margin: 0 20px 8px; padding: 8px 10px; font-size: 12.5px;
+  color: var(--ink-soft); background: var(--accent-soft); border-radius: 8px;
+}
+
+.import-list { list-style: none; margin: 0; padding: 0 8px; overflow-y: auto; flex: 1 1 auto; }
+.import-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 12px; border-radius: 10px; cursor: pointer;
+}
+.import-item:hover { background: var(--press); }
+.import-item .avatar { width: 38px; height: 38px; flex: 0 0 auto; }
+.import-item-name {
+  flex: 1; font-size: 14.5px; font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.import-check {
+  flex: 0 0 auto; width: 22px; height: 22px; border-radius: 6px;
+  border: 2px solid var(--faint);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; transition: background .12s, border-color .12s;
+}
+.import-check svg { display: none; width: 14px; height: 14px; }
+.import-item.is-checked .import-check { background: var(--accent); border-color: var(--accent); }
+.import-item.is-checked .import-check svg { display: block; }
+.import-item.is-added { cursor: default; opacity: .5; }
+.import-item.is-added:hover { background: transparent; }
+.import-added-tag { flex: 0 0 auto; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+
+.import-warn {
+  margin: 8px 20px 0; padding: 8px 10px; font-size: 12.5px;
+  color: var(--danger-ink); background: var(--danger-bg); border-radius: 8px;
+}
+
+.import-foot {
+  display: flex; gap: 10px; padding: 14px 20px 18px; border-top: 1px solid var(--line);
+}
+.import-cancel {
+  flex: 0 0 auto; padding: 12px 16px; font-size: 14px; font-weight: 600;
+  background: transparent; color: var(--ink-soft);
+  border: 1px solid var(--line); border-radius: var(--radius-btn); cursor: pointer;
+}
+.import-add {
+  flex: 1; padding: 12px; font-size: 15px; font-weight: 600;
+  background: var(--btn-strong-bg); color: var(--btn-strong-ink);
+  border: 0; border-radius: var(--radius-btn); cursor: pointer;
+}
+.import-add:disabled { opacity: .5; cursor: default; }
+
+@media (prefers-reduced-motion: reduce) {
+  .import-modal, .import-scrim { transition: none; }
+}
+
+
+/* ── The grouped-view switch ([TASK-099]) ─────────────────────────────────────
+   Ungrouped is the default, so this is how the reader discovers grouping exists at all.
+   SINCE [TASK-104] it sits at the RIGHT of `.appbar-controls` (row 1), with the gear opposite it on
+   the left — not in the brand row, and no longer left of the gear. The original note that
+   `.appbar-sub` was measured not to fit it at 375px still stands, and row 2 now carries the wordmark
+   and the count instead. */
+/* The ARCHIVE appbar has no `.appbar-actions` — the switch is feed-only, because there is no
+   grouping on the archive screen.
+   ⚠️ `#btn-archive-manage { margin-left: auto }` IS GONE ([TASK-104], 2026-08-29). It existed only
+   because that gear was a direct child of `.brand`, a flex row with no `justify-content`, so it
+   needed its own auto margin to reach the right edge. The archive bar now uses the same
+   `.appbar-controls` row as the feed and its gear belongs on the LEFT — and an auto margin left in
+   place would have pushed it straight back to the right, so the markup change would have looked
+   applied while the screen was unchanged. Pinned by test/appbar.test.mjs T24. */
+
+.appbar-actions {
+  /* No auto margin since [TASK-104]: `.appbar-controls` pins this group right with
+     `justify-content: space-between`, so the old one was inert — verified by overriding it to 0 in a
+     live page and measuring no movement. Removed rather than left as dead weight, because an auto
+     margin consumes free space BEFORE `justify-content` distributes it, so a third control added to
+     row 1 later would collapse against the gear instead of spacing evenly. */
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* Slightly smaller than the settings switch: this one sits beside a 22px icon, not in a preference
+   row. The 44px hit target is restored by the ::before below rather than by the painted size. */
+.switch-grouping { width: 38px; height: 22px; }
+.switch-grouping .switch-knob { width: 18px; height: 18px; }
+.switch-grouping.is-on .switch-knob { left: 18px; }
+
+/* A 44px tap target without a 44px control — the painted switch stays small in a tight row while the
+   touch area meets the minimum. */
+.switch-grouping::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px; height: 44px;
+}
+
+/* Inert: the reader is OFF and a classify has never produced a tile, so there is nothing to switch
+   INTO. Never reached while ON — the way back out is always open ("always allow turning off", Asli
+   2026-08-27), so this rule cannot dim a switch the reader needs to escape a view with. `aria-disabled`
+   rather than `disabled` keeps the control in the accessibility tree so its label can still be read;
+   the click handler carries the real guard. */
+.switch-grouping[aria-disabled="true"] {
+  opacity: .38;
+  cursor: default;
+}
+
+.switch-grouping:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* The bloom: three breaths of gold when topics first become showable. It says "the result is ready".
+   [TASK-099] paired it with the "Gathering the topics…" pill on the argument that "only the pill can
+   carry a sentence" — TASK-101 RE-TOOK that trade rather than dropping it, and both halves moved:
+   "work is happening" is now the `.g-busy` ring beside this switch, and the SENTENCE is
+   `.toggle-note`, raised at this same instant. Two facts still, in two places, both on the control.
+   The bloom itself is unchanged. */
+.switch-grouping.is-shining { animation: shine-bloom 1.15s ease-in-out 3; }
+
+@keyframes shine-bloom {
+  0%   { box-shadow: 0 0 0 0 rgb(var(--shine) / .55); }
+  55%  { box-shadow: 0 0 0 7px rgb(var(--shine) / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(var(--shine) / 0); }
+}
+
+/* Completely still. NOT a shortened animation — a reader who asked for reduced motion gets no
+   motion, and the switch is still perfectly usable without the cue.
+   This block controls MOTION only. The inert dimming is state-based (`[aria-disabled="true"]`
+   above) and deliberately unaffected: an inert switch should still read as inert here. */
+@media (prefers-reduced-motion: reduce) {
+  .switch-grouping.is-shining { animation: none; }
+  .switch-grouping { transition: none; }
+  .switch-grouping .switch-knob { transition: none; }
+}
+
+/* A post that lives in a tile while the reader has grouping on. HIDDEN, not removed: the card stays
+   in the DOM so toggling back is symmetric and needs nothing rebuilt. Every selector that COUNTS
+   feed cards excludes it — see updateCount / checkEmpty / updateSectionHeads / liftGroupedFromStream. */
+.card.grouped-out { display: none; }
+
+/* ── [BUG-051] The damaged-store notice ─────────────────────────────────────
+   In FLOW, not overlaid: it pushes content down rather than covering a control. Mobile-first — it
+   is a single column at every width, so there is no row to wrap and nothing to reflow at 390px.
+   Uses the existing danger tokens, which are defined in BOTH themes, rather than inventing a pair
+   that would only be right in one. */
+.damaged-notice {
+  margin: 12px 16px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  background: var(--danger-bg);
+  color: var(--danger-ink);
+}
+.damaged-notice-text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.damaged-notice-action {
+  margin-top: 10px;
+  /* 44px, which is [BUG-106]'s NUMBER and not merely its lesson — and the same mistake this file
+     already records making once. Written at ~34px (8+8 padding on a 13px line box) under a comment
+     citing that task; found by independent review. This button is the ONLY escape from a
+     read-only app, so it is exactly the case that rule's own note says the judgement expires for. */
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--danger-ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+/* `--danger-ink`, not `#fff`: white on `--danger` computes to 3.27:1 in dark theme, under AA's 4.5
+   for 13px text. Momentary, but the honest token costs nothing. (Independent review, 2026-09-10.) */
+.damaged-notice-action:active { background: var(--danger-bg); color: var(--danger-ink); }
+
+/* ── First-run tour ([TASK-092]) ──────────────────────────────────────────────
+   Look and numbers are mock version 2's, which Asli settled. Everything is `position: fixed` against
+   the viewport, because app.js places it from `getBoundingClientRect`, which is viewport-relative.
+
+   THE DIM IS THE RING'S SHADOW, not a separate layer: a spread wide enough to cover any screen, so the
+   cut-out follows the control's corner radius exactly. With nothing to point at, the ring collapses to
+   a point in the middle and the shadow still covers everything. The four blockers are transparent;
+   their only job is to take the taps outside the cut-out and do nothing with them. */
+.tour { position: fixed; inset: 0; z-index: 55; pointer-events: none; }
+.tour-block { position: fixed; z-index: 1; pointer-events: auto; background: transparent; touch-action: none; }
+.tour-ring {
+  position: fixed; border: 2px solid var(--accent); border-radius: 12px; pointer-events: none;
+  z-index: 2;
+  box-shadow: 0 0 0 5px var(--tour-glow), 0 0 0 200vmax var(--tour-scrim);
+  transition: top .28s ease, left .28s ease, width .28s ease, height .28s ease, border-radius .28s ease;
+}
+.tour-ring.no-target {
+  border-color: transparent; width: 0; height: 0; left: 50%; top: 50%;
+  box-shadow: 0 0 0 200vmax var(--tour-scrim);
+}
+.tour-card {
+  position: fixed; width: min(290px, calc(100vw - 24px));
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: var(--tour-shadow);
+  padding: 13px 14px 11px; pointer-events: auto;
+  z-index: 3; /* above the blockers and the ring by declaration, not by markup order: a centred card sits under a full-screen blocker (review round 1, MED-4) */
+  transition: top .28s ease, left .28s ease;
+}
+/* The caret toward the control; app.js sets which side and how far along. */
+.tour-card::before {
+  content: ''; position: absolute; left: var(--caret-x, 50%); width: 12px; height: 12px;
+  background: var(--surface); border: 1px solid var(--line); transform: translateX(-50%) rotate(45deg);
+}
+.tour-card[data-side="below"]::before { top: -7px; border-right: 0; border-bottom: 0; }
+.tour-card[data-side="above"]::before { bottom: -7px; border-left: 0; border-top: 0; }
+.tour-card[data-side="center"]::before { display: none; }
+.tour-part {
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); margin: 0 0 4px;
+}
+.tour-text { font-size: 14.5px; line-height: 1.45; margin: 0 0 11px; }
+.tour-foot { display: flex; align-items: center; gap: 6px; }
+.tour-back {
+  width: 30px; height: 30px; flex: 0 0 auto; display: grid; place-items: center; padding: 0;
+  background: none; border: 1px solid var(--line); color: var(--ink); border-radius: 8px; cursor: pointer;
+}
+.tour-back svg { width: 16px; height: 16px; }
+.tour-back:disabled { opacity: .35; cursor: default; }
+.tour-count { font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; margin-right: auto; padding-left: 2px; }
+.tour-close {
+  background: none; border: none; color: var(--ink-soft); font: inherit; font-size: 13.5px; font-weight: 600;
+  padding: 7px 8px; cursor: pointer; border-radius: 8px;
+}
+.tour-main {
+  background: var(--accent); color: #fff; border: none; font: inherit; font-size: 13.5px; font-weight: 600;
+  padding: 7px 14px; border-radius: 9px; cursor: pointer;
+}
+.tour-card button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* The page does not scroll under the dim (UI & states). A class of its own rather than reusing
+   `profile-open`: closing the import picker removes that one, which would unlock the page mid-tour. */
+body.tour-open { overflow: hidden; }
+
+/* The ring and card JUMP instead of sliding. They still appear, and so does the dim: the tour is
+   information, not decoration ([TASK-099] criterion 11 as narrowed by [TASK-101]). */
+@media (prefers-reduced-motion: reduce) {
+  .tour-ring, .tour-card { transition: none; }
+}

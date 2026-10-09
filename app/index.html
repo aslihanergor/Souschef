@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <!-- X's video CDN (video.twimg.com) 403s requests carrying a non-Twitter Referer. `same-origin`
+       strips the Referer on cross-site requests (so video plays) while keeping it first-party.
+       Analytics-safe: analytics report via JS payloads, not the Referer header. (TASK-038)
+       NOTE (future): when we add site analytics, re-confirm the chosen tool is happy with this. -->
+  <meta name="referrer" content="same-origin">
+
+  <title>SousChef</title>
+  <!-- Green-dot favicon, matching the landing + privacy pages (TASK-069). data: URI is allowed by the
+       CSP img-src ('self' data: …); keep it identical across all pages so the browser tab is consistent. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Ccircle%20cx%3D%2211%22%20cy%3D%2215%22%20r%3D%225.5%22%20fill%3D%22%232f8f6b%22%2F%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2210.5%22%20r%3D%226.5%22%20fill%3D%22%232f8f6b%22%2F%3E%3Ccircle%20cx%3D%2221%22%20cy%3D%2215%22%20r%3D%225.5%22%20fill%3D%22%232f8f6b%22%2F%3E%3Crect%20x%3D%229.5%22%20y%3D%2212%22%20width%3D%2213%22%20height%3D%2211%22%20rx%3D%224.5%22%20fill%3D%22%232f8f6b%22%2F%3E%3Crect%20x%3D%2210.5%22%20y%3D%2221%22%20width%3D%2211%22%20height%3D%227.6%22%20rx%3D%222%22%20fill%3D%22%2325735a%22%2F%3E%3C%2Fsvg%3E">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/style.css">
+  <!-- CSP (TASK-065): the inline theme script below is allow-listed by a sha256 hash in
+       vercel.json's Content-Security-Policy (script-src). If you EDIT it, the hash changes and the
+       script gets blocked (theme won't resolve before first paint → flash). Recompute the hash and
+       paste it into vercel.json with:  node scripts/csp-hash.mjs -->
+  <script>
+    // Resolve theme before first paint: light, unless this browser was signed in on its last boot AND a
+    // choice is stored. The phone's setting is never read. Light is set FIRST, so storage that throws
+    // still paints light. showView makes the final call once the session is known: the sign-in page is
+    // always light. [TASK-109]
+    (function () {
+      var d = document.documentElement;
+      d.setAttribute('data-theme', 'light');
+      try {
+        var t = localStorage.getItem('focus_theme');
+        if (localStorage.getItem('focus_was_authed') === '1' && (t === 'light' || t === 'dark')) {
+          d.setAttribute('data-theme', t);
+        }
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+
+  <!-- SIGN-IN WALL (TASK-027, made mandatory in TASK-084) — shown to every signed-out visitor on
+       every boot, not just the first. It offers the only two ways into the app: Google (a plain
+       redirect link, no JS) and a magic-link email. TASK-084 deleted the anonymous skip that used
+       to sit below them — anonymous users can't be reached, interviewed or counted as people, which
+       made DAU a count of browsers. Nothing here may reintroduce a way past it. -->
+  <div id="view-landing" class="view hidden">
+    <div class="landing-wrap">
+      <div class="landing-brand">
+        <span class="dot"></span>
+        <h1>SousChef</h1>
+      </div>
+
+      <!-- Trimmed to just sign-in (TASK-069 M5): the public landing at / now does the explaining
+           (headline + sources), so this in-app welcome is lean — a short line + the sign-in actions. -->
+      <div class="landing-hero">
+        <h2 class="landing-headline">A feed you can finish.</h2>
+        <p class="landing-sub">Sign in to pick your channels and keep your feed in sync across devices.</p>
+      </div>
+
+      <div class="landing-auth">
+        <!-- signed-out actions -->
+        <div id="landing-signin">
+          <a class="acct-google" href="/api/auth/google/start">
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+              <path fill="#4285F4" d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+              <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+              <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.997 8.997 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+              <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+            </svg>
+            Continue with Google
+          </a>
+          <div class="acct-or">or</div>
+          <div class="acct-form">
+            <input id="landing-email" class="acct-input" type="email" inputmode="email"
+                   autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false"
+                   placeholder="you@email.com">
+            <button id="landing-send" class="acct-btn" type="button">Send sign-in link</button>
+          </div>
+          <p class="acct-msg hidden" id="landing-msg"></p>
+        </div>
+
+        <!-- link sent -->
+        <div id="landing-sent" class="hidden">
+          <div class="acct-sent-panel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+            <div>
+              <div class="acct-sent-h">Check your email</div>
+              <div class="acct-sent-p">We sent a sign-in link to <b id="landing-sent-email"></b>. It works once and expires in 15 minutes.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="landing-reassure">Your channels come with you when you sign in — if you've used SousChef on another device, sign in there first.</p>
+    </div>
+  </div>
+
+  <!-- SETUP SCREEN -->
+  <div id="view-setup" class="view hidden">
+    <div class="setup-wrap">
+
+      <!-- [BUG-051] The damaged-store notice. INLINE and in flow, never a toast — `_pushNow`'s
+           halt guard records the reasoning in app.js: a paused-sync condition "is a STATE, not an event, and
+           the toast auto-hides at 5s", and [BUG-047]'s attempt 3 shipped a notice that appeared once
+           and then no-opped in silence. (ATTRIBUTION CORRECTED after independent review:
+           three copies credited that sentence to `_showSyncConflict`, which does not contain it.
+           The precedent is real; the source named was not.) A damaged store is a state that persists until it heals, so
+           the notice persists with it and clears when it does.
+           In FLOW rather than overlaid, deliberately: it pushes content down instead of covering a
+           control, which is one of the things the handset walk checks.
+           Ships `hidden`, and is seeded in the harness's HIDDEN_IDS — docs.test.mjs asserts the two
+           agree, so removing the class here fails the suite rather than silently making every
+           "was it revealed" assertion pass. -->
+      <div id="damaged-notice-setup" class="damaged-notice hidden" role="status">
+        <p id="damaged-notice-setup-text" class="damaged-notice-text"></p>
+        <button id="damaged-heal-setup" class="damaged-notice-action hidden" type="button">Restore from my account</button>
+      </div>
+
+      <!-- Theme toggle relocated into the Settings drawer (TASK-071; per TASK-063's intent). -->
+
+      <!-- Fixed header: brand, intro, source toggle, Shorts pref, add-form. Stays pinned
+           while only the channel list below scrolls, so "Open my feed →" stays reachable. (TASK-045)
+           On a screen too short for it plus one channel row, the whole view scrolls instead. [TASK-111] -->
+      <div class="setup-head">
+        <!-- Profile / account entry (TASK-028a): mobile → above ● SousChef; desktop (≥760px) →
+             fixed to the screen's top-left corner (see style.css). Opens the profile panel. -->
+        <button class="profile-btn" id="profile-btn" type="button" aria-label="Settings" aria-haspopup="dialog" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+        <div class="setup-brand">
+          <span class="dot"></span>
+          <h1>SousChef</h1>
+        </div>
+        <p class="setup-sub">Add the channels and accounts you follow. Your feed stays finishable. You'll always reach "all caught up."</p>
+
+        <!-- Which source this add targets. Can't auto-detect (@handle is ambiguous across
+             platforms), so the user picks. YouTube = default; X resolves an exact @handle.
+             Kept outside #add-form so it doesn't inherit the form's primary-button styling.
+             Stays above the Shorts row so the tabs don't shift when that row toggles. -->
+        <div class="source-toggle" id="source-toggle" role="group" aria-label="Source to add from">
+          <button type="button" class="source-opt is-active" data-source="youtube" aria-pressed="true">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8ZM9.5 15.5v-7l6.5 3.5-6.5 3.5Z"/></svg>
+            YouTube
+          </button>
+          <button type="button" class="source-opt" data-source="twitter" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.9 2H22l-7.3 8.3L23 22h-6.6l-5.2-6.8L5.3 22H2.2l7.8-8.9L1.6 2h6.8l4.7 6.2L18.9 2Zm-1.2 18h1.8L7.4 3.9H5.5L17.7 20Z"/></svg>
+            X
+          </button>
+          <button type="button" class="source-opt" data-source="substack" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22.539 8.242H1.46V5.406h21.08v2.836zM1.46 10.812V24L12 18.11 22.54 24V10.812H1.46zM22.54 0H1.46v2.836h21.08V0z"/></svg>
+            Substack
+          </button>
+        </div>
+
+        <!-- Shorts preference (persisted; feed filtering lands in TASK-006). YouTube-only —
+             hidden on the X tab by setAddSource(); sits below the tabs so they stay put. -->
+        <div class="pref-row" id="pref-shorts">
+          <div class="pref-text">
+            <div class="pref-title">Shorts</div>
+            <div class="pref-desc">Include YouTube Shorts in my feed.</div>
+          </div>
+          <button type="button" class="switch is-on" id="toggle-shorts" role="switch" aria-checked="true" aria-label="Include YouTube Shorts">
+            <span class="switch-knob"></span>
+          </button>
+        </div>
+
+        <div class="add-form" id="add-form">
+          <input id="input-url" type="text" placeholder="Channel name, @handle, or URL" autocomplete="off" autocorrect="off" spellcheck="false">
+          <button id="btn-add" type="button">Add channel</button>
+          <p class="add-error hidden" id="add-error"></p>
+        </div>
+
+        <!-- Bulk import via OAuth (TASK-015): YouTube-only; hidden on the X/Substack tabs by
+             setAddSource(). Sits under the manual add-form as the "add many at once" path. -->
+        <button id="btn-connect-youtube" class="btn-connect-yt" type="button">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8ZM9.5 15.5v-7l6.5 3.5-6.5 3.5Z"/></svg>
+          Import your subscriptions
+        </button>
+      </div>
+
+      <!-- Scroll region: the confirm panel + channel list. The only part of setup that
+           scrolls when the screen fits (TASK-045); the header above and the CTA below stay pinned.
+           Never shorter than one channel row — below that the whole view scrolls. [TASK-111]
+           When the panel overflows it, the panel's Add/Cancel row pins to its bottom edge. [BUG-126] -->
+      <div class="setup-scroll">
+        <!-- Confirm before adding: pick the channel, then set its filter -->
+        <div id="add-confirm" class="add-confirm hidden">
+          <p class="confirm-label">Is this the right channel?</p>
+          <div class="confirm-card">
+            <div class="avatar" id="confirm-avatar"></div>
+            <div class="confirm-info">
+              <div class="confirm-name" id="confirm-name"></div>
+              <div class="confirm-meta" id="confirm-meta"></div>
+            </div>
+          </div>
+
+          <button type="button" id="btn-show-alternatives" class="btn-show-alternatives hidden"></button>
+          <ul id="confirm-alternatives" class="confirm-alternatives hidden"></ul>
+
+          <div class="confirm-keyword">
+            <div id="keyword-chips"></div>
+            <p class="add-hint">Show videos matching any of these. Press Enter after each. Several words in one chip means all must appear. Leave empty for all.</p>
+          </div>
+
+          <div class="confirm-actions">
+            <button id="btn-confirm-add" type="button" class="btn-confirm-add">Add this channel</button>
+            <button id="btn-confirm-cancel" type="button" class="btn-confirm-cancel">Cancel</button>
+          </div>
+        </div>
+
+        <ul class="channel-list" id="channel-list"></ul>
+      </div>
+
+      <button id="btn-go" class="btn-go hidden" type="button">Open my feed →</button>
+
+    </div>
+  </div>
+
+  <!-- FEED SCREEN -->
+  <div id="view-feed" class="view hidden">
+    <div class="appbar">
+      <!-- [TASK-104] ROW 1 IS THE CONTROLS: gear on the LEFT, grouping switch on the RIGHT, and
+           nothing else. The wordmark dropped to row 2 to sit level with the count, and the date came
+           out entirely — the feed is already chronological and every card carries its own "2h ago".
+           `.appbar-actions` no longer holds the gear, which is what moves the ready note's caret
+           (style.css) from 53px to 12px: the switch is now the rightmost thing on the row.
+           NOT 13. An earlier version of this comment said 13, which omits `.toggle-note`'s own 1px
+           border — an absolutely-positioned pseudo-element resolves against the PADDING box, not the
+           border box. MEASURED on an iPhone 2026-08-29 (TASK-104 handset walk, criterion 9): caret
+           centre and switch centre coincide, delta 0.0 at both 402px and 874px. The reading carries a
+           control — forcing the rule to `right: 60px` moved the delta to -48.0 and restoring it
+           returned 0.0 — so this is a measurement, not a constant echoed back. -->
+      <div class="appbar-controls">
+        <button id="btn-feed-manage" class="btn-feed-manage" type="button" aria-label="Settings" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+        <div class="appbar-actions">
+          <!-- [TASK-101] Progress sits ON the control it is about, and inside the STICKY appbar, so
+               it survives the scroll that used to carry [TASK-073]'s pill off screen mid-wait.
+               `role="status"` + the visually-hidden text keep the announcement a screen reader used
+               to get from the pill.
+               ⚠️ AN EARLIER VERSION OF THIS COMMENT SAID "the ring itself is decoration and is hidden
+               from them", which was FALSE and was caught by two independent reviewers: there is no
+               `aria-hidden` anywhere in this markup, and there cannot be — the ring IS this element,
+               the one carrying `role="status"`. The effect is the same (CSS borders contribute no
+               accessible name, so the announcement is just the sr-only text) but the mechanism the
+               sentence described did not exist. The deleted pill genuinely did have
+               `aria-hidden="true"` on its inner `.g-spinner`, which is where the false memory came from.
+               KNOWN, NOT FIXED, and below /log-task's threshold because it is exact parity with the
+               pill rather than a regression: a `role="status"` region revealed from `display: none`
+               with its text ALREADY present is not a content change within a live region, and
+               VoiceOver announces that inconsistently. Criterion 12 asserts these announce and
+               nothing verifies it — a two-minute VoiceOver check would settle it. The robust shape,
+               if it ever proves wrong: keep the region rendered permanently and inject/clear its
+               text, with the visual ring as a separate `aria-hidden` sibling. -->
+          <span class="g-busy hidden" id="group-busy" role="status">
+            <span class="sr-only">Preparing topics…</span>
+          </span>
+          <button id="toggle-grouping" class="switch switch-grouping" type="button" role="switch"
+                  aria-checked="false" aria-disabled="true" aria-label="Group posts by topic">
+            <span class="switch-knob"></span>
+          </button>
+        </div>
+      </div>
+      <!-- [TASK-104] ROW 2: the wordmark, level with the count.
+           ⚠️ CORRECTED 2026-08-29 — every claim in the previous version of this paragraph was
+           falsified by the SAME COMMIT that wrote it, which is why it is rewritten rather than
+           patched. It said the archive screen "keeps its own row-1 arrangement", that it is "not
+           being redesigned", that the change was "two 13.5px text spans", and that "its gear stays
+           flush right". All four are false: Asli reversed the original "untouched" scope mid-session
+           and the archive bar now MIRRORS this one — its gear moved into an `.appbar-controls` row on
+           the LEFT (`#btn-archive-manage`'s `margin-left: auto` deleted, measured live at left:20,
+           margin-left:0px), and its brand dropped into `.appbar-sub` beside the count. T25 asserts
+           the opposite of the old sentence 1.
+           What remains TRUE: `.brand` and `.appbar-sub` are shared by both screens, so a change to
+           either moves both — `.appbar-sub` gained `align-items: center` (from baseline) and
+           `margin-top: 6px` (from 5px) here. -->
+      <div class="appbar-sub">
+        <div class="brand">
+          <span class="dot"></span>
+          <h1>SousChef</h1>
+        </div>
+        <span class="count" id="feed-count"></span>
+      </div>
+
+      <!-- [TASK-101] The ready sentence, at the moment the switch blooms. A child of `.appbar` (not
+           of `.appbar-actions`) so it hangs BELOW the whole bar instead of lying over the row
+           beneath it for its six seconds. (That row was the date and "N new"; [TASK-104] deleted the
+           date and moved the wordmark down beside the count. The nesting is what matters and is now
+           pinned by test/appbar.test.mjs T10b: `.toggle-note` is `position:absolute; top:100%`, so if
+           it ever falls OUT of `.appbar` it resolves against the initial containing block and lands
+           about a viewport down the page.) Deliberately NOT a toast: translucent rather than the
+           solid `--btn-strong-bg` a user named as "too black and solid", and beside the control it is
+           about rather than at the far end of the screen. -->
+      <p class="toggle-note hidden" id="group-ready-note" role="status">You can group your posts by topic now.</p>
+    </div>
+
+
+    <!-- [BUG-051] The damaged-store notice. INLINE and in flow, never a toast — `_pushNow`'s
+         halt guard records the reasoning in app.js: a paused-sync condition "is a STATE, not an event, and
+         the toast auto-hides at 5s", and [BUG-047]'s attempt 3 shipped a notice that appeared once
+         and then no-opped in silence. (ATTRIBUTION CORRECTED after independent review:
+           three copies credited that sentence to `_showSyncConflict`, which does not contain it.
+           The precedent is real; the source named was not.) A damaged store is a state that persists until it heals, so
+         the notice persists with it and clears when it does.
+         In FLOW rather than overlaid, deliberately: it pushes content down instead of covering a
+         control, which is one of the things the handset walk checks.
+         Ships `hidden`, and is seeded in the harness's HIDDEN_IDS — docs.test.mjs asserts the two
+         agree, so removing the class here fails the suite rather than silently making every
+         "was it revealed" assertion pass. -->
+    <div id="damaged-notice-feed" class="damaged-notice hidden" role="status">
+      <p id="damaged-notice-feed-text" class="damaged-notice-text"></p>
+      <button id="damaged-heal-feed" class="damaged-notice-action hidden" type="button">Restore from my account</button>
+    </div>
+
+    <!-- Everything below the appbar pulls down on refresh; the appbar stays put.
+         The pull transform is applied to #feed-body, not #view-feed. -->
+    <div class="feed-body" id="feed-body">
+      <div class="loading" id="feed-loading">
+        <div class="spinner"></div>
+        <p>Loading your feed…</p>
+      </div>
+
+      <p class="feed-error hidden" id="feed-error"></p>
+      <p class="feed-note hidden" id="feed-note"></p>
+
+      <!-- ONE STREAM ([TASK-098]). "Posts" is the only head: a topic renders as a `.topic-card`
+           INSIDE #feed, in the chronological slot of its newest post, rather than as a tile in a
+           separate "Topics" block above it. #topics-head, #group-grid and the #group-detail drill-in
+           are gone with the split — the same feed read in two places under two rules is where
+           [BUG-029], [BUG-092], [BUG-098] and [BUG-103] all lived.
+           The id stays `videos-head` so app.js/style.css need no churn for a copy change. -->
+      <h2 class="section-head hidden" id="videos-head">Posts</h2>
+      <!-- Kept deliberately, and REWORDED ([TASK-098] criterion 13). Its only reveal used to be the
+           last line of renderGroupGrid, which this task deletes; `renderTopicCards` reveals it now,
+           or `_groupsCapped` would be set and never read — silent truncation, which is the one thing
+           this note exists to prevent. "in the feed below" was true of a two-section layout and is
+           false in one stream, where the ungrouped posts are interleaved in time order. -->
+      <p class="group-note hidden" id="group-note">Some posts weren't grouped this time (too many at once). They're in the stream, in time order.</p>
+      <div class="feed" id="feed" style="display:none"></div>
+
+      <div class="caughtup hidden" id="caughtup">
+        <div class="seal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#2f8f6b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 6 9 17l-5-5"/>
+          </svg>
+        </div>
+        <h2>You're all caught up</h2>
+        <p>You've seen everything new from your channels. Nothing more to scroll.</p>
+        <button class="archive-nudge hidden" id="archive-nudge" type="button"></button>
+        <button class="btn-manage" id="btn-manage" type="button">Manage channels</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ARCHIVE SCREEN (TASK-008) — the "watch later" list; reuses feed cards in an archive context -->
+  <div id="view-archive" class="view hidden">
+    <div class="appbar">
+      <!-- [TASK-104] THE SAME TWO-ROW SHAPE AS THE FEED BAR (Asli, 2026-08-29). Row 1 is controls
+           with the gear on the LEFT; row 2 is the wordmark level with the count. There is no
+           grouping switch here — grouping is feed-only ([TASK-099]) — so row 1 carries the gear
+           alone, and the two bars come out the SAME HEIGHT because their rows match: a 22px control
+           over a 19px wordmark. That height parity is a consequence of this structure, not a value
+           set anywhere, which is why test/appbar.test.mjs pins the shape rather than a pixel.
+           The standalone "Archive" label is gone: the highlighted bottom-nav tab names the screen
+           and the count already reads "N saved" — and the feed does not label itself either. -->
+      <div class="appbar-controls">
+        <button id="btn-archive-manage" class="btn-feed-manage" type="button" aria-label="Settings" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+      </div>
+      <div class="appbar-sub">
+        <div class="brand">
+          <span class="dot"></span>
+          <h1>SousChef</h1>
+        </div>
+        <span class="count" id="archive-count"></span>
+      </div>
+    </div>
+
+    <!-- [BUG-051] The damaged-store notice, third copy. Added after independent review: a refused
+         un-archive on this screen showed NOTHING at all — the exact silence the notice exists to
+         prevent, on the one view where `focus_archive` damage is most visible. Same element, same
+         render loop, same wiring; see the setup copy above for why it is inline and not a toast. -->
+    <div id="damaged-notice-archive" class="damaged-notice hidden" role="status">
+      <p id="damaged-notice-archive-text" class="damaged-notice-text"></p>
+      <button id="damaged-heal-archive" class="damaged-notice-action hidden" type="button">Restore from my account</button>
+    </div>
+
+    <div class="feed-body">
+      <div class="feed" id="archive-feed"></div>
+      <div class="archive-empty hidden" id="archive-empty">
+        <h2>Nothing saved yet</h2>
+        <p>Tap <b>Archive</b> on any post to keep it here and revisit later.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pull-to-refresh throbber: kept at body level (outside #view-feed) so the
+       pull transform on the feed doesn't drag it. 12 bars = the spoke ring. -->
+  <div class="ptr" id="ptr" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+  <!-- Reusable toast with one optional action (Undo). Body-level so it floats above the
+       feed and bottom nav. Shown by toggling `.show` (not `.hidden`) so it can fade. (TASK-016) -->
+  <div id="toast" class="toast" role="status" aria-live="polite">
+    <span class="toast-msg"></span>
+    <button type="button" class="toast-action hidden"></button>
+  </div>
+
+  <!-- Connect-YouTube import picker (TASK-015): preview subscriptions, multi-select, add.
+       Body-level so it floats above setup; shown by toggling `.open`/`.show`. -->
+  <div class="import-scrim" id="import-scrim"></div>
+  <div class="import-modal" id="import-modal" role="dialog" aria-modal="true" aria-label="Import from YouTube" aria-hidden="true">
+    <div class="import-head">
+      <div>
+        <h2 class="import-title">Import from YouTube</h2>
+        <p class="import-sub" id="import-sub">Pick the channels to add to your feed.</p>
+      </div>
+      <button class="import-close" id="import-close" type="button" aria-label="Close">×</button>
+    </div>
+    <div class="import-tools">
+      <input id="import-search" class="import-search" type="text" placeholder="Search…" autocomplete="off" autocorrect="off" spellcheck="false">
+      <button id="import-selectall" class="import-selectall" type="button">Select all</button>
+    </div>
+    <p class="import-note hidden" id="import-note"></p>
+    <ul class="import-list" id="import-list"></ul>
+    <p class="import-warn hidden" id="import-warn"></p>
+    <div class="import-foot">
+      <button id="import-cancel" class="import-cancel" type="button">Cancel</button>
+      <button id="import-add" class="import-add" type="button">Add</button>
+    </div>
+  </div>
+
+  <!-- Profile panel (TASK-028a): the account/identity surface, slid in from the left. The
+       account block (TASK-025) lives here now, so the add page stays channels-only. A dim
+       scrim + a ← rail on the panel's right edge close it (Escape too). -->
+  <div class="profile-scrim" id="profile-scrim"></div>
+  <aside class="profile-panel" id="profile-panel" role="dialog" aria-modal="true" aria-label="Settings" aria-hidden="true" tabindex="-1">
+    <div class="profile-body">
+      <div class="profile-id">
+        <div class="profile-id-av" id="profile-id-av">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.4 0-8 2.7-8 6v1h16v-1c0-3.3-3.6-6-8-6Z"/></svg>
+        </div>
+        <div class="profile-id-text">
+          <div class="profile-id-name" id="profile-id-name">Anonymous</div>
+          <div class="profile-id-sub" id="profile-id-sub">Not signed in. Channels saved on this device only</div>
+        </div>
+      </div>
+
+      <!-- Preferences (TASK-071): theme + manage-channels, folded into the Settings drawer. -->
+      <div class="pref-block">
+        <div class="pref-row">
+          <span class="pref-label">Theme</span>
+          <div class="pref-theme" role="group" aria-label="Theme">
+            <button type="button" class="theme-opt" data-theme="light" aria-label="Light theme">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+            </button>
+            <button type="button" class="theme-opt" data-theme="dark" aria-label="Dark theme">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/></svg>
+            </button>
+          </div>
+        </div>
+        <button class="pref-manage" id="btn-drawer-manage" type="button">
+          <span>Manage channels</span>
+          <span class="pref-arrow" aria-hidden="true">→</span>
+        </button>
+        <!-- [TASK-092] Replays the first-run tour from the start, whatever this device's record says. -->
+        <button class="pref-manage" id="btn-drawer-tour" type="button">
+          <span>Show the tour</span>
+          <span class="pref-arrow" aria-hidden="true">→</span>
+        </button>
+        <!-- [TASK-104] "Mark all done" moved here from the appbar. NOT redundant with [TASK-098]'s
+             per-topic button: ungrouped is the DEFAULT view, where no topic card exists at all, and
+             grouping is X-only ([TASK-094]) — so YouTube and Substack items never sit inside one and
+             a YouTube-only reader would never see a per-topic button in their life. Keeps its id, so
+             updateCount/showCaughtUp go on toggling it untouched, and keeps `hidden`, which is what
+             gives them something to reveal. Its handler CLOSES THIS DRAWER FIRST ([CHR-032]). -->
+        <button class="pref-manage btn-mark-all hidden" id="btn-mark-all" type="button">
+          <span>Mark all done</span>
+          <span class="pref-arrow" aria-hidden="true">✓</span>
+        </button>
+      </div>
+
+      <div class="acct-block" id="account">
+      <div class="acct-title">Account</div>
+
+      <!-- signed out -->
+      <div id="acct-out">
+        <p class="acct-desc">Sign in to sync your channels, archive &amp; settings across devices.</p>
+        <a class="acct-google" href="/api/auth/google/start">
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#4285F4" d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+            <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+            <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.997 8.997 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+            <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+          </svg>
+          Continue with Google
+        </a>
+        <div class="acct-or">or</div>
+        <div class="acct-form">
+          <input id="acct-email" class="acct-input" type="email" inputmode="email"
+                 autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false"
+                 placeholder="you@email.com">
+          <button id="acct-send" class="acct-btn" type="button">Send sign-in link</button>
+        </div>
+        <p class="acct-msg hidden" id="acct-msg"></p>
+      </div>
+
+      <!-- link sent -->
+      <div id="acct-sent" class="hidden">
+        <div class="acct-sent-panel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+          <div>
+            <div class="acct-sent-h">Check your email</div>
+            <div class="acct-sent-p">We sent a sign-in link to <b id="acct-sent-email"></b>. It works once and expires in 15 minutes.</div>
+          </div>
+        </div>
+        <button id="acct-different" class="acct-link" type="button">Use a different email</button>
+      </div>
+
+      <!-- signed in -->
+      <div id="acct-in" class="hidden">
+        <div class="acct-who">
+          <div class="acct-avatar" id="acct-avatar"></div>
+          <div>
+            <div class="acct-email" id="acct-in-email"></div>
+            <div class="acct-sync">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              Synced across your devices
+            </div>
+          </div>
+        </div>
+        <button id="acct-signout" class="acct-btn-quiet" type="button">Sign out</button>
+        <!-- Shown only when the server REFUSED the save (BUG-047), never on a network blip: that
+             write will never land, so refusing to sign out would wedge the drawer permanently.
+             Asli's call 2026-08-23 — let them out, having named what is lost. Same inline-panel
+             pattern as the delete confirm below, and no typing: losing un-pushed changes is not
+             account deletion. -->
+        <div id="acct-signout-confirm" class="acct-confirm hidden">
+          <p class="acct-confirm-note">Your recent changes couldn’t be saved — the saved copy is different. Signing out now will lose them on this device.</p>
+          <div class="acct-confirm-actions">
+            <button id="acct-signout-cancel" class="acct-btn-neutral" type="button">Cancel</button>
+            <button id="acct-signout-go" class="acct-btn-danger-solid" type="button">Sign out anyway</button>
+          </div>
+        </div>
+        <!-- Account data controls (TASK-028b): export + delete, signed-in only -->
+        <div class="acct-data">
+          <button id="acct-export" class="acct-btn-neutral" type="button">Export my data</button>
+          <button id="acct-delete-open" class="acct-btn-danger" type="button">Delete account</button>
+          <div id="acct-delete-confirm" class="acct-confirm hidden">
+            <p class="acct-confirm-note">This permanently deletes your account and everything we store for it, including the channels on this device. This can't be undone.</p>
+            <label class="acct-confirm-label" for="acct-delete-email">Type your email to confirm</label>
+            <input id="acct-delete-email" class="acct-input" type="email" inputmode="email" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="you@example.com">
+            <div class="acct-confirm-actions">
+              <button id="acct-delete-cancel" class="acct-btn-neutral" type="button">Cancel</button>
+              <button id="acct-delete-go" class="acct-btn-danger-solid" type="button" disabled>Permanently delete</button>
+            </div>
+            <p id="acct-delete-msg" class="acct-msg hidden"></p>
+          </div>
+        </div>
+      </div>
+      <!-- Privacy disclosure (TASK-070) — identified usage analytics. Minimal in-app note;
+           the full policy page rides with TASK-069/067. Shown whether signed in or not. -->
+      <div class="acct-privacy">
+        <div class="acct-privacy-title">Privacy</div>
+        <p>SousChef records how you use the app: sign-ins, which sections and features you open, and
+           when. This is linked to your account (or just this device before you sign in), so we can
+           understand usage and make SousChef better. We don’t record which specific videos or posts
+           you read or watch. Deleting your account removes this along with the rest of your data.</p>
+      </div>
+      </div>
+    </div>
+    <button class="profile-rail" id="profile-close" type="button" aria-label="Close profile">
+      <span class="profile-rail-arrow" aria-hidden="true">←</span>
+      <span class="profile-rail-label">Close</span>
+    </button>
+  </aside>
+
+  <!-- Bottom nav: switch between Feed and Archive (TASK-008). Shown only on the feed-side
+       views; hidden on setup. "+ Add channels" stays separate (in each appbar). -->
+  <nav id="bottom-nav" class="bottom-nav hidden" aria-label="Views">
+    <button type="button" class="nav-tab" data-view="view-archive">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+      <span>Archive</span>
+    </button>
+    <button type="button" class="nav-tab is-active" data-view="view-feed">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      <span>Feed</span>
+    </button>
+  </nav>
+
+  <!-- The first-run tour ([TASK-092]). BODY-LEVEL on purpose: inside a .view it would hide with that
+       view, and the feed part points at the appbar. z-index 55 — above the bottom nav (50), below the
+       Settings drawer (60/61), toasts (62) and the import picker (70/71), so an Undo stays reachable.
+       The dim is the ring's own shadow, which follows the control's corner radius; the four blockers
+       are transparent and only take the taps outside the cut-out. The layer, the ring and every
+       blocker ship `hidden` (display:none, so nothing here is in the tab order while it is down) and
+       are seeded in the harness's HIDDEN_IDS — docs.test.mjs asserts the two agree. -->
+  <div id="tour" class="tour hidden">
+    <div id="tour-block-top" class="tour-block hidden"></div>
+    <div id="tour-block-right" class="tour-block hidden"></div>
+    <div id="tour-block-bottom" class="tour-block hidden"></div>
+    <div id="tour-block-left" class="tour-block hidden"></div>
+    <div id="tour-ring" class="tour-ring hidden"></div>
+    <!-- A dialog labelled by its sentence, deliberately NOT aria-modal (Asli, 2026-09-15): a modal dialog tells
+         a screen reader that everything outside it is inert, and the highlighted control the card points at
+         lives outside it — VoiceOver could not reach the very thing the card asks the reader to use. -->
+    <div id="tour-card" class="tour-card" role="dialog" aria-labelledby="tour-text">
+      <p id="tour-part" class="tour-part"></p>
+      <p id="tour-text" class="tour-text"></p>
+      <div class="tour-foot">
+        <button id="tour-back" class="tour-back" type="button" aria-label="Previous card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <span id="tour-count" class="tour-count"></span>
+        <button id="tour-close" class="tour-close" type="button">Close</button>
+        <button id="tour-main" class="tour-main" type="button">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+  <!-- Vercel Web Analytics (cookieless; only served on the live Vercel domain) -->
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

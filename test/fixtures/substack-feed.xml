@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+<channel>
+<title><![CDATA[Slow Boring]]></title>
+<description><![CDATA[Analysis of political news]]></description>
+<link>https://www.slowboring.com</link>
+<image><url>https://substackcdn.com/image/slowboring-256x256.png</url><title>Slow Boring</title><link>https://www.slowboring.com</link></image>
+<generator>Substack</generator>
+<lastBuildDate>Tue, 07 Jul 2026 09:00:21 GMT</lastBuildDate>
+<item>
+<title><![CDATA[Where key battleground races stand four months before the midterm elections]]></title>
+<description><![CDATA[There is plenty of time before November, but conditions are telling.]]></description>
+<link>https://www.slowboring.com/p/battleground-races</link>
+<guid isPermaLink="false">https://www.slowboring.com/p/battleground-races</guid>
+<dc:creator><![CDATA[Halina Bennet]]></dc:creator>
+<pubDate>Mon, 06 Jul 2026 22:00:28 GMT</pubDate>
+<enclosure url="https://substackcdn.com/image/battleground-cover.jpg" length="0" type="image/jpeg"/>
+<content:encoded><![CDATA[<p>Long article body with a <a href="https://x.test">link</a> and a decoy <title>NOT THE TITLE</title> inside the HTML.</p>]]></content:encoded>
+</item>
+<item>
+<title><![CDATA[To save capitalism we need radical land-use reform]]></title>
+<description><![CDATA[Socialism is not the answer, but the status quo isn&#8217;t working.]]></description>
+<link>https://www.slowboring.com/p/land-use-reform</link>
+<guid isPermaLink="false">https://www.slowboring.com/p/land-use-reform</guid>
+<dc:creator><![CDATA[Matthew Yglesias]]></dc:creator>
+<pubDate>Mon, 06 Jul 2026 10:02:30 GMT</pubDate>
+<content:encoded><![CDATA[<p>Another body.</p>]]></content:encoded>
+</item>
+</channel>
+</rss>

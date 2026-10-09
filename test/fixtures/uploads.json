@@ -1,0 +1,1286 @@
+{
+  "kind": "youtube#playlistItemListResponse",
+  "etag": "LoxVU_5lU2V96mE2yRbOI8UA0Uo",
+  "nextPageToken": "EAAaHlBUOkNCa2lFRFZETjBaQk1VSTNRa0V5TVVFelF6aw",
+  "items": [
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "UxzKlr4_fu6_e1Pab20by-pU0mM",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLkxnYnlFRklMTEpJ",
+      "snippet": {
+        "publishedAt": "2026-07-03T16:00:02Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "$1 vs $10,000 Cake",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/LgbyEFILLJI/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/LgbyEFILLJI/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/LgbyEFILLJI/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/LgbyEFILLJI/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/LgbyEFILLJI/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 0,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "LgbyEFILLJI"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "LgbyEFILLJI",
+        "videoPublishedAt": "2026-07-03T16:00:02Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "hwCTv2deLco6WcO-xKggbpvuSD4",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLmlZbE9EdGt5d19J",
+      "snippet": {
+        "publishedAt": "2026-06-27T16:00:05Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "Survive 30 Days Chained To A Stranger, Win $250,000",
+        "description": "imagine being chained to a random stranger for 30 days lol\n\nNext time you’re roasting s’mores, pick up Feastables! You can find our products at Albertsons, Walmart, or Target :) https://feastables.com/pages/find-a-store FeastablesPartner\n\nSUBSCRIBE OR I TAKE YOUR DOG\n╔═╦╗╔╦╗╔═╦═╦╦╦╦╗╔═╗\n║╚╣║║║╚╣╚╣╔╣╔╣║╚╣═╣ \n╠╗║╚╝║║╠╗║╚╣║║║║║═╣\n╚═╩══╩═╩═╩═╩╝╚╩═╩═╝\n\nFor any questions or inquiries regarding this video, please reach out to chucky@mrbeastbusiness.com\n\nMusic Provided by https://www.extrememusic.com\n----------------------------------------------------------------\nFollow all of these or I will kick you\n• Facebook - https://www.facebook.com/MrBeast/\n• Twitter - https://twitter.com/MrBeast\n•  Instagram - https://www.instagram.com/mrbeast\n•  Im Hiring! - https://www.mrbeastjobs.com/\n--------------------------------------------------------------------",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/iYlODtkyw_I/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/iYlODtkyw_I/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/iYlODtkyw_I/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/iYlODtkyw_I/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/iYlODtkyw_I/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 1,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "iYlODtkyw_I"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "iYlODtkyw_I",
+        "videoPublishedAt": "2026-06-27T16:00:05Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "25CUNgEBJ4gaahTsKt3wikGwreU",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLllBX2tYOGh1MWdn",
+      "snippet": {
+        "publishedAt": "2026-06-26T16:00:01Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "This Plane Takes Off in 12 Seconds",
+        "description": "Learn more at lowes.com/kidsclub #lowespartner",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/YA_kX8hu1gg/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/YA_kX8hu1gg/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/YA_kX8hu1gg/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/YA_kX8hu1gg/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/YA_kX8hu1gg/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 2,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "YA_kX8hu1gg"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "YA_kX8hu1gg",
+        "videoPublishedAt": "2026-06-26T16:00:01Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "Hr5ie7E-plD9Xhg5F6FqZZB36lY",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLlhDR1Z1cmphNzNj",
+      "snippet": {
+        "publishedAt": "2026-06-24T16:00:14Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "I Raced The Fastest Man On Earth",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/XCGVurja73c/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/XCGVurja73c/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/XCGVurja73c/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/XCGVurja73c/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/XCGVurja73c/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 3,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "XCGVurja73c"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "XCGVurja73c",
+        "videoPublishedAt": "2026-06-24T16:00:14Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "n6K9duB8Yp4-ecTg8JY_fGqtpjk",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLnI5YVdlR3FwNDNz",
+      "snippet": {
+        "publishedAt": "2026-06-17T17:00:21Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "We Made Make-A-Wish Kids’ Dreams Come True",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/r9aWeGqp43s/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/r9aWeGqp43s/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/r9aWeGqp43s/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/r9aWeGqp43s/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/r9aWeGqp43s/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 4,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "r9aWeGqp43s"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "r9aWeGqp43s",
+        "videoPublishedAt": "2026-06-17T17:00:21Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "BCqX6Ob4mR7wxe8nc-p86UBkhzc",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLnhEdXVNM0VScjVR",
+      "snippet": {
+        "publishedAt": "2026-06-14T16:00:01Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "Guess The Youtuber = Win $1,000",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/xDuuM3ERr5Q/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/xDuuM3ERr5Q/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/xDuuM3ERr5Q/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/xDuuM3ERr5Q/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/xDuuM3ERr5Q/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 5,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "xDuuM3ERr5Q"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "xDuuM3ERr5Q",
+        "videoPublishedAt": "2026-06-14T16:00:01Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "lyuKtxlX6Csp6Cj3C0IXHDqj7x4",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLl9fZm1EajBaSjFR",
+      "snippet": {
+        "publishedAt": "2026-06-13T16:00:00Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "50 YouTube Legends Fight For $1,000,000",
+        "description": "50 YouTube legends all here in one video is actually insane 😅\n\nDon't let pain stop your momentum. Keep the moment going with MOTRIN®- grab it on Amazon https://a.co/d/01LFWI3W\n\nThanks to OverBuilt for providing the car crushers! Check out https://overbuilt.com \n\n\"Just Do It’ - Courtesy of LaBeouf, Rönkkö & Turner\n“MrBeast Faces His Scariest Challenge Yet While Eating Spicy Wings\" - Courtesy of First We Feast\nVanoss Gaming - pe$o$ by Evan Fong\nVolumetric Capture provided by Arcturus\n\nSUBSCRIBE OR I TAKE YOUR DOG\n╔═╦╗╔╦╗╔═╦═╦╦╦╦╗╔═╗\n║╚╣║║║╚╣╚╣╔╣╔╣║╚╣═╣ \n╠╗║╚╝║║╠╗║╚╣║║║║║═╣\n╚═╩══╩═╩═╩═╩╝╚╩═╩═╝\n\nFor any questions or inquiries regarding this video, please reach out to chucky@mrbeastbusiness.com\n\nMusic Provided by https://www.extrememusic.com\n----------------------------------------------------------------\nFollow all of these or I will kick you\n• Facebook - https://www.facebook.com/MrBeast/\n• Twitter - https://twitter.com/MrBeast\n•  Instagram - https://www.instagram.com/mrbeast\n•  Im Hiring! - https://www.mrbeastjobs.com/\n--------------------------------------------------------------------",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/__fmDj0ZJ1Q/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/__fmDj0ZJ1Q/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/__fmDj0ZJ1Q/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/__fmDj0ZJ1Q/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/__fmDj0ZJ1Q/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 6,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "__fmDj0ZJ1Q"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "__fmDj0ZJ1Q",
+        "videoPublishedAt": "2026-06-13T16:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "GQxQZp5JqvIq0Y1lMgVjeK234d4",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLnhDbDJnbmR6RnFF",
+      "snippet": {
+        "publishedAt": "2026-06-12T16:00:05Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "POV: You Time Traveled Back to 2016",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/xCl2gndzFqE/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/xCl2gndzFqE/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/xCl2gndzFqE/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/xCl2gndzFqE/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/xCl2gndzFqE/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 7,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "xCl2gndzFqE"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "xCl2gndzFqE",
+        "videoPublishedAt": "2026-06-12T16:00:05Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "3vhN9Fh-L_b3CJE8j_gNmn9Iu7s",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLkdwUVNVak5zTm0w",
+      "snippet": {
+        "publishedAt": "2026-05-30T16:00:02Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "7 Days Stranded in The Arctic",
+        "description": "can the boys and i survive the arctic for 7 days\n\nFind My Jack Link’s Beef Sticks at Walmart Now\nhttps://tinyurl.com/JackLinksBeefSticks\n\nNew Merch - https://mrbeast.store\n\nCheck out Viewstats! - https://www.viewstats.com/\n\nSUBSCRIBE OR I TAKE YOUR DOG\n╔═╦╗╔╦╗╔═╦═╦╦╦╦╗╔═╗\n║╚╣║║║╚╣╚╣╔╣╔╣║╚╣═╣ \n╠╗║╚╝║║╠╗║╚╣║║║║║═╣\n╚═╩══╩═╩═╩═╩╝╚╩═╩═╝\n\nFor any questions or inquiries regarding this video, please reach out to chucky@mrbeastbusiness.com\n\n----------------------------------------------------------------\nfollow all of these or i will kick you\n• Facebook - https://www.facebook.com/MrBeast/\n• Twitter - https://twitter.com/MrBeast\n•  Instagram - https://www.instagram.com/mrbeast\n•  Im Hiring! - https://www.mrbeastjobs.com/\n--------------------------------------------------------------------",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/GpQSUjNsNm0/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/GpQSUjNsNm0/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/GpQSUjNsNm0/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/GpQSUjNsNm0/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/GpQSUjNsNm0/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 8,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "GpQSUjNsNm0"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "GpQSUjNsNm0",
+        "videoPublishedAt": "2026-05-30T16:00:02Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "xpj4shsTZRhudSxvCM2HfQ7rkbw",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLnkxVVZBdEhBTGFB",
+      "snippet": {
+        "publishedAt": "2026-05-29T16:00:07Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "I Surprised a Random Subscriber With $10,000",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/y1UVAtHALaA/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/y1UVAtHALaA/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/y1UVAtHALaA/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/y1UVAtHALaA/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/y1UVAtHALaA/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 9,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "y1UVAtHALaA"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "y1UVAtHALaA",
+        "videoPublishedAt": "2026-05-29T16:00:07Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "ULn-gvLpS6MKQdGgDlupwNXkBO8",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLmhZYWhVX0Nxd3A4",
+      "snippet": {
+        "publishedAt": "2026-05-22T16:00:04Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "YouTube CEO Has A Surprise For Me",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/hYahU_Cqwp8/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/hYahU_Cqwp8/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/hYahU_Cqwp8/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/hYahU_Cqwp8/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/hYahU_Cqwp8/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 10,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "hYahU_Cqwp8"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "hYahU_Cqwp8",
+        "videoPublishedAt": "2026-05-22T16:00:04Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "9T1i7DPH1WSeGFTZlEy6Aifdtqw",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLlNsbFhhSmlRakJB",
+      "snippet": {
+        "publishedAt": "2026-05-19T16:00:02Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "Every Youtube Play Button",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SllXaJiQjBA/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SllXaJiQjBA/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SllXaJiQjBA/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/SllXaJiQjBA/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/SllXaJiQjBA/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 11,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "SllXaJiQjBA"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "SllXaJiQjBA",
+        "videoPublishedAt": "2026-05-19T16:00:02Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "-GEbCJ2b4ZHzktDrlvygoYeHnyI",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLmRxcEN2U1UtRUNF",
+      "snippet": {
+        "publishedAt": "2026-05-17T16:00:00Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "Can He Make This Shot?",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/dqpCvSU-ECE/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/dqpCvSU-ECE/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/dqpCvSU-ECE/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/dqpCvSU-ECE/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/dqpCvSU-ECE/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 12,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "dqpCvSU-ECE"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "dqpCvSU-ECE",
+        "videoPublishedAt": "2026-05-17T16:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "Z1nRan50KeGlDj8Zl4KEQ6xxAk4",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLkFhTWRYWk12VDN3",
+      "snippet": {
+        "publishedAt": "2026-05-16T16:00:01Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "Survive 30 Days On An Island With Your Ex, Win $250,000",
+        "description": "imagine being trapped on an island with 6 of your exes \n\nThe Sheep Detectives - Now Playing Only In Theaters. Get tickets now: https://www.amazon.com/SALP/thesheepdetectives\n\nNew and current subscribers will receive an entry for a chance to win during the sweepstakes period (May 15, 2026 - June 14, 2026). YouTube account must be set to public and include a valid email address. No purchase necessary. Must be 18+. Full rules at https://bit.ly/MrB_Cash_Giveaway\n\nNew Merch - https://mrbeast.store\n\nCheck out Viewstats! - https://www.viewstats.com/\n\nSUBSCRIBE OR I TAKE YOUR DOG\n╔═╦╗╔╦╗╔═╦═╦╦╦╦╗╔═╗\n║╚╣║║║╚╣╚╣╔╣╔╣║╚╣═╣ \n╠╗║╚╝║║╠╗║╚╣║║║║║═╣\n╚═╩══╩═╩═╩═╩╝╚╩═╩═╝\n\nFor any questions or inquiries regarding this video, please reach out to chucky@mrbeastbusiness.com\n\n----------------------------------------------------------------\nfollow all of these or i will kick you\n• Facebook - https://www.facebook.com/MrBeast/\n• Twitter - https://twitter.com/MrBeast\n•  Instagram - https://www.instagram.com/mrbeast\n•  Im Hiring! - https://www.mrbeastjobs.com/\n--------------------------------------------------------------------",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/AaMdXZMvT3w/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/AaMdXZMvT3w/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/AaMdXZMvT3w/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/AaMdXZMvT3w/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/AaMdXZMvT3w/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 13,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "AaMdXZMvT3w"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "AaMdXZMvT3w",
+        "videoPublishedAt": "2026-05-16T16:00:01Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "SJdPUoNZWmDCeFYTkOPNwLZV1ck",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLlFBa0VNdEpwcTNj",
+      "snippet": {
+        "publishedAt": "2026-05-15T16:00:10Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "Hit The Button, Win $1,000",
+        "description": "New and current subscribers will receive an entry for a chance to win during the sweepstakes period (May 15, 2026 - June 14, 2026). YouTube account must be set to public and include a valid email address. No purchase necessary. Must be 18+. Full rules at https://bit.ly/MrB_Cash_Giveaway",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/QAkEMtJpq3c/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/QAkEMtJpq3c/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/QAkEMtJpq3c/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/QAkEMtJpq3c/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/QAkEMtJpq3c/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 14,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "QAkEMtJpq3c"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "QAkEMtJpq3c",
+        "videoPublishedAt": "2026-05-15T16:00:10Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "lQ9cNHzChv2gsdqV_n6rTGOvsfc",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLmhDdXFoMk5VMlln",
+      "snippet": {
+        "publishedAt": "2026-05-12T16:00:07Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "World's Fastest Date",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/hCuqh2NU2Yg/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/hCuqh2NU2Yg/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/hCuqh2NU2Yg/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/hCuqh2NU2Yg/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/hCuqh2NU2Yg/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 15,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "hCuqh2NU2Yg"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "hCuqh2NU2Yg",
+        "videoPublishedAt": "2026-05-12T16:00:07Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "mcwPUZzVa16CugBvtTBxB364Gpg",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLkI5TGl6T0FBb0xn",
+      "snippet": {
+        "publishedAt": "2026-05-07T16:00:00Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "I’m Granting Wishes For My Subscribers",
+        "description": "Disclaimer: We are contributing cash towards the wish of your choosing. Rules and conditions apply. Please visit https://bit.ly/MrB_Birthday_YT for additional rules and details.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/B9LizOAAoLg/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/B9LizOAAoLg/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/B9LizOAAoLg/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/B9LizOAAoLg/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/B9LizOAAoLg/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 16,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "B9LizOAAoLg"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "B9LizOAAoLg",
+        "videoPublishedAt": "2026-05-07T16:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "Ki11TZ8rVwgIeYjwkdWqjM1tlko",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLnJxc1JkZmRONHVJ",
+      "snippet": {
+        "publishedAt": "2026-05-05T16:00:02Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "Guess The Animal",
+        "description": "Filming with these animals was so fun! We had the American Humane Society on set throughout filming to make sure all the animals were safe and cared for. They gave us their official “No Animals Were Harmed®” stamp of approval.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/rqsRdfdN4uI/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/rqsRdfdN4uI/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/rqsRdfdN4uI/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/rqsRdfdN4uI/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/rqsRdfdN4uI/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 17,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "rqsRdfdN4uI"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "rqsRdfdN4uI",
+        "videoPublishedAt": "2026-05-05T16:00:02Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "16mS1KD81ny54rL06KaQUknN42A",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLmZldTVQUXZvQ2lB",
+      "snippet": {
+        "publishedAt": "2026-05-03T16:00:11Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "Asking My Fiancée on a Date",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/feu5PQvoCiA/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/feu5PQvoCiA/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/feu5PQvoCiA/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/feu5PQvoCiA/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/feu5PQvoCiA/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 18,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "feu5PQvoCiA"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "feu5PQvoCiA",
+        "videoPublishedAt": "2026-05-03T16:00:11Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "At_fwg3KjfdGwPjs5n5rSjTRTRU",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLjZaeTVWTGNFYlpj",
+      "snippet": {
+        "publishedAt": "2026-05-02T16:00:01Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "I Stranded 100 People In The Wilderness For $250,000",
+        "description": "what wins in a battle of survival, knowledge or resources?\n\nThanks to Bass Pro Shops for providing these teams with some awesome gear. Shop here: https://www.basspro.com/home\n\nDisclaimer: We are contributing cash towards the wish of your choosing. Rules and conditions apply. Please visit https://bit.ly/MrB_Birthday_YT for additional rules and details.\n\nThe survivalists were told they’d be in a MrBeast Survival video so they packed for that. They were also given a small limited amount of food and gear like rice, beans, fishing gear, first aid kits, and a few tarps.\n\nSUBSCRIBE OR I TAKE YOUR DOG\n╔═╦╗╔╦╗╔═╦═╦╦╦╦╗╔═╗\n║╚╣║║║╚╣╚╣╔╣╔╣║╚╣═╣ \n╠╗║╚╝║║╠╗║╚╣║║║║║═╣\n╚═╩══╩═╩═╩═╩╝╚╩═╩═╝\n\nFor any questions or inquiries regarding this video, please reach out to chucky@mrbeastbusiness.com\n\nMusic Provided by https://www.extrememusic.com\n----------------------------------------------------------------\nFollow all of these or I will kick you\n• Facebook - https://www.facebook.com/MrBeast/\n• Twitter - https://twitter.com/MrBeast\n•  Instagram - https://www.instagram.com/mrbeast\n•  Im Hiring! - https://www.mrbeastjobs.com/\n--------------------------------------------------------------------",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/6Zy5VLcEbZc/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/6Zy5VLcEbZc/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/6Zy5VLcEbZc/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/6Zy5VLcEbZc/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/6Zy5VLcEbZc/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 19,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "6Zy5VLcEbZc"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "6Zy5VLcEbZc",
+        "videoPublishedAt": "2026-05-02T16:00:01Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "XepFlqnn5qTa5x0ioJg0bQnqtaA",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLkVkVDVaMTZZNVdF",
+      "snippet": {
+        "publishedAt": "2026-04-29T16:00:05Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "Would Your Dog Pick $10,000 or Steak?",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/EdT5Z16Y5WE/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/EdT5Z16Y5WE/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/EdT5Z16Y5WE/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/EdT5Z16Y5WE/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/EdT5Z16Y5WE/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 20,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "EdT5Z16Y5WE"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "EdT5Z16Y5WE",
+        "videoPublishedAt": "2026-04-29T16:00:05Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "Gj8PDsYXogAmlt2fcvbcciQROgE",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLlNjalFBY2JBOWU0",
+      "snippet": {
+        "publishedAt": "2026-04-28T16:00:24Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "Important Announcement From The Grocery Store",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/ScjQAcbA9e4/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/ScjQAcbA9e4/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/ScjQAcbA9e4/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/ScjQAcbA9e4/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/ScjQAcbA9e4/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 21,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "ScjQAcbA9e4"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "ScjQAcbA9e4",
+        "videoPublishedAt": "2026-04-28T16:00:24Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "1_0J9F-nyg6_Q4yz4Oa-vbaTjNk",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLmhSQnBEZFdiVXBJ",
+      "snippet": {
+        "publishedAt": "2026-04-27T19:01:02Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "Can My Fiancée Lift Me?",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/hRBpDdWbUpI/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/hRBpDdWbUpI/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/hRBpDdWbUpI/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/hRBpDdWbUpI/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/hRBpDdWbUpI/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 22,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "hRBpDdWbUpI"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "hRBpDdWbUpI",
+        "videoPublishedAt": "2026-04-27T19:01:02Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "oYapCBmG9qMV0F4un3p9cnzr4c4",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLnB6eHRHTDlrelBz",
+      "snippet": {
+        "publishedAt": "2026-04-24T16:00:00Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "Try Not To Get Slimed",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/pzxtGL9kzPs/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/pzxtGL9kzPs/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/pzxtGL9kzPs/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/pzxtGL9kzPs/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/pzxtGL9kzPs/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 23,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "pzxtGL9kzPs"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "pzxtGL9kzPs",
+        "videoPublishedAt": "2026-04-24T16:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "sPH_eL6nO8H657bumYFEqWlkPl8",
+      "id": "VVVYNk9RM0RrY3NiWU5FNkg4dVFRdVZBLnl5LU50MGRSaE5J",
+      "snippet": {
+        "publishedAt": "2026-04-21T16:00:02Z",
+        "channelId": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "title": "Winner Picks Our Honeymoon",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/yy-Nt0dRhNI/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/yy-Nt0dRhNI/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/yy-Nt0dRhNI/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/yy-Nt0dRhNI/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/yy-Nt0dRhNI/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "MrBeast",
+        "playlistId": "UUX6OQ3DkcsbYNE6H8uQQuVA",
+        "position": 24,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "yy-Nt0dRhNI"
+        },
+        "videoOwnerChannelTitle": "MrBeast",
+        "videoOwnerChannelId": "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      },
+      "contentDetails": {
+        "videoId": "yy-Nt0dRhNI",
+        "videoPublishedAt": "2026-04-21T16:00:02Z"
+      }
+    }
+  ],
+  "pageInfo": {
+    "totalResults": 991,
+    "resultsPerPage": 25
+  }
+}

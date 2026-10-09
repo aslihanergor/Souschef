@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "focus-social.app" }],
+      "destination": "https://trysouschef.vercel.app/$1",
+      "permanent": false
+    },
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "focus-social.vercel.app" }],
+      "destination": "https://trysouschef.vercel.app/$1",
+      "permanent": false
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains" },
+        { "key": "X-Content-Type-Options",    "value": "nosniff" },
+        { "key": "X-Frame-Options",           "value": "DENY" },
+        { "key": "Permissions-Policy",         "value": "geolocation=(), camera=(), microphone=(), payment=(), usb=()" },
+        { "key": "Content-Security-Policy",    "value": "default-src 'self'; script-src 'self' 'sha256-EdnzONIQ42osYbDuXndN2A0AouEKYCHD4qm9JJLYdu4=' https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://i.ytimg.com https://yt3.ggpht.com https://*.googleusercontent.com https://pbs.twimg.com https://substackcdn.com https://substack-post-media.s3.amazonaws.com; media-src 'self' https://video.twimg.com; frame-src https://www.youtube.com; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" }
+      ]
+    }
+  ]
+}

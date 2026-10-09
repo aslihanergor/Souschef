@@ -1,0 +1,9 @@
+#!/bin/sh
+# Pre-commit gate: the test suite must be green before a commit lands.
+#
+# Activated by `git config core.hooksPath .githooks` — the package.json "prepare"
+# script sets this automatically on `npm install`, so there's no manual setup. This
+# is the fast local gate; the GitHub Actions workflow is the backstop that a
+# `git commit --no-verify` bypass can't dodge.
+
+npm test

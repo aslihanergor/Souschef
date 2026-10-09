@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="referrer" content="same-origin">
+  <meta name="robots" content="index, follow">
+
+  <!-- Public landing / explainer (TASK-069), rebuilt as a scroll-driven dot story (TASK-091).
+       Carries JavaScript since TASK-091 — /landing.js, loaded as an EXTERNAL file because
+       vercel.json's script-src allows 'self' plus one hashed snippet (which lives in
+       app/index.html) and no 'unsafe-inline'; an inline script here is blocked at runtime and the
+       stage renders as a dead black rectangle. Pinned by test/public-landing.test.mjs.
+       The CSS defaults are the no-JavaScript state; /landing.js adds `js-stage` to <html> and
+       takes over. Light/dark follows the OS via prefers-color-scheme — except the stage, which
+       commits to one dark world on purpose (a gold bloom is invisible on cream). -->
+
+  <title>SousChef: a feed you can finish</title>
+  <meta name="description" content="SousChef is a finishable feed for the YouTube channels, X accounts and Substacks you follow. One calm, chronological feed you can actually reach the end of. No algorithm, no infinite scroll.">
+
+  <!-- Open Graph / Twitter (TASK-071: og:image is the branded card at /og-image.png). -->
+  <meta property="og:title" content="SousChef: a feed you can finish">
+  <meta property="og:description" content="Everything you follow, in one calm chronological feed you can actually finish. No algorithm, no infinite scroll.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://trysouschef.vercel.app/">
+  <meta property="og:image" content="https://trysouschef.vercel.app/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://trysouschef.vercel.app/og-image.png">
+
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Ccircle%20cx%3D%2211%22%20cy%3D%2215%22%20r%3D%225.5%22%20fill%3D%22%232f8f6b%22%2F%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2210.5%22%20r%3D%226.5%22%20fill%3D%22%232f8f6b%22%2F%3E%3Ccircle%20cx%3D%2221%22%20cy%3D%2215%22%20r%3D%225.5%22%20fill%3D%22%232f8f6b%22%2F%3E%3Crect%20x%3D%229.5%22%20y%3D%2212%22%20width%3D%2213%22%20height%3D%2211%22%20rx%3D%224.5%22%20fill%3D%22%232f8f6b%22%2F%3E%3Crect%20x%3D%2210.5%22%20y%3D%2221%22%20width%3D%2211%22%20height%3D%227.6%22%20rx%3D%222%22%20fill%3D%22%2325735a%22%2F%3E%3C%2Fsvg%3E">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+  <style>
+    :root {
+      color-scheme: light;
+      --toque-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%225%203.5%2022%2025.5%22%3E%3Cg%20fill%3D%22%23000%22%3E%3Ccircle%20cx%3D%2211%22%20cy%3D%2215%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2210.5%22%20r%3D%226.5%22%2F%3E%3Ccircle%20cx%3D%2221%22%20cy%3D%2215%22%20r%3D%225.5%22%2F%3E%3Crect%20x%3D%229.5%22%20y%3D%2212%22%20width%3D%2213%22%20height%3D%2211%22%20rx%3D%224.5%22%2F%3E%3Crect%20x%3D%2210.5%22%20y%3D%2221%22%20width%3D%2211%22%20height%3D%227.6%22%20rx%3D%222%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
+      --bg: #f7f6f3; --surface: #ffffff; --ink: #1c1d22; --ink-soft: #6b6f76;
+      --line: #ecebe6; --accent: #2f8f6b; --accent-active: #266f53; --faint: #b0b4bb;
+      --radius-btn: 11px;
+
+      /* The stage's own world — fixed across themes. A gold bloom is invisible on cream,
+         so the dot story commits to dark and only its ENDING is theme-aware. */
+      --void:   #0e1014;
+      --void-2: #16191f;
+      --noise:  #5b626e;
+      --chosen: #3fa37d;
+      --bloom:  #e0aa4f;
+      --stage-ink: #eceef1;
+      --stage-dim: #8b939f;
+
+      /* What the stage lifts INTO at the end. It cannot just be --bg: in dark mode that is
+         #131419 against a #0e1014 void — a 3-point difference — so the final beat would render
+         as nothing at all. Dark mode gets a gentle brightening; light mode the full open-up. */
+      --lift-to: #f7f6f3;
+
+      --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --bg: #131419; --surface: #1c1e25; --ink: #e8e9ec; --ink-soft: #9498a1;
+        --line: #2a2d36; --accent: #3fa37d; --accent-active: #4fb98f; --faint: #6b7079;
+        --lift-to: #1e2129;
+      }
+    }
+    * { box-sizing: border-box; }
+    /* `scroll-behavior: smooth` was here for the old "See how it works" anchor, which TASK-091
+       deleted. It is actively harmful now: scroll restoration on reload would smooth-animate
+       through all five beats. */
+    body {
+      margin: 0; background: var(--bg); color: var(--ink);
+      font: 16px/1.6 var(--sans);
+      -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+      overflow-x: hidden;
+    }
+    a { color: inherit; }
+    .container { width: 100%; max-width: 1040px; margin: 0 auto; padding: 0 22px; }
+    :focus-visible { outline: 2px solid var(--bloom); outline-offset: 3px; border-radius: 4px; }
+
+    /* ── Top bar. Rides dark over the stage, swaps at the seam (BRIEF non-negotiable #6) ── */
+    .nav {
+      position: fixed; inset: 0 0 auto 0; z-index: 40;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 13px clamp(16px, 4vw, 34px);
+      border-bottom: 1px solid transparent;
+      color: var(--stage-ink);
+      background: rgba(14, 16, 20, .55);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      transition: background .45s ease, border-color .45s ease, color .45s ease;
+    }
+    .nav.day {
+      color: var(--ink);
+      background: color-mix(in srgb, var(--bg) 82%, transparent);
+      border-bottom-color: var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 18px; letter-spacing: -.01em; }
+    /* Green toque, neutral wordmark. Green carries MEANING on this page ("yours"), so spending
+       it on the wordmark too blunts what the animation is teaching, and competes with the CTA. */
+    .brand .dot {
+      width: 15px; height: 16px; flex: none; background: var(--chosen);
+      -webkit-mask: var(--toque-mask) center/contain no-repeat; mask: var(--toque-mask) center/contain no-repeat;
+      transition: background .45s ease;
+    }
+    .nav.day .brand .dot { background: var(--accent); }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px; justify-content: center;
+      background: var(--chosen); color: #06120d; border: none; border-radius: var(--radius-btn);
+      padding: 10px 18px; font-size: 15px; font-weight: 600; text-decoration: none; cursor: pointer;
+      transition: filter .18s, transform .15s, background .45s ease, color .45s ease;
+    }
+    .btn:hover { filter: brightness(1.08); }
+    .btn:active { transform: translateY(1px); }
+    .nav.day .btn { background: var(--accent); color: #fff; }
+    .btn-lg { padding: 14px 26px; font-size: 17px; }
+
+    /* ── The stage: a tall scroll track driving a pinned viewport ──────────────
+       Without JavaScript it collapses to a single screen — otherwise a visitor whose script
+       was blocked scrolls through seven blank viewports to reach the footer. */
+    .stage { position: relative; height: 100vh; background: var(--void); }
+    .js-stage .stage { height: 450vh; }
+    .pin {
+      position: sticky; top: 0; overflow: hidden;
+      /* Sized to the SMALL viewport (BUG-084). `100vh` on iOS resolves to the LARGE viewport —
+         the one with the URL bar hidden — so with the bar showing, 41px of the pin sat permanently
+         below the fold and anything laid out against its bottom edge (the phone, the scroll hint)
+         was cut off no matter how it was sized. Measured on a handset: pin 754 against innerHeight
+         713.
+
+         `svh` is the right unit and `dvh` is a trap. Both `vh` and `svh` are STABLE — they do not
+         change when the URL bar hides — which is what BUG-079's fix depends on, since layout()
+         measures this box as the canvas's coordinate space. `dvh` changes on the first scroll and
+         would resurrect that bug exactly.
+
+         The 41px that appear below the pin once the bar hides are seamless: this gradient's outer
+         stop is already `--void`, which is `.stage`'s own background. */
+      height: 100vh;
+      height: 100svh;
+      background: radial-gradient(120% 90% at 50% 42%, var(--void-2) 0%, var(--void) 62%);
+    }
+    #field { position: absolute; inset: 0; display: block; }
+
+    /* Light spreading out from the phone screen at the very end. */
+    .daylight {
+      position: absolute; inset: 0; pointer-events: none; opacity: 0;
+      background: radial-gradient(circle at var(--lx, 50%) var(--ly, 50%),
+        var(--lift-to) 0 calc(var(--lr, 0) * 1%), transparent calc(var(--lr, 0) * 1.75%));
+    }
+
+    .pin-grid {
+      position: absolute; inset: 0; z-index: 3;
+      display: grid; grid-template-columns: minmax(0, 47%) minmax(0, 53%);
+      align-items: center; gap: 0;
+      padding: 84px clamp(20px, 5vw, 64px) 40px;
+      pointer-events: none;
+    }
+    .pin-grid > * { pointer-events: auto; }
+
+    /* ── Hero copy ── */
+    /* NOT `opacity: var(--copyfade)` — that lived here and cost the page two defects (BUG-085).
+       This element wraps the headline and #stage-cta as well as the subhead, so fading it faded
+       all three: it swallowed the third clause lighting up at p=0.60 (nine words dimmed together
+       instead), and it rendered the page's only CTA at 26% on every phone (round-1 H1). The fade
+       belongs on the one element it was ever meant for — see `.sub`. */
+    .copy { max-width: 33rem; transition: color .5s ease; }
+    .copy.day { color: var(--ink); }
+    .copy h1 {
+      font-size: clamp(30px, 4.4vw, 55px); line-height: 1.04; letter-spacing: -.032em;
+      font-weight: 800; margin: 0 0 20px; text-wrap: balance;
+    }
+    /* Default = every clause lit, so a page without JavaScript is fully readable. /landing.js
+       adds `js-stage`, which hands the clause-by-clause lighting over to the animation. */
+    .copy h1 .w { color: var(--stage-ink); transition: color .5s ease; }
+    /* 4.67:1 on --void-2, where this copy actually sits — over the 3:1 large-text floor, which
+       #565d68 (2.65:1) was under, against acceptance criterion 2. What the beat needs is the
+       lit/unlit DELTA, not darkness: lit is 15.14:1, so the gap still reads as three times the
+       contrast. Pinned by test/public-landing.test.mjs. */
+    .js-stage .copy h1 .w { color: #7c8492; }
+    .js-stage .copy h1 .w.lit { color: var(--stage-ink); }
+    .copy.day h1 .w { color: #b6b2a8; }
+    .copy.day h1 .w.lit { color: var(--ink); }
+    .sub {
+      font-size: clamp(15px, 1.4vw, 17.5px); line-height: 1.55; color: var(--stage-dim);
+      margin: 0 0 26px; max-width: 34ch; transition: color .5s ease;
+      /* The mobile step-back, and the only element that should carry it (BUG-085). The subhead is
+         the one part of the copy whose job is finished once the phone takes over, so stepping it
+         back is the whole intent. The headline is the page's argument and its clauses ARE the
+         beats; the CTA is the page's only conversion path. Neither should ever be dimmed by this.
+         The writer still sets --copyfade on `.copy` and it inherits down to here — mobile-only,
+         flat 1 above 860px. */
+      opacity: var(--copyfade, 1);
+    }
+    .copy.day .sub { color: var(--ink-soft); }
+
+    /* ── Platform rows ── */
+    .rows { display: flex; flex-direction: column; gap: 13px; }
+    /* nowrap on purpose: with wrap, the whole platform list jumps to its own line instead of
+       shrinking, which orphans the label. Wrapping happens inside .plats instead. */
+    .row { display: flex; align-items: baseline; gap: 14px; flex-wrap: nowrap; }
+    .row-label {
+      font: 600 10.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+      color: var(--stage-dim); flex: none; width: 7.4rem;
+    }
+    .copy.day .row-label { color: var(--ink-soft); }
+    .plats { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; flex: 1 1 auto; min-width: 0; }
+    .plat { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--stage-ink); }
+    .plat svg { width: 17px; height: 17px; flex: none; }
+    .row.soon .plat { opacity: .45; }
+    .tell {
+      font-size: 12.5px; color: var(--bloom); text-decoration: none;
+      border-bottom: 1px solid color-mix(in srgb, var(--bloom) 40%, transparent);
+      padding-bottom: 1px; white-space: nowrap;
+    }
+    .tell:hover { border-bottom-color: var(--bloom); }
+    .sep { color: var(--stage-dim); opacity: .5; }
+
+    /* ── The page's one CTA, arriving with the daylight (TASK-091) ──
+       Visible by default so a no-JavaScript visitor still has a way in; the animation hides it
+       until the story lands. The nav button is always on screen regardless. */
+    #stage-cta { margin-top: 26px; }
+    .js-stage #stage-cta {
+      opacity: 0; pointer-events: none;
+      transform: translateY(6px);
+      transition: opacity .7s ease, transform .7s ease;
+    }
+    .js-stage #stage-cta.on { opacity: 1; pointer-events: auto; transform: none; }
+
+    .hint {
+      display: none;
+      position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%);
+      z-index: 4; font: 500 10.5px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase;
+      color: var(--stage-dim); align-items: center; gap: 9px;
+      transition: opacity .4s ease;
+    }
+    .js-stage .hint { display: flex; }
+    .hint i { display: block; width: 1px; height: 20px; background: linear-gradient(var(--stage-dim), transparent); }
+
+    /* ── Phone ── */
+    .visual { display: grid; place-items: center; height: 100%; }
+    .phone {
+      position: relative; width: min(292px, 74%); aspect-ratio: 292 / 596;
+      border-radius: 40px; padding: 11px;
+      background: linear-gradient(168deg, #2b3038, #14171c 58%);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.09), 0 40px 90px rgba(0,0,0,.55);
+      opacity: 0; transition: opacity .05s linear;
+    }
+    .phone::before {
+      content: ""; position: absolute; top: 19px; left: 50%; transform: translateX(-50%);
+      width: 62px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.13); z-index: 3;
+    }
+    .screen {
+      position: relative; height: 100%; border-radius: 30px; overflow: hidden;
+      background: #f7f6f3; color: #1c1d22;
+      display: flex; flex-direction: column;
+      box-shadow: 0 0 60px rgba(224,170,79,.10);
+    }
+    .screen-top {
+      flex: none; display: flex; align-items: center; justify-content: space-between;
+      padding: 26px 15px 11px; border-bottom: 1px solid #ecebe6;
+    }
+    .screen-top b { font-size: 13.5px; letter-spacing: -.01em; }
+    .screen-top span { font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #8d9198; }
+    .feed { flex: 1; padding: 9px; display: flex; flex-direction: column; gap: 7px; overflow: hidden; }
+
+    .post {
+      background: #fff; border: 1px solid #ecebe6; border-radius: 11px;
+      padding: 9px 10px; opacity: 0; transform: translateY(9px) scale(.97);
+      max-height: 90px;
+      transition: opacity .28s ease, transform .28s ease;
+    }
+    .post.in { opacity: 1; transform: none; }
+    .post.cleared {
+      opacity: 0; transform: translateX(78%);
+      max-height: 0; padding-top: 0; padding-bottom: 0; margin-bottom: -7px; border-width: 0;
+      transition: opacity .3s ease, transform .34s cubic-bezier(.4,0,.6,1),
+                  max-height .34s ease .06s, padding .34s ease .06s, margin .34s ease .06s;
+    }
+    .p-kind {
+      display: inline-flex; align-items: center; gap: 4px;
+      font: 600 8.5px/1 var(--mono); letter-spacing: .09em; text-transform: uppercase;
+      color: #8d9198; margin-bottom: 4px;
+    }
+    .p-kind .swatch { width: 5px; height: 5px; border-radius: 50%; background: var(--chosen); }
+    .p-title { font-size: 11.5px; line-height: 1.32; font-weight: 600; letter-spacing: -.005em; margin: 0; }
+    .p-meta { font-size: 10px; color: #83878e; margin: 3px 0 0; }
+    .post.topic { background: linear-gradient(#fff, #f4f8f6); border-color: #dbe8e2; }
+
+    .caught {
+      position: absolute; inset: 0; display: grid; place-content: center; justify-items: center;
+      gap: 10px; text-align: center; padding: 24px; background: #f7f6f3;
+      opacity: 0; pointer-events: none; transition: opacity .5s ease;
+    }
+    .caught.on { opacity: 1; }
+    .caught .ring {
+      width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center;
+      background: color-mix(in srgb, var(--chosen) 15%, transparent);
+      color: var(--chosen); font-size: 19px; font-weight: 700;
+    }
+    .caught b { font-size: 14px; letter-spacing: -.01em; }
+    .caught small { font-size: 10.5px; color: #83878e; line-height: 1.45; max-width: 20ch; }
+
+    /* ── Footer ── */
+    footer { border-top: 1px solid var(--line); padding: 28px 0; }
+    footer .container { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    footer .f-links { display: flex; gap: 20px; }
+    footer a { color: var(--ink-soft); text-decoration: none; font-size: 14px; }
+    footer a:hover { color: var(--ink); }
+    footer .f-copy { color: var(--faint); font-size: 13px; }
+    footer .brand .dot { background: var(--accent); }
+
+    /* ── Responsive ── */
+    @media (max-width: 860px) {
+      /* ── The mobile stage is a vertical budget, and it did not balance (BUG-084) ──
+         Measured on a handset at 402x713 visible: 74 top + 311 copy + 14 gap + 441 phone + 30
+         bottom = 870 against 713. A 157px deficit, which surfaced as TWO reported bugs — the phone
+         spilling out the bottom, and the dot queue shoved up into the subhead because nothing was
+         left between the copy and the phone (BUG-083).
+
+         Three claimants, and they cannot all keep what they have. What gives:
+           - the CTA and the platform rows leave the FLOW (below). ~156px, and free.
+           - the gap becomes the queue's band, declared rather than hoped for.
+           - the phone takes what remains, which is ~180px wide against 216 today.
+         Nothing is a magic number: the phone is sized by subtraction, so it stays correct as the
+         headline rewraps or the OS font scales. */
+      .pin-grid {
+        grid-template-columns: 1fr;
+        /* minmax(0, 1fr) rather than 1fr: `1fr` means `minmax(auto, 1fr)`, whose MINIMUM is its
+           content — so the 441px phone forced this row to 441 and pushed the grid 22px past the
+           pin. That was the original overflow. */
+        grid-template-rows: auto minmax(0, 1fr);
+        align-items: start; padding: 74px 22px 30px;
+        /* Not spacing — this IS the band the dot queue forms in, between the copy above and the
+           phone below. It was 14px, which is why the queue had to be drawn over the subhead. */
+        gap: 74px;
+      }
+      .copy { max-width: none; position: relative; }
+      .copy h1 { font-size: clamp(26px, 7.6vw, 36px); margin-bottom: 13px; }
+      .sub { margin-bottom: 18px; font-size: 14.5px; }
+      .row { gap: 8px; }
+      .row-label { width: auto; }
+
+      /* ── The rows and the CTA leave the flow, and cost nothing to do it ──
+         Together they reserve ~156px of vertical space for the entire story while being visible
+         for almost none of it. The platform rows fade to zero by p=0.33; the phone does not appear
+         until p=0.35. The CTA arrives at p≈0.93, by which point the rows are long gone. So out of
+         flow they occupy exactly the space the phone will later use, only while the phone is
+         invisible — and the two never overlap at any point in the story.
+
+         They share one slot deliberately, for the same reason. `top: 100%` anchors them to the
+         copy's own bottom edge, so neither carries a hardcoded offset that a headline rewrap would
+         invalidate. Both stay DOM children of `.copy`, so `--copyfade` still multiplies them —
+         round-1 H1's coupling is unchanged and its test still guards it. */
+      #rows, #stage-cta { position: absolute; top: 100%; }
+      #rows { left: 0; right: 0; }
+      #stage-cta { left: 0; }          /* no `right`, so the button still shrink-wraps */
+
+      /* ── The phone is sized by the room it HAS, not by its width (BUG-084) ──
+         It used to be `width: min(216px, 62%)` with the aspect-ratio deriving the height, so it
+         asked for 216 x 441 regardless of the space available and its bottom was cut off by .pin's
+         overflow:hidden — including at the final beat, where the caught-up card is the one thing
+         the whole page exists to show.
+
+         `grid-template-rows: minmax(0, 1fr)` here is the load-bearing line, and it is easy to read
+         as redundant. It is not. A first attempt at this fix wrote the same `height: min(100%, …)`
+         below WITHOUT it, and the fix was completely inert — the handset measured `phone css
+         h=440.875px`, i.e. the cap had chosen its 441 branch, and the rendering was pixel-identical
+         to the bug. The reason: `.visual` is itself a grid, its single implicit row is `auto`, and
+         so the phone's `height: 100%` resolved against a box sized by the phone's own content. A
+         cycle, which CSS settles at the content size. Making the row `minmax(0, 1fr)` gives the
+         percentage something definite to resolve against, and only then does the cap bind.
+
+         The cap is on HEIGHT rather than width for a separate reason: with a definite height plus
+         an aspect-ratio, a binding max-width clamps the width WITHOUT recomputing the height, so
+         the ratio breaks silently and the mock renders stretched. On a tall handset the derived
+         width exceeds 216, so a max-width WOULD bind and do exactly that. Capping height keeps
+         width derived from it, so the ratio can never be violated. It is the old 216px width
+         expressed in the other dimension, written as the arithmetic so the derivation stays
+         readable rather than appearing as an unexplained 441.
+
+         No magic number survives: the phone fits whatever row it is given, so it self-corrects for
+         headline rewrap, OS font scaling and handset height — the things the original could not
+         see. layout() re-reads #screen's rect on every resize, so the dot flight targets follow. */
+      .visual { min-height: 0; grid-template-rows: minmax(0, 1fr); }
+      .phone {
+        width: auto; max-width: 100%;
+        height: min(100%, calc(216px * 596 / 292));
+      }
+
+      /* ── The demo posts follow the phone down (BUG-084) ──
+         Sizing the phone to the room available made it 185px wide rather than 216, and its contents
+         did not follow. At that width the titles wrap to two lines and the meta to three, which
+         exceeds `.post`'s 90px max-height — and that box has no `overflow`, so the text rendered
+         OUTSIDE the card, spilling past its own rounded border. Seen on a handset.
+
+         Type is scaled to the new width, plus two guards that make this class of failure
+         impossible rather than merely unlikely:
+           - `overflow: hidden` on the card, so content can never escape its border again whatever
+             the demo copy is later changed to say;
+           - a two-line clamp on the meta, so the truncation reads as deliberate. A card that ends
+             cleanly says "there is more below", which is exactly what the feed is for. Ragged text
+             bleeding over the card beneath it just reads as broken.
+         `.post.cleared` still wins on specificity (0,2,0 against 0,1,0), so the clear-out animation
+         is untouched. */
+      .screen-top { padding: 18px 11px 8px; }
+      .screen-top b { font-size: 12px; }
+      .screen-top span { font-size: 8.5px; }
+      /* The last card is always cut by the feed's edge — six posts cannot fit a 377px phone and are
+         not meant to. Masking the bottom edge makes that read as "more below" rather than as a card
+         chopped in half. `.caught` is a sibling of `.feed`, not a child, so the end card is
+         unaffected. */
+      .feed {
+        padding: 7px; gap: 5px;
+        -webkit-mask-image: linear-gradient(#000 84%, transparent 100%);
+        mask-image: linear-gradient(#000 84%, transparent 100%);
+      }
+      /* 88px is derived, not picked: 10.5 (kind + margin) + 25.6 (title, 2 lines at 10/1.28)
+         + 2 + 27.2 (meta, 2 lines at 8.5/1.6) + 14 (padding) = 79.3, plus headroom. The first
+         attempt capped at 78 — under the content — so `overflow: hidden` clipped every card's last
+         line instead of letting it spill. Whole cards need the box sized to what goes in it; the
+         clamps below are what make that total bounded and therefore checkable. */
+      /* `flex: none` is the load-bearing one. `.feed` is a flex column and `.post` never opted out
+         of shrinking, so six cards in a feed too short for them were each COMPRESSED below their
+         own content — and once `overflow: hidden` was added, that compression started clipping the
+         text instead of spilling it. Every card rendered title-only, cut mid-word. max-height was
+         never the binding constraint; flex-shrink was. Cards now keep their natural height and the
+         feed overflows into the mask above, which is what that mask is for.
+         Mobile-only on purpose: measured, desktop's posts total 423px in a 501px feed, so they
+         never shrink there and this would be a change with no defect behind it. */
+      .post { flex: none; padding: 7px 8px; border-radius: 9px; max-height: 88px; overflow: hidden; }
+      .p-kind { font-size: 7.5px; margin-bottom: 3px; }
+      .p-title {
+        font-size: 10px; line-height: 1.28;
+        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+      }
+      .p-meta {
+        font-size: 8.5px; margin-top: 2px;
+        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+      }
+      .caught { padding: 16px; gap: 8px; }
+      .caught .ring { width: 34px; height: 34px; font-size: 15px; }
+      .caught b { font-size: 12.5px; }
+      .caught small { font-size: 9.5px; }
+    }
+    @media (max-width: 520px) {
+      .rows { gap: 9px; }
+      .plats { gap: 11px; }
+      .plat span { display: none; }
+      .row.soon .plat span { display: inline; }
+      .btn { padding: 9px 15px; font-size: 14px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .post, .caught, .nav, .copy, .copy h1 .w, #stage-cta { transition-duration: .01ms !important; }
+      .hint, .js-stage .hint { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Top bar: brand + persistent Get Started. Dark over the stage, light after the lift. -->
+  <nav class="nav">
+    <span class="brand"><span class="dot"></span>SousChef</span>
+    <a class="btn" href="/app">Get started</a>
+  </nav>
+
+  <!-- The dot story (TASK-091). Five beats driven by scroll position; see /landing.js. -->
+  <div class="stage" id="stage">
+    <div class="pin" id="pin">
+      <canvas id="field" aria-hidden="true"></canvas>
+      <div class="daylight" id="daylight" aria-hidden="true"></div>
+
+      <div class="pin-grid">
+        <div class="copy" id="copy">
+          <h1>
+            <span class="w" id="w1">Everything you follow,</span>
+            <span class="w" id="w2">in one feed</span>
+            <span class="w" id="w3">you can finish.</span>
+          </h1>
+          <p class="sub">One chronological feed of the accounts you chose. No algorithm, no infinite
+            scroll — you reach the bottom and stop.</p>
+
+          <div class="rows" id="rows">
+            <div class="row">
+              <span class="row-label">Works with</span>
+              <span class="plats">
+                <span class="plat">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8ZM9.5 15.5v-7l6.5 3.5-6.5 3.5Z"/></svg>
+                  <span>YouTube</span>
+                </span>
+                <span class="plat">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.9 2H22l-7.3 8.3L23 22h-6.6l-5.2-6.8L5.3 22H2.2l7.8-8.9L1.6 2h6.8l4.7 6.2L18.9 2Zm-1.2 18h1.8L7.4 3.9H5.5L17.7 20Z"/></svg>
+                  <span>X</span>
+                </span>
+                <span class="plat">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22.539 8.242H1.46V5.406h21.08v2.836zM1.46 10.812V24L12 18.11 22.54 24V10.812H1.46zM22.54 0H1.46v2.836h21.08V0z"/></svg>
+                  <span>Substack</span>
+                </span>
+              </span>
+            </div>
+
+            <!-- Coming-soon is restricted to RSS/open-API sources: each is a branch in api/feed.js
+                 (?source=) plus an underscore helper, NOT a new serverless function, so it does not
+                 hit the 12/12 Vercel Hobby cap. Instagram and TikTok are deliberately absent —
+                 they would be promises we cannot keep. -->
+            <div class="row soon">
+              <span class="row-label">Coming soon</span>
+              <span class="plats">
+                <span class="plat">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 3c2.5 1.6 4.6 4.4 6 7.4C13.4 7.4 15.5 4.6 18 3c1.9-1.2 3.6.1 3.6 2.4 0 1.6-.9 5-1.4 6.4-.7 1.9-2.3 2.5-3.9 2.3 2.4.4 3.2 1.9 2 3.5-2.3 3-4.4 1.2-5.4-1-.4-.8-.6-1.4-.9-2-.3.6-.5 1.2-.9 2-1 2.2-3.1 4-5.4 1-1.2-1.6-.4-3.1 2-3.5-1.6.2-3.2-.4-3.9-2.3C3.3 10.4 2.4 7 2.4 5.4 2.4 3.1 4.1 1.8 6 3Z"/></svg>
+                  <span>Bluesky</span>
+                </span>
+                <span class="plat">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.2c-.8 0-1.4.6-1.4 1.4 0 .1 0 .2.1.3L9.6 8.6c-1.9.1-3.6.6-4.9 1.4a2 2 0 1 0-2.2 3.2c0 .2-.1.4-.1.6 0 3.2 3.9 5.8 8.6 5.8s8.6-2.6 8.6-5.8c0-.2 0-.4-.1-.6a2 2 0 1 0-2.2-3.2c-1.3-.8-3-1.3-4.9-1.4l.9-4.3 3 .6a1.4 1.4 0 1 0 .2-1.2l-3.6-.7a.6.6 0 0 0-.7.4l-.1.5A1.4 1.4 0 0 0 12 2.2Zm-3.4 9.9a1.4 1.4 0 1 1 0 2.8 1.4 1.4 0 0 1 0-2.8Zm6.8 0a1.4 1.4 0 1 1 0 2.8 1.4 1.4 0 0 1 0-2.8Zm-6.6 4.4c1 .9 2.2 1.2 3.2 1.2s2.2-.3 3.2-1.2a.5.5 0 0 1 .7.7c-1.2 1.1-2.6 1.5-3.9 1.5s-2.7-.4-3.9-1.5a.5.5 0 0 1 .7-.7Z"/></svg>
+                  <span>Reddit</span>
+                </span>
+                <span class="plat">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a3.2 3.2 0 0 0-3.2 3.2v6a3.2 3.2 0 1 0 6.4 0v-6A3.2 3.2 0 0 0 12 2ZM6 10.4a1 1 0 0 0-1 1v.4a7 7 0 0 0 6 6.9V21H8.6a1 1 0 1 0 0 2h6.8a1 1 0 1 0 0-2H13v-2.3a7 7 0 0 0 6-6.9v-.4a1 1 0 1 0-2 0v.4a5 5 0 0 1-10 0v-.4a1 1 0 0 0-1-1Z"/></svg>
+                  <span>Podcasts</span>
+                </span>
+                <!-- A dedicated address, not a personal one: a mailto on an indexed page gets
+                     scraped, and `+tag` is not protection. A forum is the better long-term home
+                     for this (TASK-093) — deferred because an empty board at launch tells a
+                     visitor nobody uses the product. Swapping this href is a one-line change. -->
+                <span class="sep">·</span>
+                <a class="tell" href="mailto:souschef.feedback@gmail.com?subject=Source%20request">Want another? Tell us →</a>
+              </span>
+            </div>
+          </div>
+
+          <a class="btn btn-lg" id="stage-cta" href="/app">Get started, it's free</a>
+        </div>
+
+        <div class="visual">
+          <div class="phone" id="phone">
+            <div class="screen" id="screen">
+              <div class="screen-top"><b>Today</b><span id="screenCount">6 new</span></div>
+              <div class="feed" id="feed">
+                <article class="post topic">
+                  <span class="p-kind"><i class="swatch"></i>Topic · 5 posts</span>
+                  <p class="p-title">AI policy moved this week</p>
+                  <p class="p-meta">Three takes on the draft rules, one on enforcement.</p>
+                </article>
+                <article class="post">
+                  <span class="p-kind">YouTube</span>
+                  <p class="p-title">Building a solar oven, part two</p>
+                  <p class="p-meta">Field Notes · 14:22</p>
+                </article>
+                <article class="post">
+                  <span class="p-kind">Substack</span>
+                  <p class="p-title">What the new rules actually change</p>
+                  <p class="p-meta">The Signal Weekly · 6 min read</p>
+                </article>
+                <article class="post">
+                  <span class="p-kind">X</span>
+                  <p class="p-title">Three things I got wrong about shipping fast</p>
+                  <p class="p-meta">@dispatch · 2h ago</p>
+                </article>
+                <article class="post topic">
+                  <span class="p-kind"><i class="swatch"></i>Topic · 3 posts</span>
+                  <p class="p-title">İstanbul transit changes</p>
+                  <p class="p-meta">New lines, and what the fare update means.</p>
+                </article>
+                <article class="post">
+                  <span class="p-kind">YouTube</span>
+                  <p class="p-title">Why sourdough hates your schedule</p>
+                  <p class="p-meta">Kitchen Geometry · 8:41</p>
+                </article>
+              </div>
+              <div class="caught" id="caught">
+                <span class="ring">✓</span>
+                <b>You're all caught up</b>
+                <small>Nothing left. Come back later for what's new.</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hint" id="hint" aria-hidden="true"><i></i>Scroll<i></i></div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="container">
+      <span class="brand"><span class="dot"></span>SousChef</span>
+      <div class="f-links">
+        <a href="/app">Sign in</a>
+        <a href="/privacy">Privacy</a>
+      </div>
+      <span class="f-copy">A finishable feed.</span>
+    </div>
+  </footer>
+
+  <!-- External, and without `defer`, on purpose — see the note in <head>. -->
+  <script src="/landing.js"></script>
+</body>
+</html>

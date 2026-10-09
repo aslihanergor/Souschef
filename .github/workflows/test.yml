@@ -1,0 +1,30 @@
+name: tests
+
+# Every PR and every push to main runs the suite. Mirrors `npm test`
+# (node --test test/).
+#
+# This is ADVISORY, not binding: GitHub does not enforce required status checks
+# on a free personal private repo, so a red run shows up but cannot block the
+# merge (CHR-006 — revisit if the repo goes public or moves to Team). What it
+# does add over the local pre-commit hook is that it cannot be bypassed with
+# --no-verify, and it runs on a clean checkout rather than the author's machine.
+# The enforced gate today is the local hook; this is the visible one.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm test

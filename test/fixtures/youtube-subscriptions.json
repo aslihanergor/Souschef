@@ -1,0 +1,57 @@
+{
+  "kind": "youtube#subscriptionListResponse",
+  "etag": "etag-page-1",
+  "nextPageToken": "CDIQAA",
+  "pageInfo": { "totalResults": 3, "resultsPerPage": 50 },
+  "items": [
+    {
+      "kind": "youtube#subscription",
+      "etag": "etag-mkbhd",
+      "id": "sub-id-mkbhd",
+      "snippet": {
+        "publishedAt": "2020-01-02T00:00:00Z",
+        "title": "Marques Brownlee",
+        "description": "MKBHD. Quality Tech Videos.",
+        "resourceId": { "kind": "youtube#channel", "channelId": "UCBJycsmduvYEL83R_U4JriQ" },
+        "channelId": "UCsubscriberOwnChannel0000000",
+        "thumbnails": {
+          "default": { "url": "https://yt3.ggpht.com/mkbhd=s88-c-k-c0x00ffffff-no-rj" },
+          "medium": { "url": "https://yt3.ggpht.com/mkbhd=s240-c-k-c0x00ffffff-no-rj" },
+          "high": { "url": "https://yt3.ggpht.com/mkbhd=s800-c-k-c0x00ffffff-no-rj" }
+        }
+      }
+    },
+    {
+      "kind": "youtube#subscription",
+      "etag": "etag-veritasium",
+      "id": "sub-id-veritasium",
+      "snippet": {
+        "publishedAt": "2019-05-06T00:00:00Z",
+        "title": "Veritasium",
+        "description": "An element of truth.",
+        "resourceId": { "kind": "youtube#channel", "channelId": "UCHnyfMqiRRG1u-2MsSQLbXA" },
+        "channelId": "UCsubscriberOwnChannel0000000",
+        "thumbnails": {
+          "default": { "url": "https://yt3.ggpht.com/veritasium=s88" },
+          "medium": { "url": "https://yt3.ggpht.com/veritasium=s240" },
+          "high": { "url": "https://yt3.ggpht.com/veritasium=s800" }
+        }
+      }
+    },
+    {
+      "kind": "youtube#subscription",
+      "etag": "etag-kurzgesagt",
+      "id": "sub-id-kurzgesagt",
+      "snippet": {
+        "publishedAt": "2021-07-08T00:00:00Z",
+        "title": "Kurzgesagt – In a Nutshell",
+        "description": "",
+        "resourceId": { "kind": "youtube#channel", "channelId": "UCsXVk37bltHxD1rDPwtNM8Q" },
+        "channelId": "UCsubscriberOwnChannel0000000",
+        "thumbnails": {
+          "default": { "url": "https://yt3.ggpht.com/kurzgesagt=s88" }
+        }
+      }
+    }
+  ]
+}

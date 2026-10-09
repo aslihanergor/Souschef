@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="referrer" content="same-origin">
+  <meta name="robots" content="index, follow">
+
+  <!-- Privacy policy (TASK-069 / needed by TASK-067 Google OAuth verification). Static, no inline JS →
+       CSP-clean. Written to be accurate to what the code actually does. -->
+
+  <title>Privacy | SousChef</title>
+  <meta name="description" content="How SousChef handles your data: what's stored, who processes it, and how to export or delete it.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Ccircle%20cx%3D%2211%22%20cy%3D%2215%22%20r%3D%225.5%22%20fill%3D%22%232f8f6b%22%2F%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2210.5%22%20r%3D%226.5%22%20fill%3D%22%232f8f6b%22%2F%3E%3Ccircle%20cx%3D%2221%22%20cy%3D%2215%22%20r%3D%225.5%22%20fill%3D%22%232f8f6b%22%2F%3E%3Crect%20x%3D%229.5%22%20y%3D%2212%22%20width%3D%2213%22%20height%3D%2211%22%20rx%3D%224.5%22%20fill%3D%22%232f8f6b%22%2F%3E%3Crect%20x%3D%2210.5%22%20y%3D%2221%22%20width%3D%2211%22%20height%3D%227.6%22%20rx%3D%222%22%20fill%3D%22%2325735a%22%2F%3E%3C%2Fsvg%3E">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f6f3; --surface: #ffffff; --ink: #1c1d22; --ink-soft: #6b6f76;
+      --line: #ecebe6; --accent: #2f8f6b; --accent-active: #266f53; --faint: #b0b4bb;
+      --nav-bg: rgba(247, 246, 243, .82); --radius-card: 18px; --radius-btn: 11px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --bg: #131419; --surface: #1c1e25; --ink: #e8e9ec; --ink-soft: #9498a1;
+        --line: #2a2d36; --accent: #3fa37d; --accent-active: #4fb98f; --faint: #6b7079;
+        --nav-bg: rgba(19, 20, 25, .82);
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--ink);
+      font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); }
+    .nav {
+      position: sticky; top: 0; z-index: 20;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 22px;
+      background: var(--nav-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 18px; text-decoration: none; color: var(--ink); }
+    .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex: none; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--accent); color: #fff; border-radius: var(--radius-btn);
+      padding: 10px 18px; font-size: 15px; font-weight: 600; text-decoration: none;
+    }
+    .btn:hover { background: var(--accent-active); }
+
+    .doc { max-width: 720px; margin: 0 auto; padding: 40px 22px 72px; }
+    .doc h1 { font-size: clamp(28px, 5vw, 40px); letter-spacing: -.02em; margin: 8px 0 6px; }
+    .updated { color: var(--faint); font-size: 14px; margin: 0 0 28px; }
+    .doc h2 { font-size: 20px; letter-spacing: -.01em; margin: 34px 0 10px; }
+    .doc p, .doc li { color: var(--ink); font-size: 16px; }
+    .doc p { margin: 0 0 14px; }
+    .doc ul { margin: 0 0 14px; padding-left: 22px; }
+    .doc li { margin: 0 0 7px; }
+    .lead { color: var(--ink-soft); font-size: 17px; }
+    .tldr {
+      background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-card);
+      padding: 18px 22px; margin: 4px 0 8px;
+    }
+    .tldr h2 { margin-top: 0; }
+    .tldr ul { margin-bottom: 0; }
+    footer { border-top: 1px solid var(--line); padding: 26px 0; }
+    footer .wrap { max-width: 720px; margin: 0 auto; padding: 0 22px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: center; }
+    footer a { color: var(--ink-soft); text-decoration: none; font-size: 14px; margin-left: 18px; }
+    footer a:first-child { margin-left: 0; }
+    footer a:hover { color: var(--ink); }
+    footer .f-copy { color: var(--faint); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="brand" href="/"><span class="dot"></span>SousChef</a>
+    <a class="btn" href="/app">Get started</a>
+  </nav>
+
+  <main class="doc">
+    <h1>Privacy</h1>
+    <p class="updated">Last updated 29 July 2026</p>
+
+    <p class="lead">SousChef is built to be calm and yours. We keep as little as possible, don't sell
+      anything, and make it easy to take your data or delete it. Here's exactly what happens.</p>
+
+    <div class="tldr">
+      <h2>The short version</h2>
+      <ul>
+        <li>SousChef needs an <b>account</b> to use. Your channels and read state live in your browser and sync to your account.</li>
+        <li>If you <b>sign in</b> (Google or an email link), we store your <b>verified email</b> so your feed syncs across devices. <b>No passwords</b>, ever.</li>
+        <li>We record <b>which features and sections you use, and when</b>, but <b>never which specific video, post, or channel</b> you look at.</li>
+        <li>We <b>don't sell</b> your data or track you across other sites.</li>
+        <li>You can <b>export</b> everything or <b>delete</b> your account (which removes it) at any time.</li>
+      </ul>
+    </div>
+
+    <h2>What we store</h2>
+    <ul>
+      <li><b>Your channels &amp; accounts</b>: the YouTube channels, X accounts and Substacks you add, plus any keyword filters.</li>
+      <li><b>Your read state</b>: what you've marked Done or Archived, and your settings (theme, hide-Shorts, topic groups).</li>
+      <li><b>An anonymous device id</b>: a random identifier stored in your browser. It's assigned on your first visit, carries the usage counts above until you sign in, and is what lets channels you set up on this browser move into your account when you do. It isn't tied to your identity.</li>
+      <li><b>Your email</b>: only if you sign in. We store your verified email address (and, for Sign in with Google, your Google account's stable id) to identify your account. We never see or store a password.</li>
+      <li><b>A session</b>: a private, httpOnly cookie that keeps you signed in. We store only a hashed form of it.</li>
+      <li><b>Usage events</b>: section/action-level activity (e.g. "opened the feed", "played a video", "signed in") with a timestamp, tied to your account when you're signed in. These <b>never</b> include which specific item you viewed.</li>
+    </ul>
+
+    <h2>How we use it</h2>
+    <ul>
+      <li>To <b>build your feed</b>: fetching new posts from the channels you chose.</li>
+      <li>To <b>sync</b> your channels, read state and settings across your devices when you're signed in.</li>
+      <li>To <b>understand usage</b> in aggregate (which features get used, roughly when) so we can improve SousChef. This is visible only to the operator, never published.</li>
+    </ul>
+
+    <h2>Where your content goes (service providers)</h2>
+    <p>SousChef is a thin layer over services you already use. To work, it shares the minimum needed with:</p>
+    <ul>
+      <li><b>Neon</b>: the database that stores your account and synced state.</li>
+      <li><b>Vercel</b>: hosting, and cookieless, aggregate page analytics (no personal identification).</li>
+      <li><b>Resend</b>: sends your sign-in email link (only when you request one).</li>
+      <li><b>Google</b>: Sign in with Google, and (if you choose) reading your YouTube subscriptions to import them.</li>
+      <li><b>YouTube, X and Substack</b>: we request the posts of the accounts you follow, to show them to you.</li>
+      <li><b>Anthropic</b>: the text of your unread X posts is sent to Anthropic's Claude to generate the topic labels and summaries. Per Anthropic's API terms this content is used only to produce that result and not to train their models. If this is unavailable, SousChef simply shows the ungrouped feed.</li>
+    </ul>
+
+    <h2>Connecting YouTube (Google user data)</h2>
+    <p>If you choose "Connect YouTube", SousChef requests <b>read-only</b> access to your subscriptions for a
+      single purpose: to show you the channels you follow so you can pick which to add. We import only the
+      channels you select, we never post or change anything, and we don't retain your Google access token
+      after the import. SousChef's use of information received from Google APIs adheres to the
+      <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Services User Data Policy</a>,
+      including its Limited Use requirements.</p>
+
+    <h2>Cookies</h2>
+    <p>We use a single essential cookie (the httpOnly session that keeps you signed in) plus a
+      short-lived security cookie during sign-in. Your settings and read state are kept in your browser's
+      local storage, not in cookies. Vercel's analytics are cookieless.</p>
+
+    <h2>Your controls</h2>
+    <ul>
+      <li><b>What an account means</b>: signing in is required, so your channels and read state are tied to your verified email. We still never record which specific video, post or channel you look at.</li>
+      <li><b>Export your data</b>: download your channels, read state and settings as a file, any time.</li>
+      <li><b>Delete your account</b>: removes your account, your synced state and sessions, and clears this device's local copy — channels and read state included. Some traces can outlive it: copies stored for browsers you signed out of, and sign-in records holding your email address, are not reached by the delete today. It signs you out everywhere, but a browser you were signed in on elsewhere keeps its own local copy until you clear that browser's data.</li>
+      <li><b>Sign out</b>: ends the session and clears that device's local copy — channels and read state (your light/dark preference stays) — so the next person starts empty. If a change can't be saved to your account first, we don't sign you out at all — we say so and leave you signed in, with your data still on this device, so nothing is lost. Sign out again once it saves. Your account keeps everything; signing back in restores it.</li>
+    </ul>
+
+    <h2>Retention</h2>
+    <p>Signed-in data is kept until you delete your account. Data from before you sign in — the device id
+      and pending usage counts — lives in your browser and is cleared when you clear your browser data. Signing out leaves a copy on our servers that the browser can
+      no longer reach; it isn't deleted. Sign-in email links expire in 15 minutes and work once.</p>
+
+    <h2>Changes</h2>
+    <p>If this policy changes, we'll update the date above. Material changes will be noted in the app.</p>
+
+    <h2>Contact</h2>
+    <p>Questions about your data? Email <a href="mailto:souschef.feedback@gmail.com">souschef.feedback@gmail.com</a>.</p>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/"><span class="dot"></span>SousChef</a>
+      <div>
+        <a href="/app">Sign in</a>
+        <a href="/">Home</a>
+      </div>
+      <span class="f-copy">A finishable feed.</span>
+    </div>
+  </footer>
+</body>
+</html>

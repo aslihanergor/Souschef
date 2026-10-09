@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>SousChef · Analytics</title>
+  <!-- Owner-only analytics dashboard (TASK-070). No inline script (CSP script-src 'self') — logic is
+       in /admin.js. Access is enforced server-side by GET /api/state?admin (ADMIN_EMAIL); this page
+       just renders what that returns and shows a notice if you're not the owner. -->
+  <style>
+    :root {
+      --bg: #f6f7f9; --card: #fff; --ink: #16181c; --muted: #6b7280;
+      --line: #e5e7eb; --accent: #1d9bf0; --bar: #cfe8fb; --bar2: #1d9bf0;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1114; --card: #181b20; --ink: #e7e9ea; --muted: #8b98a5;
+        --line: #2b2f36; --accent: #1d9bf0; --bar: #22303c; --bar2: #1d9bf0;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--ink);
+      font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .sub { color: var(--muted); font-size: 13px; margin: 0 0 24px; }
+    h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 28px 0 10px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+    .totals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .totals .card { text-align: center; }
+    .totals .n { font-size: 26px; font-weight: 700; }
+    .totals .k { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 14px; }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .tbl-scroll { overflow-x: auto; }
+    /* --card on --bg is a 3/255 delta in light mode, so the panel was invisible there while
+       reading clearly in dark. The 1px --line border is what delineates it in both. */
+    .caveat {
+      margin: 10px 0; padding: 8px 12px; font-size: 13px; color: var(--muted);
+      background: var(--card); border: 1px solid var(--line);
+      border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0;
+    }
+    /* Criterion 4's warning is the load-bearing phrase on this panel; inheriting --muted rendered
+       it as the least prominent text on screen. */
+    .caveat strong { color: var(--ink); }
+    .bars { display: flex; flex-direction: column; gap: 6px; }
+    .bar-row { display: grid; grid-template-columns: 130px 1fr 46px; align-items: center; gap: 10px; }
+    .bar-label { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bar-track { background: var(--bar); border-radius: 5px; height: 18px; overflow: hidden; }
+    .bar-fill { background: var(--bar2); height: 100%; border-radius: 5px; }
+    .bar-num { text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
+    .hours { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; align-items: end; height: 90px; }
+    .hour { background: var(--bar2); border-radius: 2px 2px 0 0; min-height: 2px; }
+    .hour-axis { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; color: var(--muted); font-size: 9px; margin-top: 4px; }
+    .hour-axis span { text-align: center; }
+    .muted { color: var(--muted); }
+    .live { margin-bottom: 4px; }
+    .live-head { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+    .live-head strong { font-size: 22px; font-weight: 700; }
+    .live-dot { width: 9px; height: 9px; border-radius: 50%; background: #22c55e; flex: none; animation: pulse 2s infinite; }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(34,197,94,.5); }
+      70% { box-shadow: 0 0 0 7px rgba(34,197,94,0); }
+      100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+    }
+    .live-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+    .live-list:empty { display: none; }
+    .active-row { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+    .active-row .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex: none; }
+    .active-row .who { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .active-row .ago { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .notice { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 32px; text-align: center; color: var(--muted); }
+    .notice a { color: var(--accent); }
+    .refresh { float: right; font-size: 13px; color: var(--accent); background: none; border: 1px solid var(--line); border-radius: 8px; padding: 5px 12px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <button class="refresh" id="refresh" hidden>↻ Refresh</button>
+    <h1>SousChef · Analytics</h1>
+    <p class="sub" id="sub">Loading…</p>
+    <div id="content"></div>
+  </div>
+  <script src="/admin.js"></script>
+</body>
+</html>

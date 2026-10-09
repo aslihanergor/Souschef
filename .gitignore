@@ -1,0 +1,24 @@
+node_modules/
+.vercel
+.DS_Store
+# Concurrency lock from scripts/mutate.mjs (CHR-010). A clean run deletes it; one
+# left behind means a battery died mid-run — delete it. Never committed.
+.mutate.lock
+# Local secrets (e.g. YOUTUBE_API_KEY) — never commit. Vercel gets these from its
+# dashboard Environment Variables, not from a file.
+.env
+.env.local
+.env.*
+# design mockups (Claude Design exports) — local-only reference, never committed
+mockups/
+# Private working notes. Never commit.
+Users.md
+INTERVIEWS.md
+MEETINGS.md
+# Transient per-review artifact from /code-review — findings get fixed or routed to the
+# registry, then the file is deleted. Never committed.
+CODE_REVIEW.md
+
+# Review/agent worktrees live here; they are transient and must never be committed.
+# A `git add -A` swept one into a commit on 2026-08-18 (BUG-092 round 3).
+.claude/worktrees/
