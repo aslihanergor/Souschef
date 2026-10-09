@@ -373,7 +373,7 @@ function lanAddress() {
 const hasIPv6Loopback = () => Object.values(os.networkInterfaces()).some((list) => (list || []).some((a) => a.address === '::1'));
 
 // Run `node <script> [args]` on `port` from ANOTHER folder — the server must serve its own folder,
-// not the one it was started in — and settle when it prints its first line or exits.
+// not the one it was started in — and settle when it has printed its first two lines or exits.
 function run(args, port, script = SERVER) {
   const child = spawn(process.execPath, [script, ...args], { cwd: os.tmpdir(), env: { ...process.env, PORT: String(port) } });
   let out = '';
@@ -382,7 +382,9 @@ function run(args, port, script = SERVER) {
   const exited = new Promise((resolve) => child.on('exit', (code) => resolve(code)));
   const listening = new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`dev-server.mjs printed nothing in 10s: ${out}`)), 10000);
-    child.stdout.on('data', () => { if (out.includes('dev server')) { clearTimeout(timer); resolve(); } });
+    // Wait for the mode line too, not only the first line: they are separate writes and can arrive
+    // apart. e2 read the output between them once, on a CI machine, and failed on a healthy server.
+    child.stdout.on('data', () => { if (/dev server[^]*\nNet → .*\n/.test(out)) { clearTimeout(timer); resolve(); } });
     exited.then((code) => { clearTimeout(timer); reject(new Error(`dev-server.mjs exited (${code}) before listening: ${out}`)); });
   });
   listening.catch(() => {});
