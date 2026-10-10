@@ -1,56 +1,42 @@
-// [BUG-113] — A BULLET MUST DESCRIBE A POST THE READER CAN REACH.
+// A BULLET MUST DESCRIBE A POST THE READER CAN REACH.
 //
 // The card told two stories about itself. Header, rail and dots counted only the posts THIS render
 // fetched; the bullet summary was filtered against every unread assignment the account holds. On
-// Asli's handset (2026-09-08, the [TASK-107] walk) that read "6 posts" over 26 bullets, and "1 post"
+// a handset that read "6 posts" over 26 bullets, and "1 post"
 // over 6 bullets on a topic with no backlog at all.
 //
-// The rule this file pins, Asli's decision of 2026-09-08: A BULLET DESCRIBES A POST THE READER CAN
+// The rule this file pins: A BULLET DESCRIBES A POST THE READER CAN
 // REACH RIGHT NOW — on this card's rail, or visible in the chronological stream. That resolves all
 // three cases with no special case for any:
 //   • a post this render did not fetch is reachable nowhere      → its bullet goes    (B1, B2, B10)
-//   • a [BUG-092]-deferred post is on screen in the stream       → its bullet stays   (C3c, next door)
+//   • a deferred post is on screen in the stream                 → its bullet stays   (C3c, next door)
 //   • the feed has not loaded, so nothing is known to be absent  → nothing is hidden  (B7)
 //
-// WHY THE WIDE SET STILL EXISTS. `unreadByGid` is deliberately wide ([BUG-098]) because it is the
+// WHY THE WIDE SET STILL EXISTS. `unreadByGid` is deliberately wide because it is the
 // same question `liveBullets` answers for the /api/group payload, where under-reporting DESTROYS the
-// only restorable copy of a summary ([BUG-091]). This change narrows the RENDER and nothing else.
+// only restorable copy of a summary. The narrowing applies to the RENDER and nothing else.
 // B4 is the guard on that and is the one test here whose failure means data loss.
 //
-// WHICH TESTS COULD RED BEFORE THE FIX — predicted before the run, because a merely-red suite hides
-// the one that passed for the wrong reason:
-//   RED before the fix   — B1, B2, B8, B9, B10. These pin the defect itself.
-//   GREEN before the fix — B4, B5, B6, B7. Each guards a defect only the FIX could introduce, which
-//                          is why they are here despite passing on the branch point.
-// CORRECTED AFTER THE RUN, both directions, because a prediction quietly fixed up afterwards is
-// worth nothing. B9 was predicted GREEN and came back RED: it asserts the id-less bullet survives
-// (true on the branch point) AND that x2's bullet is hidden (false there), so it is a RED test and
-// the prediction had conflated its two halves. B5 was predicted GREEN and came back RED for a
-// reason in the TEST, not the code — see the note at its final assertion.
+// WHICH TESTS FAIL WITHOUT THE NARROWING:
+//   fail without it — B1, B2, B8, B9, B10. These pin the defect itself.
+//   pass without it — B4, B5, B6, B7. Each guards a defect only the narrowing could introduce.
 //
-// ⚠️ `group-defer-lift` C3c BECOMES LOAD-BEARING FOR THIS CHANGE and is not duplicated here. It
-// asserts a deferred post keeps its bullet; after this change `buildTopicCard` reads the narrowed
-// set, so C3c is what catches the deferred branch LOSING its `reachable.add`. C3c must pass UNEDITED.
+// ⚠️ `group-defer-lift` C3c IS LOAD-BEARING HERE and is not duplicated. It
+// asserts a deferred post keeps its bullet; `buildTopicCard` reads the narrowed
+// set, so C3c is what catches the deferred branch LOSING its `reachable.add`.
 //
-// ⚠️ CORRECTED 2026-09-08 after three independent reviewers measured the original sentence. It said
-// C3c catches "a narrowing applied ABOVE the `_liftDeferred` guard instead of below it". It does
-// not: that mutation SURVIVES all 1104 tests, and it is in fact an equivalent mutant, because
+// C3c does NOT catch "a narrowing applied ABOVE the `_liftDeferred` guard instead of below it":
+// that is an equivalent mutant, because
 // `_liftDeferred` is only ever filled from cards the same render put in `#feed` — so a deferred id
-// is always in `inHand`. That invariant is load-bearing and stated nowhere else. The original also
-// said "only C3c would notice"; `TASK-098 T32` notices too.
-//
-// The gap this file did NOT cover until B11: deleting the `continue` from the deferred branch left
-// all 1104 tests green. An author battery inherits the blind spot of the tests it checks, which is
-// why that one was found by a battery written with no access to this reasoning.
+// is always in `inHand`. That invariant is load-bearing and stated nowhere else.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../test-helpers/app-harness.mjs';
 
 // RELATIVE to now, never a frozen constant: `pruneGroupState` rule 3 treats an in-hand post older
-// than the window as a broken device clock. DEFENSIVE HERE RATHER THAN LOAD-BEARING — an independent
-// battery froze it to a 2025 constant and every test in this file still passed, so the drift risk is
-// real for the suite at large but is not what these fixtures rest on. Kept, and the claim narrowed to
-// what was measured.
+// than the window as a broken device clock. DEFENSIVE HERE RATHER THAN LOAD-BEARING — with a frozen
+// constant every test in this file still passes, so the drift risk is
+// real for the suite at large but is not what these fixtures rest on.
 const PUBLISHED = Date.now() - 2 * 86400_000;
 const G = 'g_ai';
 
@@ -61,8 +47,8 @@ const xPost = (id) => ({
 
 // `v: 2` (GROUP_STATE_VERSION) IS LOAD-BEARING AND ITS ABSENCE IS SILENT — `migrateGroupSummaries`
 // clears every summary below it, so a fixture without it seeds bullets that are wiped before the
-// first render and the card paints EMPTY. Measured while scoping this task: the first probe read
-// `bullets=[]` and would have "proved" the defect absent.
+// first render and the card paints EMPTY — the fixture would read
+// `bullets=[]` and "prove" the defect absent.
 const groupState = (over = {}) => JSON.stringify({
   assignments: {}, groups: {}, unfiled: [], updatedAt: PUBLISHED, v: 2, ...over,
 });
@@ -109,7 +95,7 @@ const cardFor     = app => app.queryAll('#feed .topic-card').find(c => c.dataset
 const bulletTexts = app => [...(q(app, '.tc-bullets')[0]?.children || [])].map(li => li.textContent);
 const countText   = app => q(app, '.tc-count')[0]?.textContent;
 const railIds     = app => q(app, '.tc-slide').map(s => s.dataset.id).filter(Boolean);
-// Visible in the stream: `.grouped-out` is display:none under hide-not-remove ([TASK-099]), so a raw
+// Visible in the stream: `.grouped-out` is display:none under hide-not-remove, so a raw
 // children read reports a post the reader cannot see as present.
 const streamIds   = app => app.el('feed').children
   .filter(c => c.classList.contains('card') && !c.classList.contains('grouped-out'))
@@ -122,7 +108,7 @@ function guardCard(app) {
   return card;
 }
 
-// ── B1: the defect itself (RED before the fix) ────────────────────────────────
+// ── B1: the defect itself ─────────────────────────────────────────────────────
 test('BUG-113 B1: a card shows bullets only for the posts it fetched', async () => {
   // The handset's "1 post / 6 bullets", reproduced at "1 post / 3 bullets". x2 and x3 are assigned
   // and unread, but this render did not fetch them — so the reader cannot open them from anywhere.
@@ -137,7 +123,7 @@ test('BUG-113 B1: a card shows bullets only for the posts it fetched', async () 
     + 'defect: on the branch point it reads all three');
 });
 
-// ── B2: the invariant, not just the example (RED before the fix) ──────────────
+// ── B2: the invariant, not just the example ───────────────────────────────────
 test('BUG-113 B2: every bullet names a post on the rail or visible in the stream', async () => {
   // Stated as the INVARIANT rather than as a second example, so a fix that happens to satisfy B1 by
   // some other route (say, truncating to the header count) still has to be right for the reason.
@@ -146,9 +132,9 @@ test('BUG-113 B2: every bullet names a post on the rail or visible in the stream
   await settle();
 
   guardCard(app);
-  // ⚠️ MEASURED LIMIT, recorded rather than left to inference: under grouping ON every assigned post
+  // ⚠️ MEASURED LIMIT: under grouping ON every assigned post
   // carries `.grouped-out`, so `streamIds` contributes NOTHING here and `reachable` is the rail
-  // alone. An independent battery deleted the stream term and this test stayed green. The "or
+  // alone. Deleting the stream term leaves this test green. The "or
   // visible in the stream" half of the rule is therefore pinned by `BUG-092 C3c`, not by this test.
   // The term stays because the rule has two halves and the assertion should read as the rule does.
   const reachable = new Set([...railIds(app), ...streamIds(app)]);
@@ -163,10 +149,10 @@ test('BUG-113 B2: every bullet names a post on the rail or visible in the stream
   assert.equal(bulletTexts(app).length, 2, 'and the two reachable posts do keep their bullets');
 });
 
-// ── B4: the payload stays WIDE (GREEN before the fix — guards data loss) ──────
+// ── B4: the payload stays WIDE — guards data loss ─────────────────────────────
 test('BUG-113 B4: the /api/group payload still reports every unread post', async () => {
   // THE ONE TEST HERE WHOSE FAILURE MEANS DATA LOSS. `restoreCachedBullets` rebuilds a topic's
-  // summary from exactly this field, and it is the only copy since [BUG-091]. Narrowing the render
+  // summary from exactly this field, and it is the only copy. Narrowing the render
   // must not narrow the payload: under-report here and the server replaces the summary with whatever
   // the model wrote about the new posts alone.
   const { app, bodies } = boot({ store: { focus_groups: groupState(THREE_ASSIGNED) } });
@@ -184,12 +170,12 @@ test('BUG-113 B4: the /api/group payload still reports every unread post', async
     + 'the ONLY restorable copy ([BUG-091])');
 });
 
-// ── B5: neither Mark-all-done path moves (GREEN before the fix) ───────────────
+// ── B5: neither Mark-all-done path moves ──────────────────────────────────────
 test('BUG-113 B5: "Mark all done" still marks exactly what the header claims', async () => {
-  // [BUG-092]'s guarantee, and [BUG-098] review round 2's: the per-card sweep takes what the tile
+  // The per-card sweep takes what the tile
   // claimed and no more. Narrowing the bullets must not reach this.
   //
-  // WHAT THIS TEST DOES AND DOES NOT PIN, measured by an independent battery rather than assumed:
+  // WHAT THIS TEST DOES AND DOES NOT PIN:
   // this fixture carries NO deferred post, so it cannot tell `visibleGroupUnreadIds` from
   // `reachableByGid` — swapping the sweep to the reachable set survives here and is killed by
   // `BUG-092 C3b`. Left un-duplicated deliberately: C3b already sizes its fixture so only that guard
@@ -208,11 +194,11 @@ test('BUG-113 B5: "Mark all done" still marks exactly what the header claims', a
 
   assert.deepEqual(JSON.parse(app.get('focus_done') || '[]').sort(), ['x1'],
     'only the fetched post is marked; x2 and x3 were never the card\'s to clear');
-  // ASSERTED ON x2/x3 ONLY, and the first draft of this line was WRONG in a way worth keeping:
-  // it demanded the surviving key set be exactly ['x2','x3'], which reds because `pruneGroupState`
+  // ASSERTED ON x2/x3 ONLY: demanding the surviving key set be exactly ['x2','x3'] would red,
+  // because `pruneGroupState`
   // sweeps a done assignment on the next prune pass rather than synchronously. That is prune
-  // TIMING — a different question from the one criterion 5 asks, and pinning it here would have
-  // made this test fail for a reason it does not care about.
+  // TIMING — a different question, and pinning it here would
+  // make this test fail for a reason it does not care about.
   const state = JSON.parse(app.get('focus_groups'));
   for (const id of ['x2', 'x3']) {
     assert.ok(Object.hasOwn(state.assignments, id),
@@ -221,10 +207,10 @@ test('BUG-113 B5: "Mark all done" still marks exactly what the header claims', a
   }
 });
 
-// ── B6: nothing is destroyed (GREEN before the fix) ───────────────────────────
+// ── B6: nothing is destroyed ──────────────────────────────────────────────────
 test('BUG-113 B6: hiding a bullet does not delete it from storage', async () => {
   // The fix is a RENDER-TIME FILTER over untouched state, which is what makes being wrong here show
-  // a bullet too many rather than destroy one ([BUG-089] chose the same direction). If this ever
+  // a bullet too many rather than destroy one. If this ever
   // reds, the filter has become a mutation and the whole safety argument is void.
   const { app } = boot({ store: { focus_groups: groupState(THREE_ASSIGNED) } });
   render(app, [xPost('x1')]);
@@ -239,11 +225,11 @@ test('BUG-113 B6: hiding a bullet does not delete it from storage', async () => 
     'and all three assignments remain');
 });
 
-// ── B7: no feed, no narrowing (GREEN before the fix) ──────────────────────────
+// ── B7: no feed, no narrowing ─────────────────────────────────────────────────
 test('BUG-113 B7: with no feed loaded, nothing is hidden', async () => {
   // `_lastFeedItems === null` after a caught-up or failed boot, so `inHandGroupableIds()` answers
-  // null and NOTHING is known to be absent. Absence is not evidence — the doctrine [BUG-098] rests
-  // on. Painting topics without a feed render is the toggle's path.
+  // null and NOTHING is known to be absent. Absence is not evidence.
+  // Painting topics without a feed render is the toggle's path.
   const { app } = boot({ store: { focus_groups: groupState(THREE_ASSIGNED) } });
   app.ctx.renderTopicCards();
   await settle();
@@ -254,7 +240,7 @@ test('BUG-113 B7: with no feed loaded, nothing is hidden', async () => {
     + 'inferring it from absence is exactly what [BUG-098] cost');
 });
 
-// ── B8: one definition, not two (RED before the fix) ──────────────────────────
+// ── B8: one definition, not two ───────────────────────────────────────────────
 test('BUG-113 B8: after a single Done the repaint uses the same set a full render would', async () => {
   // Two bullet loops reading different sets ARE two renderers — the T31 defect, where the card went
   // stale until something else happened to rebuild it. `finishGroupCardAction` repaints from
@@ -277,11 +263,11 @@ test('BUG-113 B8: after a single Done the repaint uses the same set a full rende
     + 'repaint — on the branch point the repaint reads the wide set and x3 shows up here');
 });
 
-// ── B9: an id-less bullet always shows (GREEN before the fix) ─────────────────
+// ── B9: an id-less bullet always shows ────────────────────────────────────────
 test('BUG-113 B9: a bullet naming no posts is never hidden', async () => {
   // `bulletIsLive`'s keep-forever default. An id we cannot resolve, or one the model never gave, is
-  // not evidence a post was read — and deleting such a bullet is the [BUG-070]/[BUG-073] failure
-  // class, worse than the bug being fixed. Narrowing must not acquire an opinion about it.
+  // not evidence a post was read — and deleting such a bullet is a summary-destroying failure,
+  // worse than the bug being fixed. Narrowing must not acquire an opinion about it.
   const { app } = boot({
     store: {
       focus_groups: groupState({
@@ -298,7 +284,7 @@ test('BUG-113 B9: a bullet naming no posts is never hidden', async () => {
     'the id-less bullet survives while x2\'s — whose post was not fetched — does not');
 });
 
-// ── B10: it self-corrects (RED before the fix) ────────────────────────────────
+// ── B10: it self-corrects ─────────────────────────────────────────────────────
 test('BUG-113 B10: a hidden bullet returns when its post is fetched', async () => {
   // The reason this is safe to ship: the state is never touched, so a bullet hidden by a shallow
   // load comes back on the next load that reaches its post. Asserted across TWO renders in one
@@ -316,23 +302,19 @@ test('BUG-113 B10: a hidden bullet returns when its post is fetched', async () =
     'and a deeper load restores every bullet — nothing was destroyed to hide them');
 });
 
-// ── B11: the deferral `continue` is load-bearing (found by an INDEPENDENT battery) ──
+// ── B11: the deferral `continue` is load-bearing ────────────────────────────────
 test('BUG-113 B11: a topic whose only unread post is deferred paints no card at all', async () => {
-  // ADDED AFTER THE FACT, and that is the point worth recording. An independent mutation battery
-  // deleted the `continue` from the deferred branch — leaving the `reachable.add` in place — and
-  // ALL 1104 TESTS STAYED GREEN. The author's own battery never wrote that mutation.
+  // Deleting the `continue` from the deferred branch — leaving the `reachable.add` in place —
+  // is caught by nothing else.
   //
   // What ships if it is ever deleted: a deferred post falls through into `counts[gid]`, so a topic
   // whose only unread post is deferred paints a card reading "0 posts" with an EMPTY RAIL and a
   // bullet, sitting in the stream directly above the very post it describes. The reader sees the
   // post twice — once as a card, once as a phantom topic. `counts[gid] > 0` is the only thing
   // stopping it, and it also gates `paintableTileCount`, which decides whether the grouping switch
-  // is inert ([TASK-099]).
+  // is inert.
   //
-  // The guard is PRE-EXISTING — the `continue` sat on the line before this change too, equally
-  // unpinned. This change rewrote that line and so now RESTS on it, which is why it is pinned here
-  // rather than left to whoever touches it next. A diff shows what you added, never what it now
-  // rests on.
+  // The narrowing RESTS on this guard, which is why it is pinned here.
   const { app } = boot({
     store: {
       focus_done: JSON.stringify(['x1']),
@@ -343,7 +325,7 @@ test('BUG-113 B11: a topic whose only unread post is deferred paints no card at 
       }),
     },
     // The classify that finally places x2 — the moment it becomes assigned AND deferred, because it
-    // is already on screen and must not be yanked out from under the reader ([BUG-092]).
+    // is already on screen and must not be yanked out from under the reader.
     reply: [{ label: 'AI', item_ids: ['x2'], summary: [{ text: 'about x2', item_ids: ['x2'] }] }],
   });
   render(app, [xPost('x1'), xPost('x2')]);

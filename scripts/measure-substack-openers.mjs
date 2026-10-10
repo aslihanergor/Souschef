@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Measure the length of Substack opening paragraphs, through the SAME gate the app applies.
-// ([BUG-115]) Every statistic quoted in tasks/BUG-115.md came from this script; without it in the
+// The statistics behind the teaser cap in api/_substack.js came from this script; without it in the
 // repo those numbers rest on an artefact a later reader cannot reproduce.
 //
 //   node scripts/measure-substack-openers.mjs [host ...]

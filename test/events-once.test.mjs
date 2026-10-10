@@ -1,4 +1,4 @@
-// [BUG-123] An analytics event is stored ONCE, however many times it is sent.
+// An analytics event is stored ONCE, however many times it is sent.
 //
 // The defect has three causes and they are not independent: events-only and unload saves skip
 // pushNow's in-flight latch, so two saves can carry the same buffer; a closing document never reads
@@ -7,13 +7,12 @@
 // first-boot sign-in: 4 copies, and one real `refresh` destroyed.
 //
 // These tests assert on WHAT IS STORED — `sql.eventRows` in the fake database, driven by the real
-// `createStateHandler` — never on which function ran. Counting calls is what let this ship: the fake
-// recorded event inserts as a log, so "stored once" could not be asked at all.
+// `createStateHandler` — never on which function ran. A fake that records event inserts as a log
+// of calls cannot ask "stored once" at all.
 //
-// WHICH TESTS CAN FAIL TODAY (checked at the RED step, so a guard is never mistaken for coverage):
-//   RED today — c1, c2, c3, c4, c5b, c6a, c6c, c8, n1, n2
-//   GREEN today, and guards on the fix's own hazards — c5a (no id written into an entry already
-//   buffered), c6b, c7, r1 (the fallback that keeps a mis-ordered deploy counting twice, not zero).
+// c5a (no id written into an entry already buffered), c6b, c7 and r1 (the fallback that keeps a
+// mis-ordered deploy counting twice, not zero) guard the de-duplication's own hazards, not the
+// original defect.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -30,8 +29,7 @@ const settle = () => new Promise((r) => setImmediate(r));
 const lowerKeys = (h = {}) => Object.fromEntries(Object.entries(h).map(([k, v]) => [k.toLowerCase(), v]));
 const ok = (body) => ({ ok: true, status: 200, json: async () => body });
 // RECENT, deliberately: `clampTs` rewrites any ts more than 30 days old to the server's own clock, so
-// a fixture dated in the past cannot be found again by its ts. Found at the RED step, in a test that
-// failed for that reason rather than for the defect.
+// a fixture dated in the past cannot be found again by its ts.
 const TS = Date.now() - 1000;
 
 /** An app whose /api/state reaches the REAL handler over one fake store — so a client-side question
@@ -243,7 +241,7 @@ test('[BUG-123] r1 a server whose migration has NOT run still stores events — 
   assert.equal(res.statusCode, 200);
   // WHICH PATH RAN, not just how many rows. Without this the test passes whether the fallback fired or
   // the primary insert simply succeeded — so a tidy-up of the fake that stopped staging the failure
-  // would retire the deploy-order guard's only coverage in silence (independent review, MEDIUM-3).
+  // would retire the deploy-order guard's only coverage in silence.
   // The fallback statement does not name client_id, so real Postgres stores NULL there.
   assert.equal(sql.eventRows[0].client_id, null, 'the row came from the fallback insert, which names no client_id');
   await put(sql, [evt(UUID)]);
@@ -264,9 +262,9 @@ test('[BUG-123] c6d a batch mixing a repeat with a NEW event stores the repeat o
   await put(sql, [evt(UUID)]);
   // The shape EVERY real re-send has: a closing page's buffer, plus whatever was tracked since.
   // Without the conflict clause this is a 23505 that rejects the WHOLE statement, so the new event is
-  // lost at 200 — measured against Postgres (dev branch, 2026-09-16). An independent battery found
-  // that neither c6a (sanitizeEvents drops the repeat first) nor c6c (one row either way) can fail
-  // for it, so the clause was pinned by nothing that names duplicates.
+  // lost at 200 — measured against a real Postgres.
+  // Neither c6a (sanitizeEvents drops the repeat first) nor c6c (one row either way) can fail
+  // for it, so this is the test that pins the clause.
   await put(sql, [evt(UUID), evt('4b5c6d7e-8f90-4a1b-8c2d-3e4f5a6b7c8d', 'refresh')]);
   assert.equal(sql.eventCount('view'), 1, 'the repeat is still one row');
   assert.equal(sql.eventCount('refresh'), 1, 'and the new event beside it was NOT lost with the batch');
@@ -287,10 +285,10 @@ test('[BUG-123] c6e a stored row carries the SANITISED values, not whatever the 
 test('[BUG-123] r2 a server whose migration has NOT run at all still stores events', async () => {
   // The ORDINARY deploy order: a merge deploys the code, `init-db --prod` is run by hand. The table
   // then has no client_id column and Postgres answers 42703 — not the 42P10 that r1 stages, which is
-  // the narrower "column present, index missing". The first version of the fallback matched only
-  // 42P10, so the case it exists for fell through to `catch { /* swallow */ }` and every event was
-  // dropped at 200. Found by an independent mutation battery; the SQLSTATEs measured against a real
-  // Postgres (dev branch, 2026-09-16).
+  // the narrower "column present, index missing". A fallback matching only
+  // 42P10 lets the case it exists for fall through to `catch { /* swallow */ }` and every event is
+  // dropped at 200. The SQLSTATEs were measured against a real
+  // Postgres.
   const sql = fakeDb({ eventsClientIdColumn: false, eventsIndex: false });
   const res = await put(sql, [evt(UUID)]);
   assert.equal(res.statusCode, 200);
@@ -302,7 +300,7 @@ test('[BUG-123] r2 a server whose migration has NOT run at all still stores even
 
 test('[BUG-123] r1b the fallback survives a driver that loses the error code, and one that rewords it', async () => {
   // Both terms of the guard are load-bearing on their own; a "simplification" to one is invisible
-  // otherwise (independent battery survivors A2/A3).
+  // otherwise.
   for (const [label, err] of [
     ['code lost, message intact', Object.assign(new Error('there is no unique or exclusion constraint matching the ON CONFLICT specification'), {})],
     ['code intact, message reworded', Object.assign(new Error('translated database error'), { code: '42P10' })],
@@ -326,8 +324,8 @@ test('[BUG-123] r1b the fallback survives a driver that loses the error code, an
 });
 
 test('[BUG-123] r1c an ordinary database failure is NOT retried by the fallback', async () => {
-  // The guard's NARROWNESS is protective and was asserted by a comment and nothing else: a mutation
-  // making the fallback fire for every error survived the whole suite (independent review, MEDIUM-2).
+  // The guard's NARROWNESS is protective: without this test, a fallback
+  // that fires for every error passes the whole suite.
   // The harm is specific — a blip AFTER the insert commits would re-insert the batch with client_id
   // stripped, since the fallback names no such column, so the duplicates carry NULL ids and can never
   // be de-duplicated or even found again. Exactly the damage this task exists to remove, made permanent.
@@ -351,7 +349,7 @@ test('[BUG-123] r1c an ordinary database failure is NOT retried by the fallback'
 
 test('[BUG-123] c8b the migration adds the column BEFORE the index that needs it', () => {
   // Two independent regexes say both statements exist and neither says which comes first — so
-  // swapping them survives (independent battery survivor S3), and every database whose events table
+  // swapping them would go unnoticed, and every database whose events table
   // predates this change (production) would throw on the index and abort the rest of the migration.
   const src = fs.readFileSync(new URL('../scripts/init-db.mjs', import.meta.url), 'utf8');
   const col = src.indexOf('add column if not exists client_id');
@@ -362,8 +360,8 @@ test('[BUG-123] c8b the migration adds the column BEFORE the index that needs it
 
 test('[BUG-123] c3b a 409 drops only the events it carried, not those that arrived mid-flight', async () => {
   // TWO overlapping saves, because with only one in flight a count-based drop and an entry-based drop
-  // remove exactly the same entries — the first version of this test staged one save, and the
-  // mutation that restores drop-by-count on the 409 branch SURVIVED it. The defect needs the second
+  // remove exactly the same entries, and restoring drop-by-count on the 409 branch
+  // would go unnoticed. The defect needs the second
   // answer to arrive after the first has already drained the buffer.
   const app = createApp({ store: { focus_device_id: DEVICE_ID }, search: '' });
   const held = [];
@@ -401,13 +399,12 @@ test('[BUG-123] c3b a 409 drops only the events it carried, not those that arriv
 
 test('[BUG-123] c4b a save the server accepted still reports ok when the buffer write throws', async () => {
   // `_dropSentEvents` runs inside `_pushNow`'s try, so a throwing setItem (quota, private window,
-  // blocked site data) turned an ACCEPTED save into {ok:false} — which signOut reads as a failure.
-  // Pre-existing, but the 100-event cap made `setItem` the common branch where `removeItem` used to
-  // run, so this change amplified it (independent review, LOW-12).
+  // blocked site data) would turn an ACCEPTED save into {ok:false} — which signOut reads as a failure.
+  // The 100-event cap makes `setItem` the common branch, so this is not a rare path.
   //
-  // A LEFTOVER IS REQUIRED. The first version of this test dropped the only buffered entry, which
-  // takes the `removeItem` branch — so the staged setItem failure never fired and the mutation
-  // restoring the unguarded write SURVIVED. An event must arrive WHILE the save is in flight.
+  // A LEFTOVER IS REQUIRED. Dropping the only buffered entry
+  // takes the `removeItem` branch — so the staged setItem failure would never fire and
+  // an unguarded write would pass. An event must arrive WHILE the save is in flight.
   const { app, hold, release } = rig({ store: { focus_channels: JSON.stringify([{ id: 'UC1', name: 'One' }]) }, search: '' });
   await bootQuiet(app);
   app.advance(3000);
@@ -425,8 +422,8 @@ test('[BUG-123] c4b a save the server accepted still reports ok when the buffer 
 });
 
 test('[BUG-123] c1b ids are still minted where crypto.randomUUID is missing', async () => {
-  // `_eventId`'s own comment names the embedded-webview case, and no test executed that branch
-  // (independent battery's coverage note). An event with no id is counted but can never be
+  // `_eventId`'s own comment names the embedded-webview case; this executes that branch.
+  // An event with no id is counted but can never be
   // de-duplicated, so the fallback generator has to produce something the server accepts.
   const { app } = rig({ deaf: true });
   app.ctx.crypto = {};                     // a browser that offers no randomUUID
@@ -447,12 +444,12 @@ test('[BUG-123] n1 normalizeEvent keeps a valid id and drops a malformed one wit
   assert.equal(normalizeEvent({ name: 'view', ts: now, id: { evil: true } }, now).id, null);
   assert.equal(normalizeEvent({ name: 'view', ts: now }, now).id, null);
   // ANCHORING: unanchored, the check reads "contains a uuid", so two padded spellings of one id
-  // become two rows (independent battery survivor E3b).
+  // become two rows.
   assert.equal(normalizeEvent({ name: 'view', ts: now, id: `  ${UUID}` }, now).id, null, 'padded');
   assert.equal(normalizeEvent({ name: 'view', ts: now, id: `${UUID}-extra` }, now).id, null, 'suffixed');
   assert.equal(normalizeEvent({ name: 'view', ts: now, id: `id=${UUID};` }, now).id, null, 'embedded');
   // CASE: one id in two spellings is one event, or the de-duplication it exists for does not
-  // happen (independent battery survivor E2).
+  // happen.
   assert.equal(normalizeEvent({ name: 'view', ts: now, id: UUID.toUpperCase() }, now).id, UUID);
   assert.equal(normalizeEvent({ name: 'view', ts: now, id: UUID }, now).name, 'view', 'guard: still an event');
 });

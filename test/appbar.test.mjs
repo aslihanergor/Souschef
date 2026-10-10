@@ -1,30 +1,29 @@
-// [TASK-104] — THE FEED APPBAR REWORK.
+// THE FEED APPBAR REWORK.
 //
-// Three asks from Asli (2026-08-28): the date comes out, the gear moves to the LEFT of row 1 with
-// the wordmark dropping to row 2 beside the count, and the "Posts" head gets breathing room. Plus
-// one decision taken at scoping (2026-08-29): "Mark all done" moves into the settings panel rather
+// The date comes out, the gear moves to the LEFT of row 1 with
+// the wordmark dropping to row 2 beside the count, and the "Posts" head gets breathing room. And
+// "Mark all done" lives in the settings panel rather
 // than being deleted, because ungrouped is the DEFAULT view — where no topic card exists — and
 // grouping is X-only, so a YouTube-only reader would never see a per-topic button at all.
 //
 // WHY SOURCE-TEXT ASSERTIONS FOR HALF OF THIS. The harness fabricates a stub for any id asked for,
 // so "the date element is gone" is not observable through it — `el('feed-date')` answers with a
 // perfectly good object either way. Layout is verify-by-looking by project rule, and the caret
-// offset (criterion 9) and the safe-area inset are handset measurements. What IS pinned here is the
+// offset and the safe-area inset are handset measurements. What IS pinned here is the
 // half that regresses silently: element placement, and the ORDER of the panel close against the
 // toast. Precedent for the shape: test/public-landing.test.mjs and test/landing.test.mjs:479.
 //
-// WHICH TESTS COULD RED BEFORE THE FIX — predicted BEFORE running, because a merely-red suite hides
-// the one that passed for the wrong reason (CLAUDE.md, Mutation batteries):
+// WHICH TESTS FAIL WITHOUT THE REWORK, because a merely-red suite hides
+// the one that passed for the wrong reason:
 //
-//   RED before the fix   — T1 (date in markup), T2 (todayLabel in app.js), T3 (mark-all not in the
+//   RED without it   — T1 (date in markup), T2 (todayLabel in app.js), T3 (mark-all not in the
 //                          panel), T5 (toast raised behind the panel), T7b (mark-all not seeded
 //                          hidden), T8 (#videos-head override present), T9 (wordmark before the
 //                          controls in row 1).
-//   GREEN before the fix — T4, T6 and T7a are GUARDS on behaviour that must SURVIVE the move, not
+//   GREEN without it — T4, T6 and T7a are GUARDS on behaviour that must SURVIVE the move, not
 //                          proofs of the change. T5b is the CONTROL: it proves this file can SEE a
 //                          toast raised behind the panel, which is what makes T5's pass meaningful
-//                          rather than an instrument that always answers `false`. Declared rather
-//                          than quietly counted as coverage.
+//                          rather than an instrument that always answers `false`.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -44,8 +43,8 @@ const APPJS = () => read('app.js');
 // assertion was right; the instrument could not tell code from prose. T8b is the control.
 const CSS = () => read('style.css').replace(/\/\*[\s\S]*?\*\//g, '');
 
-// The feed view only. The ARCHIVE screen has its own appbar with its own gear, and this task
-// deliberately does not touch it — a whole-file search would happily match that one instead.
+// The feed view only. The ARCHIVE screen has its own appbar with its own gear
+// — a whole-file search would happily match that one instead.
 const feedView = (html) => {
   const a = html.indexOf('id="view-feed"');
   const b = html.indexOf('id="view-archive"');
@@ -76,8 +75,8 @@ function boot({ signedIn = false } = {}) {
 /** Signed in FOR REAL, which any test that changes view needs.
  *  `showView` coerces every id to 'view-landing' while `_authEmail` is unset (app.js), so a
  *  signed-out fixture never reaches the screen it names — it asserts against the sign-in wall and
- *  passes for the wrong reason. Measured 2026-08-29: T16 was doing exactly that, and a mutation
- *  leaving the bulk control live on Archive and Setup survived it. */
+ *  passes for the wrong reason: a bulk control left live on Archive and Setup
+ *  would go unnoticed. */
 async function bootSignedIn() {
   const app = boot({ signedIn: true });
   await app.ctx.checkAuth();
@@ -99,15 +98,13 @@ function insideBlock(html, opener, needle) {
   return closeAt > openAt && n > openAt && n < closeAt;
 }
 /** Render a feed the way a reader NORMALLY reaches one: `openFeedView` calls `showView('view-feed')`
- *  before `await loadFeed()`, so the common render happens with the feed on screen. From [TASK-104]
- *  round 6 that matters, because `updateCount` refuses to reveal a whole-feed bulk control while the
+ *  before `await loadFeed()`, so the common render happens with the feed on screen.
+ *  That matters, because `updateCount` refuses to reveal a whole-feed bulk control while the
  *  reader is looking at something else.
- *  ⚠️ CORRECTED 2026-08-29. The first version of this said the old fixtures modelled "a state the app
- *  cannot be in". That is FALSE, and an independent reviewer caught it: both `renderFeedResults`
+ *  This is the normal path, not the only one: both `renderFeedResults`
  *  callers sit after an `await`, so tapping Archive during a refresh lands a render into a hidden
- *  feed view for real. The fixture change is still right — it models the normal path, which is what
- *  these tests are about — but that off-feed render is now UNCOVERED here, and it is precisely what
- *  `feedSurfaceShowing()` exists to make safe. Recorded rather than left as a false justification. */
+ *  feed view for real. That off-feed render is NOT covered here, and it is precisely what
+ *  `feedSurfaceShowing()` exists to make safe. */
 const render = (app, items) => {
   app.ctx.showView('view-feed');
   return app.ctx.renderFeedResults({ items, failed: [], cappedNames: [], totalChannels: items.length });
@@ -122,7 +119,7 @@ test('T1 the date is gone from the feed appbar', () => {
 });
 
 test('T2 todayLabel() is gone from app.js', () => {
-  // Its ONLY caller was the date write (app.js:3554 before this change). A function left behind
+  // Its ONLY caller was the date write. A function left behind
   // with no caller is exactly the residue a "delete the element" change ships when nobody looks.
   assert.ok(!/todayLabel/.test(APPJS()),
     'todayLabel had one call site; deleting the element must take the function with it');
@@ -151,7 +148,7 @@ test('T8 the "Posts" head keeps no top-margin override of its own', () => {
 test('T8b CONTROL: the stripped stylesheet still shows live rules', () => {
   // Without this, T8 passes against a reader that returns nothing at all — an instrument that cannot
   // disagree. `.section-head` carries the margin the override used to beat, so if this cannot be
-  // seen, T8's silence means nothing. CLAUDE.md: a tool's silence is only evidence once you have
+  // seen, T8's silence means nothing. A tool's silence is only evidence once you have
   // seen it break the silence.
   const rule = CSS().match(/\.section-head\s*\{[^}]*\}/);
   assert.ok(rule, 'guard: .section-head must still be a live rule in the stylesheet');
@@ -160,20 +157,19 @@ test('T8b CONTROL: the stripped stylesheet still shows live rules', () => {
 });
 
 test('T10 <div> opens and closes BALANCE across the markup', () => {
-  // NAME CORRECTED after review: this counts, it does not parse. A compensating surplus-and-deficit
+  // This counts, it does not parse. A compensating surplus-and-deficit
   // pair passes it, and it only sees <div> — a stray </span> or </aside> goes through. T10b is the
   // one that actually walks nesting. Both are kept: the count localises the error to "somewhere in
-  // this file", which is what made the real defect findable in seconds.
-  // THIS TEST EXISTS BECAUSE THE SUITE MISSED THE REAL BUG. The first cut of this change left ONE
-  // surplus </div>: the replacement matched a six-space `</div>` INSIDE an eight-space one, ate the
-  // wrong closing tag, and closed `.appbar` early. `#feed-body` was ejected out of `#view-feed`
-  // altogether and the whole feed rendered 803px below the bar — a blank screen under a correct-
-  // looking header, with 926 tests green. Every markup assertion here was about ORDER and
-  // CONTAINMENT BY INDEX, and an index test cannot see nesting: the button really was between the
-  // panel's start and its end, in a document where the panel no longer closed where it appeared to.
+  // this file", which makes a real defect findable in seconds.
+  // WHY IT EXISTS: ONE
+  // surplus </div> — say, a replacement matching a six-space `</div>` INSIDE an eight-space one and eating the
+  // wrong closing tag — closes `.appbar` early. `#feed-body` is then ejected out of `#view-feed`
+  // altogether and the whole feed renders 803px below the bar — a blank screen under a correct-
+  // looking header. A markup assertion about ORDER and
+  // CONTAINMENT BY INDEX cannot see nesting: the button really is between the
+  // panel's start and its end, in a document where the panel no longer closes where it appears to.
   //
-  // Found by LOOKING, in a browser, which is exactly what the project rule is for ([TASK-084]
-  // shipped a blank page past a green suite for the same reason: nothing could ask).
+  // An index test cannot ask this; only a depth walk (or looking in a browser) can.
   const stripped = read('app/index.html').replace(/<!--[\s\S]*?-->/g, '');
   const open = (stripped.match(/<div\b/g) || []).length;
   const close = (stripped.match(/<\/div>\s*/g) || []).length;
@@ -183,11 +179,10 @@ test('T10 <div> opens and closes BALANCE across the markup', () => {
 });
 
 test('T10b the feed body is still INSIDE the feed view, by DEPTH not by index', () => {
-  // The specific consequence T10 generalises. The first version of this test compared string
-  // INDEXES — and when the surplus </div> was reintroduced as a control, it stayed GREEN: the text
-  // order never changed, only the nesting did. That is the same blind spot that let the bug through
-  // in the first place, written a second time, and it was caught by running the mutation rather than
-  // by re-reading the test. It now walks div depth and finds where the view actually closes.
+  // The specific consequence T10 generalises. Comparing string
+  // INDEXES would stay GREEN with a surplus </div>: the text
+  // order never changes, only the nesting does. So this
+  // walks div depth and finds where the view actually closes.
   const html = read('app/index.html').replace(/<!--[\s\S]*?-->/g, '');
   const viewAt = html.indexOf('id="view-feed"');
   assert.ok(viewAt >= 0, 'guard: the feed view must exist');
@@ -219,14 +214,11 @@ test('T3 mark-all lives inside the settings panel, not in the appbar', () => {
 });
 
 test('T4 GUARD: mark-all still follows the unread count', async () => {
-  // Green before the fix and after. It keeps its id precisely so updateCount and showCaughtUp go on
+  // It keeps its id precisely so updateCount and showCaughtUp go on
   // working untouched.
-  // ⚠️ SIGNED IN since [TASK-104] round 6, and this is a fixture correction rather than a weakening:
+  // SIGNED IN on purpose:
   // `showView` coerces every id to the sign-in wall while `_authEmail` is unset, so a signed-out
-  // fixture never reaches the feed it claims to render — the same flaw measured in T16 on 2026-08-29.
-  // It passed anyway because `updateCount` used to reveal regardless of which view was on screen,
-  // which is the defect round 6 fixes. (Its own comment claiming it "would catch the move breaking
-  // that contract" was false for a second reason too — see T32.)
+  // fixture never reaches the feed it claims to render.
   const app = await bootSignedIn();
   render(app, [xPost('x1'), xPost('x2')]);
   await settle();
@@ -238,13 +230,13 @@ test('T4 GUARD: mark-all still follows the unread count', async () => {
 });
 
 test('T7a GUARD: mark-all really does ship hidden in the markup', () => {
-  // HIDDEN_IDS seeds the class itself, so T7b agrees with you about markup it never read. An
-  // independent battery (2026-08-27) removed `hidden` from markup and `display:none` from CSS and
-  // nothing failed, for exactly this reason. This is the half that reads the file.
-  // Read the STRIPPED markup and match the button's own tag. Two defects, both measured: it read
-  // app/index.html RAW, so leaving a commented-out copy of the class list above a
-  // class-less button satisfied it; and its scope expression was inoperative (the button sits
-  // outside the feed-view slice, so only the whole-file half ever matched).
+  // HIDDEN_IDS seeds the class itself, so T7b agrees with you about markup it never read:
+  // removing `hidden` from markup and `display:none` from CSS would fail
+  // nothing there. This is the half that reads the file.
+  // Read the STRIPPED markup and match the button's own tag: reading
+  // app/index.html RAW, a commented-out copy of the class list above a
+  // class-less button would satisfy it; and a feed-view scope would be inoperative (the button sits
+  // outside the feed-view slice).
   const tag = HTML().match(/<button[^>]*id="btn-mark-all"[^>]*>/);
   assert.ok(tag, 'the button must exist as LIVE markup, not only inside a comment');
   assert.match(tag[0], /class="[^"]*\bhidden\b[^"]*"/,
@@ -262,16 +254,13 @@ test('T7b a fresh harness seeds mark-all hidden, so "it was revealed" can fail',
     'a button that ships hidden must start hidden in the harness too');
 });
 
-// ── The reachability requirement (criterion 5) ──────────────────────────────────────────────────
+// ── The ordering of the panel close against the toast ──────────────────────────────────────────────────
 
-// NOTE ON WHY T5 EXISTS, corrected 2026-08-29 after measuring rather than reading. It was written
-// on [CHR-032]'s account that a toast raised with the drawer open is painted BEHIND it and its Undo
-// unreachable. That account is STALE: `.toast` was raised to z-index 62 on 2026-08-24 (commit
-// 12743cb) to clear the drawer (61) and its scrim (60), and a live check with the drawer open finds
+// NOTE ON WHY T5 EXISTS. A toast raised with the drawer open is NOT painted behind it:
+// `.toast` is at z-index 62
+// to clear the drawer (61) and its scrim (60), and with the drawer open
 // `elementFromPoint` over the Undo returning `.toast-action`. So this pins a UX ordering — the
-// drawer goes before the reader is told the screen changed — NOT a reachability guarantee. Kept at
-// its stated value rather than deleted, and relabelled rather than left implying a safety property
-// it does not have.
+// drawer goes before the reader is told the screen changed — NOT a reachability guarantee.
 test('T5 marking all done closes the panel BEFORE raising the toast', async () => {
   const app = boot();
   render(app, [xPost('x1'), xPost('x2')]);
@@ -295,7 +284,7 @@ test('T5 marking all done closes the panel BEFORE raising the toast', async () =
 
 test('T5b CONTROL: this file can SEE a toast raised behind the panel', () => {
   // Without this, T5 passes against an instrument that answers `false` unconditionally — the exact
-  // shape of a reading that never had the ability to disagree. CLAUDE.md: a tool's silence is only
+  // shape of a reading that never had the ability to disagree. A tool's silence is only
   // evidence once you have seen it break the silence.
   const app = boot();
   app.ctx.openProfile();
@@ -321,16 +310,14 @@ test('T6 GUARD: Undo still brings the posts back', async () => {
   assert.equal(JSON.parse(app.get('focus_done') || '[]').length, 0, 'with nothing left marked done');
 });
 
-// ── Tests added after an INDEPENDENT mutation battery (2026-08-29) ───────────────────────────────
+// ── Gaps the tests above leave open ───────────────────────────────
 //
-// The battery ran 20 mutations and 7 SURVIVED — six of them in style.css, where only 1 of 7 died.
-// That is the [TASK-101] precedent this task's own Verification section cites, walked into anyway:
-// the author never wrote a battery at all, only spot-checked two tests. Each test below kills one
-// named survivor. C6 (`.appbar-sub` back to `align-items: baseline`) is DECLARED UNPINNED and left
+// Most of them are in style.css. Each test below closes one.
+// C6 (`.appbar-sub` back to `align-items: baseline`) is DECLARED UNPINNED and left
 // to verify-by-looking: its worst case is a count sitting a pixel off a wordmark.
 
 test('T11 every id app.js reaches for exists in the markup', () => {
-  // Kills survivor A5: the date ELEMENT is deleted but a write to it survives in openFeedView. In a
+  // The date ELEMENT is deleted but a write to it survives in openFeedView. In a
   // browser getElementById returns null, `.textContent =` throws, and the feed never renders — a
   // blank screen. The harness cannot see it: it fabricates a stub for any id asked for, so the
   // throw simply never happens there. This is the general form, and it is cheap.
@@ -358,18 +345,18 @@ test('T12 .hidden keeps !important, which is what hides the relocated button', (
 });
 
 test('T13 no #videos-head top margin under ANY property synonym', () => {
-  // Kills survivor C3: the deleted override restored as `margin-block-start`, which is the same
+  // The deleted override restored as `margin-block-start`, which is the same
   // declaration by its logical name. T8 matches the literal `margin-top` and waves it through —
-  // the "guard present but ineffective" shape CLAUDE.md warns about.
+  // a guard that is present but ineffective.
   const rule = CSS().match(/#videos-head\s*\{[^}]*\}/);
   // `margin: 2px auto 12px` — the SHORTHAND, which is the form .section-head itself uses — restores
-  // the exact complaint and slipped past the longhand-only list. Measured as a survivor, 2026-08-29.
+  // the exact complaint and would slip past a longhand-only list.
   assert.ok(!rule || !/margin(-top|-block-start|-block)?\s*:/.test(rule[0]),
     `#videos-head must not re-open its top margin under any name; found ${JSON.stringify(rule && rule[0])}`);
 });
 
 test('T14 .appbar-controls actually lays row 1 out as a row', () => {
-  // Kills survivor C4 — the ONE rule this change adds, and it was unpinned. Neutered to
+  // The ONE rule the rework adds. Neutered to
   // `display: block`, the gear and switch stop sharing a line and the entire "gear left, switch
   // right" ask is silently undone while every markup test still passes.
   const rule = CSS().match(/\.appbar-controls\s*\{[^}]*\}/);
@@ -385,15 +372,15 @@ test('T15 the ready-note caret points at the switch, not past it', () => {
   // away at empty bar — it fails SILENTLY, which is why a value this small earns a test.
   // Asserted as a PROPERTY, not as the magic number: the note and the switch share a right edge, so
   // the caret's centre must fall within the switch's own 38px width. That kills 53 without freezing
-  // 12 against the handset measurement still owed (criterion 9).
+  // 12 against a handset measurement.
   const rule = CSS().match(/\.toggle-note::after\s*\{[^}]*\}/);
   assert.ok(rule, 'guard: the caret rule must exist');
   const right = Number((rule[0].match(/right:\s*(\d+(?:\.\d+)?)px/) || [])[1]);
   const half = Number((rule[0].match(/border:\s*(\d+(?:\.\d+)?)px/) || [])[1]);
   assert.ok(Number.isFinite(right) && Number.isFinite(half), `guard: parsed right=${right} half=${half}`);
-  // TIGHTENED 2026-08-29. The `<= 2` window accepted `right` values 11 through 15 identically, so
-  // this could not tell the shipped 12 from a 3px-wrong value — and the handset measurement it was
-  // deliberately not freezing against has now been taken (delta 0.0 at 402px and 874px, with a
+  // A `<= 2` window would accept `right` values 11 through 15 identically, so
+  // it could not tell the shipped 12 from a 3px-wrong value. The handset measurement
+  // is delta 0.0 at 402px and 874px (with a
   // control that moved it to -48.0 at right:60px). Both quantities are read from the LIVE stylesheet
   // rather than hardcoded, so changing the switch's width fails here and says the caret needs
   // re-measuring, instead of silently drifting.
@@ -414,12 +401,12 @@ test('T15 the ready-note caret points at the switch, not past it', () => {
 });
 
 test('T16 mark-all is hidden on views that are not the feed', async () => {
-  // Kills the regression independent review found in this very change. `#profile-panel` is
+  // `#profile-panel` is
   // body-level and reachable from THREE gears (setup, feed, archive), so relocating the button into
-  // it made a feed-only bulk write firable from a screen where the feed is not even showing: open
+  // it makes a feed-only bulk write firable from a screen where the feed is not even showing: open
   // Archive, tap the gear, tap it, and the whole unread feed is marked read behind a hidden view.
-  // In the app bar it was physically unreachable off the feed. The scoping decision assumed one
-  // entry point; the drawer has three.
+  // In the app bar it is physically unreachable off the feed; the drawer has three
+  // entry points.
   const app = await bootSignedIn();
   render(app, [xPost('x1'), xPost('x2')]);
   await settle();
@@ -434,28 +421,28 @@ test('T16 mark-all is hidden on views that are not the feed', async () => {
 });
 
 test('T17 the bulk action is tinted apart from the navigation row above it', () => {
-  // Kills survivor C7. `.btn-mark-all` sits 16px under `#btn-drawer-manage` in an IDENTICAL
+  // `.btn-mark-all` sits 16px under `#btn-drawer-manage` in an IDENTICAL
   // `.pref-manage` shape, so colour is the only thing distinguishing "go to another screen" from
-  // "mark every unread post read". Two reviewers raised the confusion risk independently.
+  // "mark every unread post read".
   const rule = CSS().match(/(^|\})\s*\.btn-mark-all\s*\{[^}]*\}/m);
   assert.ok(rule, 'guard: a `.btn-mark-all` rule must exist');
   assert.match(rule[0], /color:\s*var\(--accent\)/,
     'the bulk write must not be pixel-identical to the navigation row above it');
 });
 
-// ── Round 2, after THREE independent blind reviews (2026-08-29) ──────────────────────────────────
+// ── The `showView` guard hides one way only ──────────────────────────────────
 //
-// All three converged on the same HIGH: the `showView` guard added in round 1 was written with
-// `classList.toggle(cls, cond)`, which also REVEALS when the condition is false. Everything below
-// closes a hole a reviewer measured as a surviving mutation against the tests above.
+// A `showView` guard written with
+// `classList.toggle(cls, cond)` also REVEALS when the condition is false. Everything below
+// closes a hole in the tests above.
 
 test('T18 returning to the feed does NOT reveal mark-all when there is nothing to mark', async () => {
-  // The HIGH. `showView` runs BEFORE any feed state exists, and the bottom-nav Feed tab is
-  // `else showView('view-feed')` with no re-render by design — so a two-way toggle un-hid the bulk
+  // `showView` runs BEFORE any feed state exists, and the bottom-nav Feed tab is
+  // `else showView('view-feed')` with no re-render by design — so a two-way toggle un-hides the bulk
   // control over the caught-up screen. The cards are still in the DOM there (showCaughtUp only
-  // hides #feed), so a tap raised a real "Marked N as done" whose UNDO then un-marked posts the
-  // reader had already finished. Round 1 pinned only the hide direction; `toggle('hidden', true)`
-  // survived the whole 935-test suite.
+  // hides #feed), so a tap raises a real "Marked N as done" whose UNDO then un-marks posts the
+  // reader had already finished. Pinning only the hide direction lets `toggle('hidden', true)`
+  // through.
   const app = await bootSignedIn();
   render(app, [xPost('x1'), xPost('x2')]);
   await settle();
@@ -473,7 +460,7 @@ test('T18 returning to the feed does NOT reveal mark-all when there is nothing t
 });
 
 test('T19 row 1 markup actually uses .appbar-controls', async () => {
-  // T14 asserts the RULE exists; nothing asserted anything USES it. Two measured survivors: drop the
+  // T14 asserts the RULE exists; this asserts something USES it. Drop the
   // class from the div, or swap it for `.appbar-actions` (a real class with no justify-content).
   // Either undoes "gear left, switch right" entirely with the stylesheet untouched.
   const v = feedView(HTML());
@@ -495,9 +482,9 @@ test('T20 the wordmark sits in row 2, and declares its own colour', async () => 
     'the wordmark belongs in row 2, level with the count');
   const rule = CSS().match(/\.brand h1\s*\{[^}]*\}/);
   assert.ok(rule, 'guard: .brand h1 must have a rule');
-  // TIGHTENED 2026-08-29 after an independent battery: `/color:\s*var\(--/` matched `--ink-soft`
-  // too, so the fix's own regression test could not fail against the exact bug it exists for —
-  // mutating `--ink` → `--ink-soft` survived all 947 tests with the wordmark visibly greyed.
+  // `--ink` specifically: `/color:\s*var\(--/` would match `--ink-soft`
+  // too, so the test could not fail against the exact bug it exists for —
+  // `--ink` → `--ink-soft` would pass with the wordmark visibly greyed.
   assert.match(rule[0], /color:\s*var\(--ink\)/,
     'it must declare --ink specifically: --ink-soft IS the bug, and is what .appbar-sub would give it');
 });
@@ -513,16 +500,15 @@ test('T21 nothing in row 1 carries an auto margin', async () => {
 });
 
 test('T22 the bulk action tints its glyph too, not just its label', async () => {
-  // T17 read only the bare `.btn-mark-all` rule, so the arrow's tint could be dropped and the ✓
+  // T17 reads only the bare `.btn-mark-all` rule, so the arrow's tint could be dropped and the ✓
   // would render in the navigation row's ink beside an accent label.
   assert.match(CSS(), /\.btn-mark-all \.pref-arrow\s*\{[^}]*color:\s*var\(--accent\)/,
     'the ✓ must carry the accent too, or the row reads half-navigation');
 });
 
-// ── The archive bar mirrors the feed bar (Asli, 2026-08-29) ──────────────────────────────────────
+// ── The archive bar mirrors the feed bar ──────────────────────────────────────
 //
-// TASK-104 originally said the archive appbar was untouched. Asli asked for the opposite once she
-// saw the two screens side by side: the gear must sit top-left there too, and the bar must be the
+// The gear must sit top-left on the archive screen too, and the bar must be the
 // same height. Height parity is a CONSEQUENCE of structural parity — both bars get a controls row
 // carrying a 22px gear, then a row-2 carrying the 19px wordmark — so these pin the structure that
 // produces it rather than freezing a pixel value a handset check may still move.
@@ -547,8 +533,8 @@ test('T23 the archive bar has the same two-row shape as the feed bar', () => {
 
 test('T24 the archive gear carries no auto margin', () => {
   // This is the rule that would silently defeat T23. `#btn-archive-manage { margin-left: auto }`
-  // existed precisely BECAUSE that gear was a direct child of `.brand` with no justify-content;
-  // left in place once the gear moves into `.appbar-controls`, it pushes it back to the right and
+  // suits a gear that is a direct child of `.brand` with no justify-content;
+  // left in place once the gear sits in `.appbar-controls`, it pushes it back to the right and
   // the markup change looks applied while the screen is unchanged.
   const rule = CSS().match(/#btn-archive-manage\s*\{[^}]*\}/);
   assert.ok(!rule || !/margin-(left|inline-start)\s*:\s*auto/.test(rule[0]),
@@ -556,13 +542,12 @@ test('T24 the archive gear carries no auto margin', () => {
 });
 
 test('T25 neither bar keeps a brand in its controls row', () => {
-  // The shape both screens now share, asserted once. On the feed this was the whole ask; on the
-  // archive it is what took the gear off the right.
+  // The shape both screens share, asserted once.
   //
-  // NON-VACUITY GUARD added 2026-08-29 after an independent review: `insideBlock` returns false when
-  // the opening tag does not EXIST at all, so a bare negative assertion here passed on `main` — where
-  // the brand genuinely IS in the controls row — for the sole reason that `.appbar-controls` was not
-  // in the markup yet. A test that cannot fail on the code it was written against pins nothing, so
+  // NON-VACUITY GUARD: `insideBlock` returns false when
+  // the opening tag does not EXIST at all, so a bare negative assertion here would pass on markup where
+  // the brand genuinely IS in the controls row, for the sole reason that `.appbar-controls` is not
+  // in the markup. A test that cannot fail on the code it was written against pins nothing, so
   // the row's existence is asserted first and the absence claim is only meaningful after it.
   for (const [name, v] of [['feed', feedView(HTML())], ['archive', archiveView(HTML())]]) {
     assert.match(v, /<div class="appbar-controls">/,
@@ -573,15 +558,13 @@ test('T25 neither bar keeps a brand in its controls row', () => {
 });
 
 test('T26 mark-all COMES BACK when you return to a feed that still has unread', async () => {
-  // The other half of T18, and a regression the round-2 fix introduced on its own. Round 1's guard
-  // was two-way and revealed when it should not; the fix made it one-way — which is correct for
+  // The other half of T18. A one-way guard is correct for
   // LEAVING, but nothing then restores the control on the way back. The bottom-nav Feed tab is
   // `else showView('view-feed')` with NO re-render by design, so `updateCount` — which is what
   // decides this from the unread count — never runs on that path.
   //
   // Result: visit Archive once with posts still unread, come back, and "Mark all done" is gone from
-  // the drawer until the next feed load. Asli spotted the button missing; her feed happened to be
-  // caught up, where hiding it is right, but the same question exposed this.
+  // the drawer until the next feed load.
   const app = await bootSignedIn();
   render(app, [xPost('x1'), xPost('x2')]);
   await settle();
@@ -597,7 +580,7 @@ test('T26 mark-all COMES BACK when you return to a feed that still has unread', 
     'returning to a feed with unread posts must offer the control again');
 });
 
-// ── The sync warning must survive the mark-all toast (Asli, 2026-08-29) ──────────────────────────
+// ── The sync warning must survive the mark-all toast ──────────────────────────
 
 /** A signed-in client whose sync is HALTED: it holds local changes the server refused with a 409.
  *  Built the way test/sync-conflict-client.test.mjs builds one — a real refusal, not a flag poked
@@ -611,10 +594,10 @@ async function bootHalted() {
     const u = String(url), method = init?.method || 'GET';
     if (u.includes('/api/auth/me')) return { ok: true, status: 200, json: async () => ({ email: 'a@example.com' }) };
     if (u.includes('/api/state') && method === 'PUT') return { ok: false, status: 409, json: async () => ({ error: 'stale state' }) };
-    // `kind: 'account'`, matching the signed-in `/api/auth/me` above ([BUG-063]; changed with Asli's
-    // approval, 2026-09-11: "yes to 3 and 4"). It said `'device'`, which the boot now refuses as a
-    // contradicted answer — so the boot never gained standing, and the halt T28 relies on came from a
-    // 409 on an analytics-only PUT, which the real server never sends. Found by independent review.
+    // `kind: 'account'`, matching the signed-in `/api/auth/me` above. With `'device'` the boot
+    // refuses the row as a
+    // contradicted answer — so the boot never gains standing, and the halt T28 relies on would come from a
+    // 409 on an analytics-only PUT, which the real server never sends.
     if (u.includes('/api/state')) return { ok: true, status: 200, json: async () => ({
       state: { channels: [{ id: 'UCrow', name: 'From the row', source: 'youtube' }], done: ['v1'] },
       updatedAt: '2026-01-01T00:00:01.000Z', rev: '2026-01-01T00:00:01.000000', kind: 'account' }) };
@@ -633,7 +616,7 @@ async function bootHalted() {
 test('T27 CONTROL: closing the drawer while halted really does raise the sync warning', async () => {
   // Without this, T28 could pass against a fixture that never halted at all — the warning would be
   // absent both before and after, and "it came back" would be indistinguishable from "there was
-  // never one". CLAUDE.md: a tool's silence is only evidence once you have seen it break the silence.
+  // never one". A tool's silence is only evidence once you have seen it break the silence.
   const app = await bootHalted();
   app.ctx.openProfile();
   app.toasts.length = 0;
@@ -644,14 +627,14 @@ test('T27 CONTROL: closing the drawer while halted really does raise the sync wa
 });
 
 test('T28 the sync warning returns on its own, without extra machinery', async () => {
-  // WRITTEN AS A REPRISE TEST, THEN CORRECTED BY ITS OWN MUTATION. A 5.25s re-raise was added here
-  // on the belief that the mark-all toast eats the warning for good — and the mutation deleting that
-  // re-raise SURVIVED. A probe showed why: `pushNow` re-shows the notice before its halted
-  // early-return, `addDone` schedules a push, and the debounce is 1500ms. So the warning comes back
-  // at ~1500, ~3000 and on every push after; it is REPEATED, not lost. The reprise was a fourth
-  // showing of a notice that already returns three times, and it is gone.
+  // There is deliberately NO re-raise of the warning after the mark-all toast.
   //
-  // What this test now pins is that property, so nobody rebuilds the machinery: mark all done while
+  // `pushNow` re-shows the notice before its halted
+  // early-return, `addDone` schedules a push, and the debounce is 1500ms. So the warning comes back
+  // at ~1500, ~3000 and on every push after; it is REPEATED, not lost. A re-raise would be a fourth
+  // showing of a notice that already returns three times.
+  //
+  // What this test pins is that property, so nobody builds the machinery: mark all done while
   // halted, and the warning is back WITHOUT anything in markAllDone doing it.
   const app = await bootHalted();
   render(app, [xPost('x1'), xPost('x2')]);
@@ -669,12 +652,11 @@ test('T28 the sync warning returns on its own, without extra machinery', async (
 });
 
 test('T29 CONTROL: a healthy client is told nothing extra after mark-all', async () => {
-  // ⚠️ REWRITTEN 2026-08-29 — the previous version described a "reprise" that "arms on EVERY mark-all
-  // and is gated once, at fire time". There is no reprise: it was removed in this same branch once a
-  // probe showed the sync notice already returns on its own (T28, six lines above, is the test that
-  // says so). The comment survived the code it described by one commit.
+  // There is no "reprise" of the sync notice after a mark-all:
+  // the notice already returns on its own (T28, above, is the test that
+  // says so).
   //
-  // What this control actually establishes, and why it still earns its place: it proves the window
+  // What this control establishes: it proves the window
   // is genuinely QUIET for a healthy client. Without it, T28's pass would be consistent with the app
   // saying something to everyone after a mark-all — a warning shown to people whose sync is fine
   // trains them to ignore the one that matters. Sized so only the halt could speak here.
@@ -690,22 +672,19 @@ test('T29 CONTROL: a healthy client is told nothing extra after mark-all', async
 });
 
 // ── The reveal branch must ask whether the feed is SHOWING, not whether caught-up is hidden ──────
-// Round 4's `else if` restored the control from the unread count, which fixed T26's regression and
-// re-opened the two paths round 3's one-way `add` had closed. Both are pinned here.
+// Restoring the control from the unread count alone fixes T26's regression but
+// re-opens two paths a one-way hide closes. Both are pinned here.
 
 test('T30 the bulk control is not offered before the feed has rendered ANYTHING', async () => {
-  // THE HIGH, found by an independent blind review 2026-08-29 and reproduced here.
-  //
   // `openFeedView` calls `showView('view-feed')` as its FIRST statement, before `await loadFeed()`.
-  // The old gate asked only "is #caughtup hidden?" — which is true on a cold boot, because nothing
+  // A gate asking only "is #caughtup hidden?" is true on a cold boot, because nothing
   // has rendered yet. `updateCount` then counts `#feed .card` (zero) PLUS `countGroupedUnread()`,
   // and `inHandGroupableIds()` returns null ("do not filter") while `_lastFeedItems === null`, so
-  // that second term is the count of PERSISTED assignments. The control is revealed over an empty
+  // that second term is the count of PERSISTED assignments. The control would be revealed over an empty
   // screen, and the gear that opens the drawer is in the sticky appbar throughout.
   //
   // A tap then marks every grouped post the account holds as done, paints "all caught up ✓" over a
-  // feed that never loaded, and PUTs that to every device. The author's own comment above the branch
-  // names this exact path as why round 1's two-way toggle was wrong.
+  // feed that never loaded, and PUTs that to every device.
   const app = createApp({ store: {
     focus_device_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     focus_group_view: 'on',
@@ -733,11 +712,11 @@ test('T30 the bulk control is not offered before the feed has rendered ANYTHING'
 });
 
 test('T31 a feed that FAILED to load offers nothing and repaints no badge', async () => {
-  // The second re-opened path, and the one two of three reviewers measured directly.
+  // The second re-opened path.
   // `showLoadError` blanks `#feed-count` on purpose — renderFeedResults: "Total fetch failure isn't
   // the same as 'caught up' — don't claim a done-state we didn't earn." It hides `#feed` but leaves
-  // the previous render's cards in the DOM, and leaves `#caughtup` hidden. So the old gate passed
-  // and `updateCount` counted STALE cards: measured "2 new" over "couldn't load your feed".
+  // the previous render's cards in the DOM, and leaves `#caughtup` hidden. So a caught-up-only gate passes
+  // and `updateCount` counts STALE cards: "2 new" over "couldn't load your feed".
   const app = await bootSignedIn();
   render(app, [xPost('x1'), xPost('x2')]);
   await settle();
@@ -756,23 +735,18 @@ test('T31 a feed that FAILED to load offers nothing and repaints no badge', asyn
   app.ctx.showView('view-feed');   // the nav tab's exact call — no re-render
   assert.equal(app.el('btn-mark-all').classList.contains('hidden'), true,
     'the bulk control must not be offered over a feed that never loaded');
-  // ⚠️ RESTORED 2026-08-29. This assertion was GREEN, and round 6 DELETED it — the test was renamed
-  // to match the weaker claim and a comment added calling the difference a "logged gap". That is the
-  // one thing CLAUDE.md forbids outright: never change a test to make it pass. The stated reason
-  // ("12 tests across three files") described a DIFFERENT gap; restoring one term in `showView`
-  // costs zero tests, measured. Found by independent review.
   assert.equal(app.el('feed-count').textContent, '',
     'the badge must stay blank: nothing loaded, so no count was earned');
 });
 
 test('T32 COVERAGE: updateCount can hide the control on its own, without showCaughtUp', async () => {
-  // GREEN before and after — declared, not counted as proof of the fix. It exists because T4 could
+  // It exists because T4 could
   // not fail: T4 drives `markAllDone()`, which calls `showCaughtUp()`, and THAT also hides the
-  // control. Two guards can stop the same input, so T4 pinned neither. Measured by an independent
-  // battery 2026-08-29: `toggle('hidden', remaining === 0)` → `toggle('hidden', false)` — i.e.
-  // updateCount can never hide anything — SURVIVED all 947 tests.
+  // control. Two guards can stop the same input, so T4 pins neither:
+  // `toggle('hidden', remaining === 0)` → `toggle('hidden', false)` — i.e.
+  // updateCount can never hide anything — would pass.
   //
-  // That term became load-bearing in a place `showCaughtUp` does not run: `showView`'s reveal branch.
+  // That term is load-bearing in a place `showCaughtUp` does not run: `showView`'s reveal branch.
   // This drives `updateCount` alone, so only the guard under test can fire.
   const app = await bootSignedIn();
   render(app, [xPost('x1'), xPost('x2')]);
@@ -786,11 +760,11 @@ test('T32 COVERAGE: updateCount can hide the control on its own, without showCau
     'updateCount must hide at zero by itself — nothing else ran here');
 });
 
-// ── Two markup survivors an independent battery measured, each green across all 947 ──────────────
+// ── Two markup guards ──────────────
 
 test('T33 row 2 keeps the .brand WRAPPER, not just an <h1> somewhere inside it', async () => {
-  // Measured survivor 2026-08-29: delete the `<div class="brand">` wrapper so the dot and the <h1>
-  // become direct children of `.appbar-sub`. Suite stayed green — T20's `insideBlock` check passes
+  // Delete the `<div class="brand">` wrapper so the dot and the <h1>
+  // become direct children of `.appbar-sub`, and T20's `insideBlock` check passes
   // either way, because the <h1> is still inside `.appbar-sub`. Looked at in a browser it undoes the
   // headline ask completely: `space-between` spreads toque hard-left, wordmark CENTRED, count right,
   // and the wordmark greys out because `.brand h1` no longer matches its own colour rule.
@@ -804,7 +778,7 @@ test('T33 row 2 keeps the .brand WRAPPER, not just an <h1> somewhere inside it',
 });
 
 test('T34 the relocated bulk button still carries the drawer row class', async () => {
-  // Measured survivor 2026-08-29: drop `pref-manage` from the class list. Suite green; in a browser
+  // Drop `pref-manage` from the class list and, in a browser,
   // the button renders as a raw UA control — `background: rgb(107,107,107)`, `border: 2px outset` —
   // sitting in the drawer. `btn-mark-all` alone only carries the tint (T17/T22), never the row shape.
   const html = HTML();
@@ -816,22 +790,21 @@ test('T34 the relocated bulk button still carries the drawer row class', async (
     'and it must still ship hidden — T7a/T7b depend on that being the seeded state');
 });
 
-// ── Round 6: the reveal is guarded where it HAPPENS, not at each way in ─────────────────────────
-// Rounds 1-5 each guarded one path into `updateCount`. `showView` is 1 of 8 callers, so three of the
-// others still re-armed a whole-feed bulk write from screens the feed was not on. Found by an
-// independent blind review of round 5, 2026-08-29.
+// ── The reveal is guarded where it HAPPENS, not at each way in ─────────────────────────
+// `showView` is 1 of 8 callers of `updateCount`, so guarding one path in leaves the
+// others able to re-arm a whole-feed bulk write from screens the feed is not on.
 
 test('T35 updateCount cannot reveal the bulk control while the reader is on Archive', async () => {
-  // H1. The drawer is body-level and the Archive gear opens it, so an off-feed reveal is TAPPABLE —
-  // it was harmless on `main` only because the button lived inside #view-feed's appbar. Two real
+  // The drawer is body-level and the Archive gear opens it, so an off-feed reveal is TAPPABLE —
+  // it would be harmless only if the button lived inside #view-feed's appbar. Two real
   // callers do this with no user action on the feed at all: the classify tail (app.js:988) fires
   // 4-10s after boot, and un-archiving a card (app.js:3375) runs on the Archive screen itself.
   const app = await bootSignedIn();
   render(app, [xPost('x1'), xPost('x2')]);
   await settle();
-  // VACUITY GUARD, added 2026-08-29 after an independent battery MEASURED this test passing
-  // vacuously: a mutation that made the control never appear at all killed seven sibling tests and
-  // T35 SURVIVED it. A test asserting "hidden" needs to prove the thing could be shown.
+  // VACUITY GUARD: without it this test passes
+  // vacuously when the control never appears at all.
+  // A test asserting "hidden" needs to prove the thing could be shown.
   assert.equal(app.el('btn-mark-all').classList.contains('hidden'), false,
     'guard: offered on the feed with two unread, or "still hidden" proves nothing');
   app.ctx.openArchiveView();
@@ -844,10 +817,10 @@ test('T35 updateCount cannot reveal the bulk control while the reader is on Arch
 });
 
 test('T36 the grouping switch cannot repaint a count over a feed that failed to load', async () => {
-  // H2. `applyGroupView` still carried the ROUND 4 PREDICATE round 5 rejected — `if (#caughtup is
-  // hidden) updateCount()` — and on the error screen #caughtup IS hidden. One tap on the appbar
-  // switch repainted "2 new" over "couldn't load your feed" and re-armed the control over the
-  // previous render's stale cards, undoing showLoadError's guard from the same commit.
+  // If `applyGroupView` ran `if (#caughtup is
+  // hidden) updateCount()`, then on the error screen — where #caughtup IS hidden — one tap on the appbar
+  // switch would repaint "2 new" over "couldn't load your feed" and re-arm the control over the
+  // previous render's stale cards, undoing showLoadError's guard.
   const app = await bootSignedIn();
   render(app, [xPost('x1'), xPost('x2')]);
   await settle();
@@ -858,17 +831,17 @@ test('T36 the grouping switch cannot repaint a count over a feed that failed to 
   app.ctx.applyGroupView();  // the switch's own handler
   assert.equal(app.el('btn-mark-all').classList.contains('hidden'), true,
     'the bulk control must stay away — its cards are the previous render\'s, already stale');
-  // KNOWN GAP, declared rather than quietly dropped: the BADGE is still repainted here, because the
+  // KNOWN GAP: the BADGE is still repainted here, because the
   // guard is scoped to the reveal (see updateCount). Nothing is tappable, so this is a wrong string
-  // rather than a data path — logged as [BUG-108], with the fixture work it depends on.
+  // rather than a data path.
 });
 
 
-// ── Three coverage gaps an independent review measured as surviving mutations ────────────────────
+// ── Three coverage gaps ────────────────────
 
 test('T38 COVERAGE: the bulk control is hidden on SETUP too, not just Archive', async () => {
-  // Declared GREEN coverage. A measured survivor narrowed `id !== 'view-feed'` to
-  // `id === 'view-archive'` and nothing noticed, because every test that leaves the feed goes to
+  // Narrowing `id !== 'view-feed'` to
+  // `id === 'view-archive'` would go unnoticed, because every other test that leaves the feed goes to
   // Archive. Setup has its OWN gear (`#profile-btn`, app/index.html) opening the same body-level
   // drawer, so that narrowing puts a whole-feed bulk write back on a screen the feed is not on —
   // the exact regression T16 exists for, one screen over.
@@ -886,11 +859,11 @@ test('T38 COVERAGE: the bulk control is hidden on SETUP too, not just Archive', 
 });
 
 test('T39 COVERAGE: the relocated button is actually WIRED to markAllDone', async () => {
-  // Declared GREEN coverage. Deleting the `addEventListener` at app.js:4505 survived the whole
-  // suite, because every test drives `ctx.markAllDone()` directly and never the control. The element
-  // MOVED FILES in this change, which makes "the button is there and does nothing" the plausible
-  // slip — and a UI action that silently did not happen looks exactly like a broken feature
-  // (CLAUDE.md). `listeners.length` exists in the harness for precisely this and was unused here.
+  // Deleting the `addEventListener` in app.js would pass every other
+  // test, because they drive `ctx.markAllDone()` directly and never the control.
+  // "The button is there and does nothing" is a plausible
+  // slip — and a UI action that silently did not happen looks exactly like a broken feature.
+  // `listeners.length` exists in the harness for precisely this.
   const app = await bootSignedIn();
   app.ctx.wireApp();
   const clicks = app.el('btn-mark-all').listeners.filter(l => l.type === 'click');
@@ -906,10 +879,10 @@ test('T39 COVERAGE: the relocated button is actually WIRED to markAllDone', asyn
 });
 
 test('T40 the caret offset stays tied to the padding the note is positioned from', async () => {
-  // Declared GREEN coverage, and it closes the last unpinned term of T15's arithmetic. `.toggle-note`
+  // Closes the last unpinned term of T15's arithmetic. `.toggle-note`
   // is `right: 20px` BECAUSE that is `.appbar`'s own side padding — the note's right edge and the
-  // switch's right edge coincide, which is the premise the 12px caret is derived from. A measured
-  // survivor moved the note to `right: 60px`: T15 still passed, because it measures the caret
+  // switch's right edge coincide, which is the premise the 12px caret is derived from. With
+  // the note moved to `right: 60px`, T15 still passes, because it measures the caret
   // relative to the NOTE and never asks where the note itself sits.
   const css = CSS();
   const noteRule = css.match(/\.toggle-note\s*\{[^}]*\}/);
@@ -927,14 +900,14 @@ test('T40 the caret offset stays tied to the padding the note is positioned from
 });
 
 test('T41 returning to a caught-up feed does not print a count over it', async () => {
-  // The sibling T31 never had, and the variant that was never logged. Same mechanism, the path a
+  // The sibling of T31. Same mechanism, the path a
   // reader hits far more often: `showCaughtUp` hides #feed but leaves the read cards in the DOM for
   // Undo, so an ungated `updateCount` on the nav-tab return counts them and prints "2 new" ABOVE
-  // "You're all caught up". Measured at round 6's tip; `main` and round 5 both read "all caught up ✓".
+  // "You're all caught up".
   //
-  // The suite already pins this invariant for the OTHER entry point — group-toggle.test.mjs, TASK-099
-  // T17, "the badge must not be repainted as 'N new' from cards whose posts are all done". Round 6
-  // broke it via `showView` instead of via the switch, which is why no existing test caught it.
+  // The same invariant is pinned for the OTHER entry point in group-toggle.test.mjs
+  // (T17, "the badge must not be repainted as 'N new' from cards whose posts are all done"). This
+  // covers the `showView` route rather than the switch.
   const app = await bootSignedIn();
   render(app, [xPost('x1'), xPost('x2')]);
   await settle();
@@ -950,24 +923,24 @@ test('T41 returning to a caught-up feed does not print a count over it', async (
     'and nothing is left to mark');
 });
 
-// ── [BUG-106] the relocated bulk control is a 17px tap target beside an identical row ────────────
+// ── The relocated bulk control is a 17px tap target beside an identical row ────────────
 //
-// TASK-104 moved "Mark all done" into the settings drawer as a `.pref-manage` row. `.pref-manage`
+// "Mark all done" sits in the settings drawer as a `.pref-manage` row. `.pref-manage`
 // is `padding: 0`, so the control is exactly its 14px line box — measured at 17px in Chrome — and
 // it sits 16px under `#btn-drawer-manage` in an IDENTICAL shape, colour being the only difference
 // (that half is T17). 17px is well under the 44px minimum tap target, and the thing one slip lands
-// on is a whole-feed bulk write synced to every device, with a 5s Undo (~1.5s halted, [BUG-105]).
+// on is a whole-feed bulk write synced to every device, with a 5s Undo (~1.5s when sync is halted).
 //
-// WHICH RED BEFORE THE FIX — predicted BEFORE running (CLAUDE.md, Mutation batteries):
+// WHICH FAIL WITHOUT THE PADDING AND DIVIDER:
 //   RED   — T42 (the rule declares no vertical padding, so the box IS the line box) and T43 (no
 //           `border-top`, so nothing separates it from the navigation row).
 //   GREEN — T44 is a GUARD, not a proof. `.hidden` is `display: none !important` and already beats
-//           anything this fix adds; it is here so the divider cannot survive as a stray line at zero
-//           unread. Declared rather than quietly counted as coverage.
+//           anything else here; it is here so the divider cannot remain as a stray line at zero
+//           unread.
 //
 // ⚠️ WHAT THESE CANNOT DO, stated because the criterion names a rendered quantity. They read CSS
 // TEXT. `padding: 14px 0` in a stylesheet is NOT a measurement of a tap target — the 44px and 16px
-// numbers are live-measured in a browser and cited in the task. These pin that the rule exists and
+// numbers are live-measured in a browser. These pin that the rule exists and
 // carries the intended values, which is the half that regresses silently when someone tidies the
 // stylesheet. A test that is green, correct and measuring the wrong quantity is the failure mode
 // this comment exists to prevent.
@@ -980,7 +953,7 @@ test('T41 returning to a caught-up feed does not print a count over it', async (
 // keeps passing and the bug comes back: that is why T43 pins the divider on the ELEMENT.
 
 // The measured line box of a `.pref-manage` row: 14px/600 type, `padding: 0`, no min-height.
-// Live Chrome measurement recorded in tasks/BUG-106.md. The arithmetic below rests on it, so it is
+// A live Chrome measurement. The arithmetic below rests on it, so it is
 // named rather than inlined — if the drawer type ever changes, this is the number that moved.
 const PREF_ROW_LINE_BOX = 17;
 const MIN_TAP_TARGET = 44;
@@ -1016,17 +989,14 @@ test('T42 the bulk control clears the 44px minimum tap target', () => {
   assert.ok(box >= MIN_TAP_TARGET,
     `the tap box is ${box}px (${PREF_ROW_LINE_BOX} line box + ${top} + ${bottom} padding); a control` +
     ` that marks the whole feed read must clear ${MIN_TAP_TARGET}px`);
-  // ⚠️ THIS ASSERTION REPLACED A SYMMETRY CHECK, 2026-08-29, and the reason is recorded because a
-  // test edit is the one move CLAUDE.md forbids doing quietly. The original asserted
-  // `top === bottom`, on the reasoning that one-sided padding puts the label off-centre. That is a
-  // PROXY, and it was the wrong one: the whitespace a reader sees is bounded by the two RULES — this
+  // NOT a symmetry check (`top === bottom`). Symmetric padding is a
+  // PROXY, and the wrong one: the whitespace a reader sees is bounded by the two RULES — this
   // button's `border-top` above, and `.pref-block`'s `border-bottom` below — and `.pref-block` puts
   // its own `padding-bottom` between the label and that lower line. So symmetric padding renders
-  // VISIBLY off-centre, which is what Asli saw on localhost: 14px above the label, 34px below.
-  // Requirement changed (her call, this session), not a gap declared to make failing code pass.
+  // VISIBLY off-centre: 14px above the label, 34px below.
   //
-  // The replacement is strictly stronger. It pins the quantity the eye actually judges, and it
-  // encodes the COUPLING to `.pref-block` — so changing that block's padding now reds this test
+  // This pins the quantity the eye actually judges, and it
+  // encodes the COUPLING to `.pref-block` — so changing that block's padding reds this test
   // instead of silently un-centring the label.
   const blockPad = CSS().match(/\.pref-block\s*\{[^}]*padding-bottom:\s*([\d.]+)px/);
   assert.ok(blockPad, 'guard: `.pref-block` must declare the padding-bottom this centring depends on');

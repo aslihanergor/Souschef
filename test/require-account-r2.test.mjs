@@ -1,38 +1,36 @@
-// A LOOKUP THAT ERRORS IS NOT A MISSING SESSION ([BUG-039], review round 2, option S2).
+// A LOOKUP THAT ERRORS IS NOT A MISSING SESSION.
 //
 // The sibling file (test/require-account.test.mjs) stages one answer only: the session lookup
-// succeeds and finds nothing. This file stages the OTHER one — the lookup throws — because review
-// round 2 measured that treating them alike costs changes `main` keeps:
+// succeeds and finds nothing. This file stages the OTHER one — the lookup throws — because
+// treating them alike loses changes:
 //
-//   - data safety F1 (HIGH): a database outage answers null, the server 412s, the client clears the
+//   - a database outage answers null, the server 412s, the client clears the
 //     unsaved mark, and the change made during the outage is lost along with any earlier unsynced
-//     one. `main`'s 500 kept both.
-//   - claims HIGH-1 / data safety F2: with a legacy device row, one such answer then a kill, a
-//     failing unload save, or a real expiry, loses a change `main`'s 409 kept.
-//   - claims HIGH-2: the unload save landing after the reloaded page read the row brings "Not
+//     one.
+//   - with a legacy device row, one such answer then a kill, a
+//     failing unload save, or a real expiry, loses a change.
+//   - the unload save landing after the reloaded page read the row brings "Not
 //     syncing" back, and Use saved copy then discards the later change.
-//   - battery finding 1 / claims MED-1: an over-cap store's refused save loses its local copy,
-//     because the refusal ran BEFORE the size check (30002 read marks → 1).
+//   - an over-cap store's refused save loses its local copy,
+//     if the refusal runs BEFORE the size check (30002 read marks → 1).
 //
-// S2: `api/_session.js` grows a `{ strict: true }` mode that rethrows a database error instead of
+// So `api/_session.js` has a `{ strict: true }` mode that rethrows a database error instead of
 // flattening it to null; `api/state.js` asks for that mode, answers **503** when the lookup could
-// not be made and keeps **412** for a lookup that found nothing — and both now sit BELOW the 400
-// and 413 checks, so an over-cap state is answered 413 whatever the session says. Asli, 2026-09-12:
-// "yes do S", then "yes" to S2.
+// not be made and keeps **412** for a lookup that found nothing — and both sit BELOW the 400
+// and 413 checks, so an over-cap state is answered 413 whatever the session says.
 //
 // A 503 needs no client change, and that is the point rather than an omission: `_pushNow`
 // special-cases 409 and 412 only, so every other failure already keeps `focus_dirty`, the base and
-// the buffered events — exactly what an offline save does. Criterion 20 pins that it stays that way.
+// the buffered events — exactly what an offline save does. The c20 tests pin that it stays that way.
 //
-// WHAT RUNS WHERE. Criterion 17 drives the real `createStateHandler` over the fake store with an
+// WHAT RUNS WHERE. The c17 tests drive the real `createStateHandler` over the fake store with an
 // injected session function, so "what did the endpoint answer, and what did it touch" is direct.
-// Criterion 18 unit-tests `api/_session.js` itself. Criteria 19–21 run the REAL app.js through the
+// The c18 tests unit-test `api/_session.js` itself. c19–c21 run the REAL app.js through the
 // harness against the real handler AND the real `sessionAccount`, with the database error staged
 // where it really happens — inside the sessions query — because a rig that fakes the resolver
 // cannot show that the two answers are distinguishable at all.
 //
-// RED on 458be33 (the renamed 3a3566e, no S2): every test below tagged RED in its own comment.
-// Criteria 22–23 are PINS, green here, shown able to fail by mutations/BUG-039-r2.mjs.
+// The c22–c23 tests are PINS: guards whose removal nothing else would notice.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../test-helpers/app-harness.mjs';
@@ -91,14 +89,14 @@ function aliceStore(sql, more = {}) {
 // recognise still falls through to the real fake, and still throws there.
 //
 // `fail()` is read PER QUERY, so a test can arm the error for exactly one request and watch the
-// next one succeed — which is the difference between "an outage" and "a blip" in the criteria below.
+// next one succeed — which is the difference between "an outage" and "a blip" in the tests below.
 function withSessions(sql, {
   accounts = { [TOKEN]: ALICE }, expiresAt = FUTURE, fail = () => false, failWrite = () => false,
 } = {}) {
   const state = { accounts, expiresAt, fail, failWrite, lookups: 0 };
   const wrapped = (strings, ...values) => {
     const text = strings.join('?').replace(/\s+/g, ' ').trim().toLowerCase();
-    // The 500 arm of criterion 20: the state write itself fails, which is what `main` already
+    // The 500 arm of the c20 tests: the state write itself fails, which is what the handler
     // answers when Neon drops a connection mid-write. Staged at the query rather than as a canned
     // status so it travels api/state.js's own catch.
     if (state.failWrite() && /^(insert into users|update users set state)/.test(text)) {
@@ -122,19 +120,18 @@ function withSessions(sql, {
   return wrapped;
 }
 
-// ── Criterion 17: the server ─────────────────────────────────────────────────────────────────────
+// ── c17: the server ──────────────────────────────────────────────────────────────────────────────
 //
 // The session function is INJECTED here (the sibling file's pattern) so each case states one answer
-// and nothing else moves. Criterion 19 runs the real resolver end to end; this asks the narrower
+// and nothing else moves. The c19 tests run the real resolver end to end; this asks the narrower
 // question of what the endpoint does with each answer it can get.
-// Behaves exactly as `api/_session.js` does under S2: a database error is flattened to null for a
+// Behaves exactly as `api/_session.js` does: a database error is flattened to null for a
 // caller that did not ask about it, and rethrown for one that did.
 //
-// Deliberately NOT a resolver that throws unconditionally. That was the first spelling, and it made
-// c17e–c17g fail on unchanged code — not because unchanged code mishandles those requests, but
-// because it never asks for strict mode, so a bare throw states an answer it cannot receive. A
-// fixture that no version of the code can satisfy measures the fixture. This one lets every case
-// below run on BOTH trees, so the ones that must not change can be read as the controls they are.
+// Deliberately NOT a resolver that throws unconditionally. A caller that never asks for strict
+// mode cannot receive a throw, so a bare throw states an answer c17e–c17g's requests cannot get. A
+// fixture that no version of the code can satisfy measures the fixture. This one lets the cases
+// that must not change be read as the controls they are.
 const failingSession = async (_sql, _cookie, { strict = false } = {}) => {
   if (strict) throw DB_DOWN();
   return null;
@@ -163,8 +160,8 @@ for (const [label, users] of [
   ['with a device row already present', [{ kind: 'device', id: DEVICE_ID, state: { channels: chans('UC_old'), done: [] } }]],
 ]) {
   test(`[BUG-039] c17a: a lookup that ERRORS answers 503 and writes nothing, ${label}`, async () => {
-    // RED on 458be33: the lookup error escapes the handler (nothing catches it), so `statusCode` is
-    // null. On `main` before the guard it was flattened to null by _session.js and the save landed
+    // Uncaught, the lookup error escapes the handler and `statusCode` is
+    // null. Flattened to null by _session.js instead, the save would land
     // in a device row.
     const sql = fakeDb({ users });
     const r = await put({ sql, session: failingSession, body: JSON.stringify({ uid: DEVICE_ID, state: STATE, events: [EVENT()] }) });
@@ -179,7 +176,7 @@ for (const [label, users] of [
 }
 
 test('[BUG-039] c17b: a lookup that finds NO SESSION still answers 412, not 503', async () => {
-  // CONTROL, green on 458be33. The two answers must stay distinguishable in both directions: a
+  // CONTROL. The two answers must stay distinguishable in both directions: a
   // mutation that answers 503 for everything passes c17a and dies here.
   const sql = fakeDb();
   const r = await put({ sql, session: noSession, body: JSON.stringify({ uid: DEVICE_ID, state: STATE }) });
@@ -189,7 +186,7 @@ test('[BUG-039] c17b: a lookup that finds NO SESSION still answers 412, not 503'
 
 for (const [name, session] of [['errors', failingSession], ['finds no session', noSession]]) {
   test(`[BUG-039] c17c: a state that is not an object is answered 400 BEFORE the refusal, when the lookup ${name}`, async () => {
-    // RED on 458be33: the refusal runs first, so both answer 412. The order is not cosmetic — see
+    // If the refusal ran first, both would answer 412. The order is not cosmetic — see
     // c17d, where it costs an over-cap store its local copy.
     const sql = fakeDb();
     const r = await put({ sql, session, body: JSON.stringify({ uid: DEVICE_ID, state: ['not', 'an', 'object'] }) });
@@ -198,10 +195,10 @@ for (const [name, session] of [['errors', failingSession], ['finds no session', 
   });
 
   test(`[BUG-039] c17d: an over-cap state is answered 413 BEFORE the refusal, when the lookup ${name}`, async () => {
-    // RED on 458be33: both answer 412. THIS IS THE ORDER THAT COSTS DATA. Under C′ a 412 clears the
-    // unsaved mark while a 413 keeps it, so a store over the cap whose session really ended had its
-    // local copy replaced by the row on the next boot — measured at 30002 read marks → 1, where
-    // `main` keeps them (battery finding 1, Risk 18). 19h/19i assert the outcome end to end.
+    // If the refusal ran first, both would answer 412. THIS IS THE ORDER THAT COSTS DATA. A 412
+    // clears the unsaved mark while a 413 keeps it, so a store over the cap whose session really
+    // ended would have its local copy replaced by the row on the next boot — measured at 30002 read
+    // marks → 1. c19h/c19i assert the outcome end to end.
     const sql = fakeDb();
     const huge = { channels: chans('UC_a'), done: Array.from({ length: 30000 }, (_, i) => `done-${i}-${'x'.repeat(20)}`) };
     const r = await put({ sql, session, body: JSON.stringify({ uid: DEVICE_ID, state: huge }) });
@@ -237,8 +234,8 @@ test('[BUG-039] c17f: an ANALYTICS-ONLY PUT is unaffected by a lookup error', as
 
 test('[BUG-039] c17g: a GET is answered exactly as today when the lookup errors', async () => {
   // CONTROL, and a SCOPE BOUNDARY. The boot read has the same conflation — a signed-in browser's GET
-  // silently resolves to the device namespace — and that half is [BUG-120], deliberately not fixed
-  // here. This pins that S2 did not change it by accident in either direction.
+  // silently resolves to the device namespace — and that half is a separate, known issue, deliberately
+  // not fixed here. This pins that strict mode did not change it by accident in either direction.
   const sql = fakeDb({ users: [{ kind: 'device', id: DEVICE_ID, state: { channels: chans('UC_dev'), done: [] } }] });
   const handler = createStateHandler({ db: () => sql, sessionAccount: failingSession });
   const res = fakeRes();
@@ -250,10 +247,10 @@ test('[BUG-039] c17g: a GET is answered exactly as today when the lookup errors'
   assert.equal(res.body?.kind, 'device', 'and still answers from the device namespace ([BUG-120])');
 });
 
-// ── Criterion 18: api/_session.js ────────────────────────────────────────────────────────────────
+// ── c18: api/_session.js ─────────────────────────────────────────────────────────────────────────
 
 test('[BUG-039] c18a: with { strict: true } a database error RETHROWS', async () => {
-  // RED on 458be33: the third argument does not exist, so the catch flattens the error to null and
+  // Without the option the catch flattens the error to null and
   // the caller cannot tell "could not check" from "no session" — the whole defect, at its source.
   const sql = withSessions(fakeDb(), { fail: () => true });
   await assert.rejects(
@@ -265,7 +262,7 @@ test('[BUG-039] c18a: with { strict: true } a database error RETHROWS', async ()
 
 test('[BUG-039] c18b: WITHOUT the option a database error still answers null, as today', async () => {
   // CONTROL. `/api/auth/me`, `/api/feed` and `/api/auth/delete` all call this and none passes the
-  // option; each must keep today's answer (Risk 21). A mutation that makes strict the default dies
+  // option; each must keep today's answer. A mutation that makes strict the default dies
   // here rather than in production.
   const sql = withSessions(fakeDb(), { fail: () => true });
   assert.equal(await sessionAccount(sql, COOKIE), null, 'the default is unchanged: a blip reads as signed-out');
@@ -293,7 +290,7 @@ test('[BUG-039] c18d: an EXPIRED session answers null in both modes — an expir
 
 test('[BUG-039] c18e: NO COOKIE answers null in both modes, without querying at all', async () => {
   // CONTROL, and it is why a cookie-less request can get a 412 but never a 503 FROM THIS FUNCTION
-  // (blast radius item 4): the anonymous fast path returns before the database is touched, so there is
+  // — the anonymous fast path returns before the database is touched, so there is
   // no error to have. The endpoint has a separate 503 for a missing store, which no cookie can avoid.
   const sql = withSessions(fakeDb(), { fail: () => true });
   assert.equal(await sessionAccount(sql, ''), null);
@@ -312,12 +309,12 @@ test('[BUG-039] c18f: an UNKNOWN token answers null in both modes — the query 
   assert.equal(sql.session.lookups, 2, 'both modes must have actually queried');
 });
 
-// ── Criterion 22: the page-close listeners reach the flush ───────────────────────────────────────
+// ── c22: the page-close listeners reach the flush ────────────────────────────────────────────────
 //
-// PINS (green here; the harness half landed in 4de856e and is pinned in test/harness-dom.test.mjs).
-// Until that commit nothing could fire either listener, so `window.addEventListener('pagehide',
-// flushPush)` and the `visibilitychange` line beside it were deletable with a fully green suite —
-// while every criterion about what a refused change owes turns on the page going away.
+// PINS (the harness half is pinned in test/harness-dom.test.mjs).
+// Without these, `window.addEventListener('pagehide',
+// flushPush)` and the `visibilitychange` line beside it are deletable with a fully green suite —
+// while every test about what a refused change owes turns on the page going away.
 
 test('[BUG-039] c22a: firing pagehide runs the unload flush', async () => {
   const sql = seeded();
@@ -358,7 +355,7 @@ test('[BUG-039] c22b: visibilitychange flushes while HIDDEN, and not while visib
 // inside the sessions query, so it travels the whole path a real one takes — `api/_session.js`'s
 // catch, whatever `api/state.js` asks for, the status on the wire, and `_pushNow`'s branches. A rig
 // that faked the resolver could not show the two answers are distinguishable at all, which is the
-// single question S2 turns on.
+// single question strict mode turns on.
 //
 //   `errorNextStatePuts(n)` the next n STATE-CARRYING PUTs hit a database error in the lookup.
 //   `endSession()`          the session row is gone — the lookup succeeds and finds nothing.
@@ -392,7 +389,7 @@ function rig2({ sql = fakeDb(), store = {}, me = ALICE, cookie = COOKIE, account
     if (url.includes('/api/auth/logout')) return { ok: true, status: 200, json: async () => ({ ok: true }) };
     if (url.includes('/api/state')) {
       // A boot whose read fails leaves the page with NO BASE, which c23-A26 needs: an unload flush
-      // claims no state while another write is travelling WITH a base ([BUG-100]), so "no base" is
+      // claims no state while another write is travelling WITH a base, so "no base" is
       // the one shape in which a flush and an ordinary save can both carry state at once.
       if (method === 'GET' && stateReadFails) return { ok: false, status: 500, json: async () => ({ error: 'read failed' }) };
       const carriesState = method === 'PUT' && 'state' in JSON.parse(init.body);
@@ -430,7 +427,7 @@ function rig2({ sql = fakeDb(), store = {}, me = ALICE, cookie = COOKIE, account
   return {
     app, sql, ssql, boot, statuses,
     errorNextStatePuts: (n = 1) => { errorPuts = n; },
-    /** The next n state-carrying PUTs fail at the WRITE — the 500 `main` already answers. */
+    /** The next n state-carrying PUTs fail at the WRITE — an ordinary 500. */
     failWrite: (n = 1) => { writePuts = n; },
     /** Run `fn` as the next ordinary save arrives, before it is answered — a mid-flight mutation. */
     beforeNextSave: (fn) => { beforeNextSave = fn; },
@@ -462,23 +459,22 @@ function statePuts(app, from = 0) {
     .map((r) => ({ headers: lowerKeys(r.init.headers), body: JSON.parse(r.init.body), keepalive: !!r.init.keepalive }));
 }
 
-// ── Criterion 19: round 2's losses are kept ─────────────────────────────────────────────────────
+// ── c19: a change made during a lookup failure is kept ──────────────────────────────────────────
 //
-// Each case ends with the change in the account row, and none of them shows "Not syncing". RED on
-// 458be33 — there the lookup error reads as "no session", the server 412s and the client clears the
-// unsaved mark, so the change survives only if the page goes away cleanly AND that keepalive lands.
-// Every case below removes one of those two conditions.
+// Each case ends with the change in the account row, and none of them shows "Not syncing". If
+// the lookup error read as "no session", the server would 412 and the client clear the
+// unsaved mark, so the change would survive only if the page went away cleanly AND that keepalive
+// landed. Every case below removes one of those two conditions.
 //
-// WHAT EACH CASE ACTUALLY ASSERTS, measured in review round 3 rather than implied by this header, which
-// previously said "AND on the device" and "never appeared" for the whole set:
+// WHAT EACH CASE ACTUALLY ASSERTS:
 //   - the notice: c19a and c19g read it on BOTH pages; c19b, c19c, c19d, c19e and c19f read it on the
 //     RELOADED page only, so a mutation that raises it on the original page dies to c19a alone.
 //   - the device's own copy: asserted by c19a, c19b (via `landed`) and c19h/c19i (the read-mark count);
 //     c19c–c19f assert the account row only.
 //   - a device row's absence: asserted by c19a, c19b and c19d's legacy arm; the rest do not look.
 //
-// `main`'s behaviour for each is in tasks/BUG-039.md → the options table; this file asserts the
-// outcome rather than the mechanism, so the same tests would hold for any option that keeps them.
+// This file asserts the
+// outcome rather than the mechanism, so the same tests would hold for any design that keeps them.
 
 /** The whole account row's channel ids, plus what the device is left holding. */
 const landed = (sql, app) => ({
@@ -488,7 +484,7 @@ const landed = (sql, app) => ({
 });
 
 test('[BUG-039] c19a: an outage spanning the save AND the page going away, reopened after it — the change is kept', async () => {
-  // data safety F1, the round-2 HIGH. The outage covers the debounced save and the unload save, so
+  // The outage covers the debounced save and the unload save, so
   // nothing about the page's exit can rescue it: the change survives only if the unsaved mark does.
   const sql = seeded();
   const r = rig2({ sql, store: aliceStore(sql) });
@@ -526,8 +522,8 @@ test('[BUG-039] c19b: the same outage, but the app is KILLED rather than closed 
 });
 
 test('[BUG-039] c19c: an earlier change that failed OFFLINE, then the outage — both changes are kept', async () => {
-  // The second half of F1: the refusal did not only lose the change made during the outage, it
-  // cleared a mark that was already standing for an earlier one. `main`'s 500 kept both.
+  // A refusal here would not only lose the change made during the outage, it
+  // would clear a mark that was already standing for an earlier one.
   const sql = seeded();
   const r = rig2({ sql, store: aliceStore(sql) });
   await r.boot();
@@ -552,8 +548,7 @@ for (const [label, users] of [
   ['with a legacy device row', [{ kind: 'device', id: DEVICE_ID, state: { channels: chans('UC_legacy'), done: [] } }]],
 ]) {
   test(`[BUG-039] c19d: ONE lookup error, then the app is killed — the change is kept, ${label}`, async () => {
-    // claims HIGH-1 / data safety F2. With a legacy row `main`'s write 409'd and kept the change;
-    // the first build lost it in both shapes.
+    // The change must be kept in both shapes, with and without a legacy device row.
     const sql = fakeDb({ users: [{ kind: 'account', id: ALICE_ID, state: ALICE_ROW }, ...users] });
     const legacyBefore = users.length ? JSON.stringify(sql.get('device', DEVICE_ID).state) : null;
     const r = rig2({ sql, store: aliceStore(sql) });
@@ -574,7 +569,7 @@ for (const [label, users] of [
   });
 
   test(`[BUG-039] c19e: ONE lookup error and then a FAILING unload save — the change is kept, ${label}`, async () => {
-    // claims MED-1: the unload save is not a guarantee. It fails at the 64 KiB keepalive cap, and on
+    // The unload save is not a guarantee. It fails at the 64 KiB keepalive cap, and on
     // a connection that is already gone. A change owed only in memory dies with the page.
     const sql = fakeDb({ users: [{ kind: 'account', id: ALICE_ID, state: ALICE_ROW }, ...users] });
     const r = rig2({ sql, store: aliceStore(sql) });
@@ -613,9 +608,9 @@ test('[BUG-039] c19f: a store OVER the 64 KiB keepalive cap, one lookup error, t
 });
 
 test('[BUG-039] c19g: the reload race — the unload save lands AFTER the reloaded page read the row', async () => {
-  // claims HIGH-2. Under the first build the unload save re-sent a refused change; if it landed after
-  // the new page had already read the row, that page's base was stale and its next save 409'd —
-  // "Not syncing" came back, and Use saved copy then discarded the newer change. A 503 leaves the
+  // If the unload save re-sent a refused change and it landed after
+  // the new page had already read the row, that page's base would be stale and its next save 409 —
+  // "Not syncing" comes back, and Use saved copy then discards the newer change. A 503 leaves the
   // change on disk instead of in flight, so there is no second writer to race.
   const sql = seeded();
   const r = rig2({ sql, store: aliceStore(sql) });
@@ -641,18 +636,17 @@ test('[BUG-039] c19g: the reload race — the unload save lands AFTER the reload
 
 // ── 19h–19i: a store over the 256 KiB cap ───────────────────────────────────────────────────────
 //
-// This is Risk 18 and the reason S2 is not S. Under C′ a 412 CLEARS the unsaved mark while a 413
-// KEEPS it, so with the refusal ahead of the size check an over-cap store was told "account
-// required", dropped its mark, and had its whole local copy replaced by the row on the next boot —
-// the independent battery measured 30002 read marks going to 1, where `main` keeps them. Moving the
+// A 412 CLEARS the unsaved mark while a 413
+// KEEPS it, so with the refusal ahead of the size check an over-cap store is told "account
+// required", drops its mark, and has its whole local copy replaced by the row on the next boot —
+// measured as 30002 read marks going to 1. Keeping the
 // refusal below the 400/413 checks is the whole fix, and these two assert the outcome.
 const OVER_CAP = Array.from({ length: 30000 }, (_, i) => `done-${i}-${'x'.repeat(20)}`);
 
-// SEED THE ROW TOO, not just the store. The first spelling seeded only `focus_done` and the boot's
-// ordinary sync replaced it with the account row before the test had staged anything — so it went on
-// asserting "30001 read marks" against a page that held 2, and the criterion it named was never
-// exercised. CLAUDE.md's rule ("the server row will erase it") is written for a RESTORE; it bites a
-// seed identically. Caught because the test stayed red after the fix that was supposed to green it.
+// SEED THE ROW TOO, not just the store. Seed only `focus_done` and the boot's
+// ordinary sync replaces it with the account row before the test has staged anything — so it would
+// assert "30001 read marks" against a page that holds 2, and the over-cap case would never be
+// exercised.
 const overCapRow = () => fakeDb({ users: [{ kind: 'account', id: ALICE_ID, state: { ...ALICE_ROW, done: OVER_CAP } }] });
 const overCapStore = (sql) => aliceStore(sql, { focus_done: JSON.stringify(OVER_CAP) });
 
@@ -663,7 +657,7 @@ test('[BUG-039] c19h: an OVER-CAP store, one lookup error, then close and reload
   r.errorNextStatePuts(1);
   r.app.ctx.addDone('one-more');
   await drain(r.app);
-  // POSITIVE, not the absence of a 412. Round 3 found the negative form could not fail for any input in
+  // POSITIVE, not the absence of a 412. The negative form cannot fail for any input in
   // this fixture: the lookup here ERRORS, so the refusal's answer would be 503 rather than 412 whichever
   // side of the size check it sat on, and `!includes(412)` is satisfied either way. Asserting the 413 is
   // PRESENT does distinguish them — put the refusal back above the size check and this reads 503.
@@ -683,7 +677,7 @@ for (const [label, users] of [
   ['with a legacy device row', [{ kind: 'device', id: DEVICE_ID, state: { channels: chans('UC_legacy'), done: [] } }]],
 ]) {
   test(`[BUG-039] c19i: an OVER-CAP store whose session really ENDS, a walled reload, then signing back in, ${label}`, async () => {
-    // The case the rescope's stop rule caught: here the session is genuinely gone, so the refusal is
+    // Here the session is genuinely gone, so the refusal is
     // correct — but the state is over the cap, so the server has something to say about it FIRST.
     const sql = fakeDb({
       users: [{ kind: 'account', id: ALICE_ID, state: { ...ALICE_ROW, done: OVER_CAP } }, ...users],
@@ -709,14 +703,14 @@ for (const [label, users] of [
   });
 }
 
-// ── Criterion 20: a 503 is an ordinary failure, not a refusal ───────────────────────────────────
+// ── c20: a 503 is an ordinary failure, not a refusal ────────────────────────────────────────────
 
 for (const [label, arm] of [
   ['503 (the lookup could not be made)', (r) => r.errorNextStatePuts(1)],
   ['500 (the write failed)', (r) => r.failWrite(1)],
 ]) {
   test(`[BUG-039] c20a: after a save answered ${label}, nothing is cleared and nothing is said`, async () => {
-    // The 500 arm is the CONTROL: it is an answer `main` already gives and the client already
+    // The 500 arm is the CONTROL: it is an ordinary server failure the client already
     // handles, so the two columns must be identical. A mutation that routes 503 into the 412 branch
     // passes the 500 arm and dies on the 503 one.
     const sql = seeded();
@@ -751,8 +745,8 @@ for (const [label, arm] of [
 
 test('[BUG-039] c20b: once a 503 has been settled by a healthy save, the page going away sends NOTHING', async () => {
   // A 503 must not arm the in-page debt a 412 arms (`_refusalOwed`). If it did, every tab switch
-  // after an outage would re-send the whole state — review round 1 measured that widening and its
-  // cost, and c15b–c15f in the sibling file pin it from the other side.
+  // after an outage would re-send the whole state; c15b–c15f in the sibling file pin it from the
+  // other side.
   const sql = seeded();
   const r = rig2({ sql, store: aliceStore(sql) });
   await r.boot();
@@ -769,7 +763,7 @@ test('[BUG-039] c20b: once a 503 has been settled by a healthy save, the page go
 
 test('[BUG-039] c20c: sign-out right after a 503 completes on the FIRST press, with the change in the account', async () => {
   // Sign-out's own save is exempt from the header, so it can never be refused — but it CAN be
-  // answered 503 if the lookup fails during it. This pins that the exit path is unchanged by S2.
+  // answered 503 if the lookup fails during it. This pins that the exit path is unchanged by it.
   const sql = seeded();
   const r = rig2({ sql, store: aliceStore(sql) });
   await r.boot();
@@ -785,12 +779,12 @@ test('[BUG-039] c20c: sign-out right after a 503 completes on the FIRST press, w
     `sign-out must complete on the first press: ${JSON.stringify(r.app.navigations)}`);
 });
 
-// ── Criterion 21: a lookup error followed by someone else is what an OFFLINE save is today ──────
+// ── c21: a lookup error followed by someone else is what an OFFLINE save is today ───────────────
 //
 // Parity, asserted as parity: each sequence is run twice, identically, differing only in HOW the
-// first save failed. The offline arm is the reference — it is `main`'s behaviour, unchanged by this
-// task — so a deepEqual between the two says "this introduces no new user-visible outcome" without
-// anyone having to write down what that outcome is. Risk 22.
+// first save failed. The offline arm is the reference, so a deepEqual between the two says
+// "a lookup error introduces no new user-visible outcome" without
+// anyone having to write down what that outcome is.
 async function afterFailedSave(how, nextEvent) {
   const sql = fakeDb({
     users: [{ kind: 'account', id: ALICE_ID, state: ALICE_ROW }, { kind: 'account', id: BOB_ID, state: BOB_ROW }],
@@ -843,15 +837,13 @@ for (const [name, sequence] of Object.entries(SEQUENCES)) {
   });
 }
 
-// ── Criterion 23: round 2's remaining gaps ──────────────────────────────────────────────────────
+// ── c23: guards that nothing else pins ──────────────────────────────────────────────────────────
 //
-// PINS, every one green on 458be33. They exist because review round 2 found each of these guards
-// completely unpinned — a mutation could remove it and the suite stayed green — not because the
-// behaviour is wrong today. Each is shown able to fail by mutations/BUG-039-r2.mjs.
+// PINS. Without these, each guard below could be removed with the suite still green.
 
 test('[BUG-039] c23-X04: a 412 on the UNLOAD save clears the mark, so the next account loads its own row', async () => {
-  // Battery X04. The unload save takes the same 412 branch as an ordinary one, and nothing asserted
-  // it: a mutation scoping the branch to non-keepalive pushes left `focus_dirty` set on the way out,
+  // The unload save takes the same 412 branch as an ordinary one. Scope the branch to
+  // non-keepalive pushes and `focus_dirty` stays set on the way out,
   // and the next boot — Bob's — would then push Alice's copy under Bob's session.
   const sql = fakeDb({
     users: [{ kind: 'account', id: ALICE_ID, state: ALICE_ROW }, { kind: 'account', id: BOB_ID, state: BOB_ROW }],
@@ -874,8 +866,8 @@ test('[BUG-039] c23-X04: a 412 on the UNLOAD save clears the mark, so the next a
 
 for (const value of ['true', 'yes', '0', '', '11']) {
   test(`[BUG-039] c23-S05: only the header value '1' declares — "${value}" does not`, async () => {
-    // Battery S05. `=== '1'` was unpinned in the loosening direction: a mutation to a truthiness
-    // check would refuse every old client that ever sends this header name, and nothing failed.
+    // Pins `=== '1'` in the loosening direction: a truthiness
+    // check would refuse every old client that ever sends this header name.
     const sql = fakeDb();
     const r = await put({
       sql, session: noSession, headers: { 'x-require-account': value },
@@ -887,9 +879,9 @@ for (const value of ['true', 'yes', '0', '', '11']) {
 }
 
 test('[BUG-039] c23-P01: a session answer with an id but NO email still writes the account row', async () => {
-  // Battery P01. The refusal keys on `account.accountId`, deliberately — exactly the condition under
-  // which resolveOwner would not address the account. A mutation keying it on the email instead
-  // would refuse every save from an account row whose email is null, and nothing asserted otherwise.
+  // The refusal keys on `account.accountId`, deliberately — exactly the condition under
+  // which resolveOwner would not address the account. Keying it on the email instead
+  // would refuse every save from an account row whose email is null.
   const sql = fakeDb({ users: [{ kind: 'account', id: ALICE_ID, state: ALICE_ROW }] });
   const rev = toCharUS(sql.get('account', ALICE_ID).updated_at);
   const r = await put({
@@ -903,7 +895,7 @@ test('[BUG-039] c23-P01: a session answer with an id but NO email still writes t
 });
 
 test('[BUG-039] c23-A17: an accepted save settles the refusal even when a mid-flight change then fails', async () => {
-  // Battery A17. c15f pins that an accepted save settles the debt; it does not pin the case where
+  // c15f pins that an accepted save settles the debt; it does not pin the case where
   // that save is accepted but NOT confirmed, because a mutation landed while it was in flight. The
   // debt is settled by `accepted`, deliberately, and only this distinguishes the two.
   const sql = seeded();
@@ -927,10 +919,10 @@ test('[BUG-039] c23-A17: an accepted save settles the refusal even when a mid-fl
   assert.deepEqual(rowIds(sql.get('account', ALICE_ID)), ['UC_alice', 'UC_new'],
     'guard: the accepted save carried the owed change up');
   assert.equal(r.app.get('focus_dirty'), '1', 'guard: the mid-flight change failed and is still unsaved');
-  // ...AND THAT MID-FLIGHT CHANGE THEN FAILS — the criterion's own words, and the half this test was
-  // missing. With it succeeding instead, the follow-up save is accepted AND confirmed, which settles
-  // the debt under `confirmed` too: the mutation that narrows `accepted` to `confirmed` (N22) survived
-  // the first spelling of this test. A failed save leaves the page dirty but quiet — no timer, no
+  // ...AND THAT MID-FLIGHT CHANGE THEN FAILS. With it succeeding instead, the follow-up save is
+  // accepted AND confirmed, which settles
+  // the debt under `confirmed` too, so narrowing `accepted` to `confirmed` would go
+  // unnoticed. A failed save leaves the page dirty but quiet — no timer, no
   // events — so the close is decided by the debt alone.
   r.offlineNextStatePuts(0);
   r.app.advance(4000);                                 // drain the analytics buffer so it cannot trigger
@@ -942,27 +934,27 @@ test('[BUG-039] c23-A17: an accepted save settles the refusal even when a mid-fl
 });
 
 test('[BUG-039] c23-A26: Use saved copy settles a refusal left owed on a HALTED page', async () => {
-  // Battery A26 / round-1 mutation R13. A page can be both halted and owed, and `adoptServerCopy` is
+  // A page can be both halted and owed, and `adoptServerCopy` is
   // the one action that resolves a halt — so it must drop the debt too, or the page keeps a flag that
   // outlives the thing it stood for.
   //
-  // REACHING THAT STATE IS THE WHOLE TEST, and the first spelling did not. Refusing and then halting
-  // does not work: the 409 branch clears `_refusalOwed` itself, so the adopt's clear is redundant and
-  // R13 survived. It has to be the other order — a 412 answered AFTER a 409 — and `_pushNow`'s halt
+  // REACHING THAT STATE IS THE WHOLE TEST. Refusing and then halting
+  // does not work: the 409 branch clears `_refusalOwed` itself, so the adopt's clear is redundant
+  // there. It has to be the other order — a 412 answered AFTER a 409 — and `_pushNow`'s halt
   // gate returns before any fetch, so a push that STARTS while halted never reaches the server.
   //
   // The one route in is the unload flush: `pushNow` lets a keepalive SKIP the in-flight queue, so a
   // flush that passed the halt gate before the 409 landed is still in the air, and its 412 is
-  // processed afterwards. That is the sequence below, and it is why the round-1 header's
+  // processed afterwards. That is the sequence below, and it is why
   // "a halted page sends no state push that a 412 could refuse" is false — true of pushes that start
   // after the halt, not of one already in flight.
   // NO BASE, from a boot that READ SUCCESSFULLY and found no row — not from a failed read. Both leave
   // the page base-less, and only this one leaves it able to push at all: a failed read leaves
-  // `_stateLoaded` false, and `_pushNow` then downgrades every push to analytics-only (BUG-056), so
-  // no state save can be refused or halted. Measured, after the failed-read version sent nothing.
+  // `_stateLoaded` false, and `_pushNow` then downgrades every push to analytics-only, so
+  // no state save can be refused or halted.
   //
   // The base matters because `flushPush` claims no state while another write is travelling WITH one
-  // ([BUG-100]) — so with a base the flush is analytics-only and can never be refused, and "no base"
+  // — so with a base the flush is analytics-only and can never be refused, and "no base"
   // is the single shape where a flush and an ordinary save both carry state at the same moment.
   const sql = fakeDb();
   // And nothing to CLAIM, or the boot's first push creates the row and comes back with a base.
@@ -1005,12 +997,11 @@ test('[BUG-039] c23-A26: Use saved copy settles a refusal left owed on a HALTED 
   await r.close();
   assert.deepEqual(statePuts(r.app, before), [],
     'using the saved copy must settle what the refusal owed, not re-send the discarded change');
-  // WHAT THIS DOES NOT PIN, measured rather than assumed. It does not kill round-1's mutation R13
-  // (the clear deleted from adoptServerCopy). With the debt left set the close still fires the flush —
+  // WHAT THIS DOES NOT PIN. It does not fail if the clear is deleted from adoptServerCopy.
+  // With the debt left set the close still fires the flush —
   // but the adopt has already cleared `dirty` and `_stateOutstanding`, so nothing is pending and the
   // payload degrades to ANALYTICS-ONLY. Asserting "no request at all" instead does not work either:
   // the adopt buffers its own event, so a request goes out on correct code too. The honest cost of
-  // deleting that clear is one redundant analytics-only push in this narrow race, and R13 stays a
-  // DECLARED survivor with that reasoning. See mutations/BUG-039-r1.mjs R13 for the full correction —
-  // including the two earlier explanations, both of which were wrong in different directions.
+  // deleting that clear is one redundant analytics-only push in this narrow race, and that gap is
+  // left open deliberately.
 });

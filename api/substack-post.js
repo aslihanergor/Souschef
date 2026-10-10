@@ -1,4 +1,4 @@
-// GET /api/substack-post?url=<post-url> — the in-app Substack reader's content endpoint (TASK-059).
+// GET /api/substack-post?url=<post-url> — the in-app Substack reader's content endpoint.
 //
 // Lazily fetched when the user taps "…read more" on a Substack card (the feed itself stays light —
 // it only carries a one-paragraph preview). Fetches the post page, pulls the article body out of
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
 
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=600');
-    // Prune curated "Other Reading…/On X…" roundup sections before sanitising (BUG-012).
+    // Prune curated "Other Reading…/On X…" roundup sections before sanitising.
     res.status(200).json({ html: sanitizeHtml(stripSubstackAppendix(article)), paywalled: isPaywalled(html) });
   } catch {
     res.status(502).json({ error: 'post fetch failed' });

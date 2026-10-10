@@ -1,4 +1,4 @@
-// Transient handoff store for Connect-YouTube import (TASK-015). The OAuth callback fetches the
+// Transient handoff store for Connect-YouTube import. The OAuth callback fetches the
 // user's subscriptions server-side and stashes them here keyed by a one-time token — only its
 // sha256 is stored, mirroring login_tokens/sessions. The callback then redirects to the app, and
 // the client reads the list exactly once via /result, which DELETEs the row. Short TTL + single-use.

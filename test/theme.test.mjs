@@ -1,4 +1,4 @@
-// Light by default; the sign-in page always light ([TASK-109]).
+// Light by default; the sign-in page always light.
 //
 // Two places decide the colour, and only a browser runs both:
 //   1. the inline <head> script in app/index.html, which paints before anything is known — no session,
@@ -14,7 +14,7 @@
 // the first frame painting light for someone who chose Dark.
 //
 // Nothing here may change what is STORED: the theme is a synced preference kept on sign-out
-// (EXIT_DISPOSITION.theme = 'keep'), and the task is about what is painted, never about the choice.
+// (EXIT_DISPOSITION.theme = 'keep'), and this is about what is painted, never about the choice.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -196,7 +196,7 @@ test('A7 guard: after a tap on Light, a later view change stays light', async ()
 });
 
 test('A8: showView survives a storage that throws on the theme read, and falls back to light (risk 3)', async () => {
-  // showView is the path that decides whether the app is reachable at all ([TASK-084]); a throw from a
+  // showView is the path that decides whether the app is reachable at all; a throw from a
   // colour read would leave no screen showing.
   const app = rig({ store: { focus_theme: 'dark', focus_was_authed: '1' }, signedIn: true });
   await boot(app, 'dark');
@@ -224,7 +224,7 @@ test('C1: vercel.json allows exactly this head script by its sha256 (criterion 7
 });
 
 test('A9: a signed-out call for any screen is coerced to the wall, and the wall is still light (criterion 3)', async () => {
-  // showView turns every signed-out request into the sign-in wall ([TASK-084] round 2). The colour must
+  // showView turns every signed-out request into the sign-in wall. The colour must
   // follow the screen actually SHOWN, not the one requested — a Dark reader asking for the feed while
   // signed out gets the wall, light.
   const app = rig({ store: { focus_theme: 'dark', focus_was_authed: '1' }, signedIn: false });

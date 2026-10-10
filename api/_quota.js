@@ -1,4 +1,4 @@
-// Per-user X quota helpers (TASK-100). Pure — no DB, no I/O, no `process.env` read — so they are
+// Per-user X quota helpers. Pure — no DB, no I/O, no `process.env` read — so they are
 // unit-tested directly, the way `_events.js` is. `nowMs` and `env` are parameters for that reason.
 //
 // Underscore-prefixed, so it does not count against Vercel Hobby's 12-function cap (we sit at 12/12).
@@ -31,18 +31,18 @@ export function readQuotaLimit(env) {
 // Is this owner already at or past their limit? Checked BEFORE the fetch, so `used >= limit` is the
 // right comparison: the request being judged is the one that would carry them past N.
 //
-// An unreadable count (a DB blip returning null/NaN) fails OPEN — criterion 12. A counting failure
+// An unreadable count (a DB blip returning null/NaN) fails OPEN. A counting failure
 // must serve the feed, never refuse it.
 export function quotaExceeded(used, limit) {
   if (!Number.isFinite(limit) || limit <= 0) return false;
-  // An unreadable count fails OPEN (criterion 12) — and that is provided by the comparison itself,
+  // An unreadable count fails OPEN — and that is provided by the comparison itself,
   // not by a guard: `Number(null)` is 0 and `Number(undefined)`/`Number('lots')` are NaN, and every
   // comparison against NaN is false. An explicit `isFinite(used)` check was here and was removed
   // deliberately: no mutation could pin it, so it read as load-bearing while pinning nothing.
   return Number(used) >= limit;
 }
 
-// The fuse as a HUMAN must read it (CHR-074). `readQuotaLimit` answers "what does the code ENFORCE"
+// The fuse as a HUMAN must read it. `readQuotaLimit` answers "what does the code ENFORCE"
 // and collapses four different situations into one `null` — correct for enforcement, useless for
 // diagnosis. "Never set", "typed wrong" and "switched off on purpose" each need a different response
 // from whoever is looking at the admin panel, and until now nothing could tell them apart: a silent

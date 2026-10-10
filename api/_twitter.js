@@ -3,8 +3,8 @@
 // Unlike YouTube (which has an RSS/scrape keyless fallback), X has NO keyless path — with
 // no token the source is simply unavailable, and the callers skip it.
 
-// Ordered v2 hosts (BUG-009). api.twitter.com is primary: on 2026-07-05 (BUG-008)
-// api.x.com returned 503 for every authenticated v2 request while api.twitter.com served
+// Ordered v2 hosts. api.twitter.com is primary:
+// api.x.com has returned 503 for every authenticated v2 request while api.twitter.com served
 // the identical API on the same token — so twitter.com is the stable host, x.com the
 // fallback. Trying both means a whole-host outage of either no longer takes X dark.
 const HOSTS = ['https://api.twitter.com/2', 'https://api.x.com/2'];
@@ -21,7 +21,7 @@ export function isTransient(status) {
 
 const defaultSleep = ms => new Promise(r => setTimeout(r, ms));
 
-// Fetch a v2 endpoint with retry-with-backoff + host fallback (BUG-009). Returns parsed
+// Fetch a v2 endpoint with retry-with-backoff + host fallback. Returns parsed
 // JSON, or null when the token is unset (callers treat X as unconfigured and skip it).
 // Throws immediately on a 4xx (fail fast), or the last error once every host attempt is
 // exhausted on transient failures — so the feed loader marks just that channel failed.
@@ -67,7 +67,7 @@ async function fetchWithTimeout(fetchImpl, url, token) {
   }
 }
 
-// Incremental pagination loop control (TASK-040). After fetching a page (so `pages` counts pages
+// Incremental pagination loop control. After fetching a page (so `pages` counts pages
 // already retrieved), decide whether to fetch another and whether we stopped early with more
 // pending. `capped` is true ONLY when a next_token remains but we've hit the page cap — i.e. older
 // new posts are being skipped (surface a note). Exhausting exactly at the cap is NOT capped.
@@ -92,7 +92,7 @@ export function parseTwitterUser(json) {
 }
 
 // Choose the mp4 variant nearest a target bitrate (~832k ≈ 640×360 — crisp at card width without
-// over-spending data). Ignores the HLS variant; null if no mp4. (TASK-038)
+// over-spending data). Ignores the HLS variant; null if no mp4.
 function pickMp4(variants, target = 832000) {
   const mp4s = (variants || []).filter(v => v.content_type === 'video/mp4' && v.url);
   if (!mp4s.length) return null;
@@ -110,7 +110,7 @@ function statusIdOf(url) {
 // Build { text, author, url } for a tweet's quoted reference, or null when there's no `quoted`
 // ref or its tweet/author isn't expanded in `includes` (defensive — the caller then leaves the
 // quoted-status link in the text as a fallback). Preview is text-only, so all t.co shorts in the
-// quoted body are dropped (quoted media isn't fetched — see spec). (TASK-034)
+// quoted body are dropped (quoted media isn't fetched — see spec).
 function resolveQuoted(tw, tweetById, userById) {
   const ref = (tw.referenced_tweets || []).find(r => r.type === 'quoted');
   if (!ref) return null;
@@ -128,8 +128,8 @@ function resolveQuoted(tw, tweetById, userById) {
 
 // users/:id/tweets → normalized feed items { id, text, urls, published, media[], url, quoted? }.
 // Joins includes.media (ALL attachments) + includes.users (permalink handle) + includes.tweets
-// (quoted context). Video/GIF media items carry a `videoUrl` (mp4) for in-app playback (TASK-038);
-// a quote tweet carries `quoted` (referenced author + text) (TASK-034).
+// (quoted context). Video/GIF media items carry a `videoUrl` (mp4) for in-app playback;
+// a quote tweet carries `quoted` (referenced author + text).
 export function parseTweets(json) {
   const tweets = json?.data;
   if (!Array.isArray(tweets)) return [];
@@ -143,7 +143,7 @@ export function parseTweets(json) {
 
   return tweets.map(tw => {
     // All attachments in order (up to 4 photos, or 1 video/gif). Photos carry `url`; video/gif
-    // carry only `preview_image_url`. width/height drive the client crop policy (TASK-037).
+    // carry only `preview_image_url`. width/height drive the client crop policy.
     const media = (tw.attachments?.media_keys || [])
       .map(k => mediaByKey[k])
       .filter(Boolean)
@@ -157,7 +157,7 @@ export function parseTweets(json) {
 
     // A quoted (referenced) tweet, if present and fully expanded. Only `quoted` refs reach here —
     // RTs/replies are excluded upstream. When resolved, its permalink in the text is redundant
-    // (we render the quote inline), so strip it below. (TASK-034)
+    // (we render the quote inline), so strip it below.
     const quoted = resolveQuoted(tw, tweetById, userById);
     const quotedId = quoted ? tw.referenced_tweets.find(r => r.type === 'quoted').id : null;
 
@@ -170,7 +170,7 @@ export function parseTweets(json) {
     // A media t.co (an entities.urls entry WITH a media_key) just points to media we already
     // render → strip it. The resolved quoted-status link is likewise redundant → strip it.
     // Every other real link stays in the text and is surfaced in `urls` for the client to
-    // linkify (TASK-035/036).
+    // linkify.
     const urls = [];
     for (const u of urlEntities) {
       if (u.media_key) text = text.split(u.url).join('');

@@ -6,7 +6,7 @@ docs/
 dev-server.mjs
 test/
 scripts/
-# Mutation battery specs (CHR-010) — dev-only, and nothing here should be served.
+# Mutation battery specs — dev-only, and nothing here should be served.
 mutations/
 # design mockups (Claude Design exports) — never deploy
 mockups/

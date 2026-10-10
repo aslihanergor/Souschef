@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { sanitizeHtml } from '../api/_sanitize.js';
 
 // The reader injects remote Substack HTML via innerHTML, so this runs SERVER-SIDE and is the
-// trust boundary. Allowlist tags/attrs; drop everything else. (TASK-059)
+// trust boundary. Allowlist tags/attrs; drop everything else.
 
 // ── allowed content is preserved ──────────────────────────────────────────────
 
@@ -112,7 +112,6 @@ test('empty / non-string input yields empty string', () => {
 
 // A '>' inside a quoted attribute value must not truncate the tag and leak its tail as visible
 // text — this is what made Substack tweet-embed JSON (data-attrs="{…>…}") spill onto the page.
-// (BUG-012)
 test('a ">" inside a quoted attribute cannot truncate the tag or leak its tail', () => {
   assert.equal(sanitizeHtml('<div data-x="a>b">keep</div>'), 'keep');
   assert.equal(sanitizeHtml('<p title="x>y">hi</p>'), '<p>hi</p>');
@@ -122,7 +121,7 @@ test('a ">" inside a quoted attribute cannot truncate the tag or leak its tail',
   );
 });
 
-// ── malformed tags must not survive as markup (BUG-018) ──────────────────────
+// ── malformed tags must not survive as markup ──────────────────────
 //
 // Two weaknesses combine, neither dangerous alone: the tokenizer only matches tags whose quotes
 // balance (so a malformed tag is never allow-listed AND never removed — it survives as text), and
@@ -132,11 +131,11 @@ test('a ">" inside a quoted attribute cannot truncate the tag or leak its tail',
 // The structural invariant asserted here is "no '<' in the output begins a tag carrying an event
 // handler" — NOT "the string 'onerror=' is absent". Once the '<' is escaped the handler text is
 // inert and legitimately survives as visible text (&lt;img src="x"onerror=…), which is the correct
-// outcome: dropping content silently is how BUG-012 went unnoticed.
+// outcome: dropping content silently hides a broken reader.
 //
 // This invariant is necessary but the interesting proof is that the browser EXECUTES the pre-fix
 // output and does not execute the post-fix output. That was verified live at body.innerHTML in
-// Chrome, not here — see the task's Verification section (pre: onerror fired, title changed; post:
+// Chrome, not here (pre: onerror fired, title changed; post:
 // 0 handlers, 0 elements). A regex assertion alone would be the exact "validate the probe" trap:
 // it proves a string property, not that a browser runs anything. The first payload below is the
 // vector confirmed to execute; the rest are structural variants that must also fail closed.

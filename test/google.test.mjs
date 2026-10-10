@@ -1,4 +1,4 @@
-// Pure helpers for Sign in with Google (TASK-060). The OAuth network calls live in the
+// Pure helpers for Sign in with Google. The OAuth network calls live in the
 // endpoints; here we test only the pure logic: building the consent URL, extracting a
 // verified email from Google's userinfo, and the CSRF state cookie.
 import { test } from 'node:test';
@@ -38,7 +38,7 @@ test('verifiedEmail rejects unverified, missing, or malformed emails', () => {
   assert.equal(verifiedEmail(null), null);
 });
 
-// BUG-013: `sub` is Google's stable, never-reused account identifier. It — not the email — is
+// `sub` is Google's stable, never-reused account identifier. It — not the email — is
 // what identifies the account, because an email can be changed upstream or recycled by a
 // Workspace/edu domain. googleIdentity() refuses to hand back an identity unless BOTH halves are
 // trustworthy: a verified email AND a usable sub.
@@ -88,7 +88,7 @@ test('serializeStateCookie omits Secure on plain http (local dev)', () => {
   assert.ok(!c.includes('Secure'));
 });
 
-// ── Connect YouTube (TASK-015): incremental-auth consent URL for youtube.readonly ──
+// ── Connect YouTube: incremental-auth consent URL for youtube.readonly ──
 
 test('youtubeRedirectUri builds the connect callback path (distinct from sign-in)', () => {
   assert.equal(

@@ -1,6 +1,6 @@
-// POST /api/auth/delete  → permanently delete the signed-in account (TASK-028b).
+// POST /api/auth/delete  → permanently delete the signed-in account.
 // Session-gated. Removes the account row (sessions cascade via the FK), the `users` state blob,
-// AND the analytics `events` for this account (TASK-070). Neither the state blob nor events would
+// AND the analytics `events` for this account. Neither the state blob nor events would
 // be removed by cascade — `users.id` has no FK, and `events.account_id` is `on delete set null`
 // (which would *anonymize*, not delete) — so both are explicit, honouring the delete's promise to
 // remove the person's data rather than orphan or merely unlink it. All deletes run in one
@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   const account = await sessionAccount(sql, req.headers?.cookie);
   if (!account) return res.status(401).json({ error: 'not signed in' });
 
-  // This browser's device row (BUG-017). It is a snapshot frozen when this browser signed in —
+  // This browser's device row. It is a snapshot frozen when this browser signed in —
   // afterwards every PUT carried the cookie and landed on the account row. Leaving it behind is
   // what made a deleted account come back: the next boot here is anonymous, so syncOnLoad resolves
   // to this row and restores what we just "deleted".
@@ -36,18 +36,18 @@ export default async function handler(req, res) {
   // — not handled anywhere else either. An earlier version of this comment claimed each one "rotates
   // its own device id on its next sign-out": it cannot. Deleting the account cascades every session
   // row, so the other device's /api/auth/me 401s, renderAccount() hides #acct-in, and #acct-signout
-  // is inside it — the only wiring for signOut(). There is no sign-out left to perform. Tracked as
-  // BUG-038; until it lands, another device keeps its local copy until the user clears it by hand.
+  // is inside it — the only wiring for signOut(). There is no sign-out left to perform.
+  // Until that is fixed, another device keeps its local copy until the user clears it by hand.
   //
   // Not a new privilege: knowing a device id already grants full read/write of that row through
   // /api/state (that is the anonymous auth model), so deleting it grants nothing extra.
   // Anonymous `events` for the device are deliberately NOT removed by device_id — the
   // attribute-on-login sweep (api/state.js) has already set account_id on them, so the statement
-  // below covers them; a blanket device_id delete would instead cut real DAU history (TASK-087).
+  // below covers them; a blanket device_id delete would instead cut real DAU history.
   const deviceId = req.headers?.['x-device-id'];
   const statements = [
     sql`delete from events where account_id = ${account.accountId}`, // analytics (set-null FK → explicit)
-    // The state blob (no cascade → explicit). `kind` is required since BUG-019: without it this
+    // The state blob (no cascade → explicit). `kind` is required: without it this
     // would also delete a device row that happens to carry the same id.
     sql`delete from users where id = ${account.accountId} and kind = ${OWNER_ACCOUNT}`,
     sql`delete from accounts where id = ${account.accountId}`,       // account (sessions cascade away)

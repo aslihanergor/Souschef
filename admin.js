@@ -1,4 +1,4 @@
-// Owner-only analytics dashboard client (TASK-070). Fetches the gated GET /api/state?admin and
+// Owner-only analytics dashboard client. Fetches the gated GET /api/state?admin and
 // renders the rollups. Access is enforced server-side (ADMIN_EMAIL vs the session email); a 403
 // just shows a notice. No framework — matches the app's vanilla/no-build convention.
 
@@ -53,7 +53,7 @@ function barRows(items, labelOf, valueOf) {
     </div>`).join('');
 }
 
-// ── X cost & volume (CHR-072) ───────────────────────────────────────────────
+// ── X cost & volume ───────────────────────────────────────────────
 // Money is always distinct posts x price; `volume` is the fairness meter and is NEVER priced.
 //
 // Two decimals throughout. An earlier version used three below $1 and claimed it stopped a real
@@ -89,7 +89,7 @@ function xMeterHtml(x) {
 
 const X_EMPTY = '<div class="card"><span class="muted">No X meter data yet.</span></div>';
 
-// [CHR-074]. Deliberately OUTSIDE xMeterHtml/renderXMeters, and that is the whole design: those
+// Deliberately OUTSIDE xMeterHtml/renderXMeters, and that is the whole design: those
 // return X_EMPTY the moment there are no meter rows, so a fuse reading placed inside them would
 // vanish on a quiet day and whenever a meter query fails — an instrument absent exactly when it is
 // needed. This row is the threshold the numbers below are measured against, so it also reads first.

@@ -1,4 +1,4 @@
-// Thin Neon Postgres client for the backend sync layer (TASK-024). The pooled DATABASE_URL is
+// Thin Neon Postgres client for the backend sync layer. The pooled DATABASE_URL is
 // server-side only (Vercel env, never sent to the browser). Uses @neondatabase/serverless over
 // HTTP — a good fit for serverless/Fluid Compute (low cold-start, nothing to pool or close).
 
@@ -17,7 +17,7 @@ export function db() {
   return _sql;
 }
 
-// Which URL do we actually connect to? (TASK-064)
+// Which URL do we actually connect to?
 //
 // The Neon Marketplace integration OWNS `DATABASE_URL` and points Production, Preview *and*
 // Development at the same (production) database. Vercel makes integration-managed variables
@@ -34,7 +34,7 @@ export function resolveDatabaseUrl(env = process.env) {
   return env.DATABASE_URL || null;
 }
 
-// ── Which database am I about to touch? (TASK-064) ────────────────────────────
+// ── Which database am I about to touch? ────────────────────────────
 // Local `.env` gets its DATABASE_URL from `vercel env pull`, and the Neon integration points
 // every Vercel environment at the SAME database — so localhost silently writes to production
 // unless something says otherwise. Nothing in the tooling used to say otherwise: a migration
@@ -58,14 +58,14 @@ export function isProductionDb(url) {
   return typeof url === 'string' && url.includes(PRODUCTION_DB_ENDPOINT);
 }
 
-// ── Which database does a MUTATING SCRIPT target? (CHR-016) ──────────────────
+// ── Which database does a MUTATING SCRIPT target? ──────────────────
 // `--prod` must SELECT production, not merely permit it. Scripts used to take resolveDatabaseUrl() and
 // refuse production without the flag — but that function prefers DEV_DATABASE_URL on any laptop, so
-// `--prod` quietly ran against the dev branch while printing a normal banner. It happened twice
-// ([BUG-123]'s migration, [BUG-055]'s cleanup). So the flag decides the target, and each mode refuses
+// `--prod` quietly ran against the dev branch while printing a normal banner.
+// So the flag decides the target, and each mode refuses
 // the other's database:
 //   prod  → DATABASE_URL, and it must be production;
-//   !prod → resolveDatabaseUrl(), and it must NOT be production (TASK-064's guard).
+//   !prod → resolveDatabaseUrl(), and it must NOT be production.
 // Returns { url, host, isProd } or { error }. Connect with neon(url) on the returned url — db() resolves
 // its own, which is how a checked URL and a connected one can differ.
 export function scriptDatabaseTarget({ prod, env = process.env }) {

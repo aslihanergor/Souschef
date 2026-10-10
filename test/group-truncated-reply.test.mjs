@@ -1,4 +1,4 @@
-// [BUG-116] — A TRUNCATED TOOL REPLY MUST NOT THROW AWAY A BILLED CLASSIFY.
+// A TRUNCATED TOOL REPLY MUST NOT THROW AWAY A BILLED CLASSIFY.
 //
 // Roughly 1 billed classify in 24 comes back with `input.groups` as a JSON STRING rather than an
 // array, truncated with its final closing bracket missing, while `stop_reason` is `tool_use` — a
@@ -9,26 +9,17 @@
 // The fixture strings in `test/fixtures/group-truncated-tool-reply.json` are the REAL captured
 // replies, committed because they are not reproducible on demand.
 //
-// WHICH TESTS CAN RED BEFORE THE FIX, declared because a merely-red suite hides the one that passed
-// for the wrong reason (CLAUDE.md, Mutation batteries):
-//
-//   RED before the fix   — C1, C2, C3, C6, C8, C9, C10, C11, C13, C14, C15, C16, C17, C18, C19.
-//                           Fifteen of nineteen. MEASURED, not asserted: the three source files were
-//                           reverted to the parent commit in a scratch copy and this file re-run.
-//   GREEN before the fix — C4, C5, C7, C12, BY DESIGN, and none is decoration:
-//     C4  guards against an OVER-EAGER repair. Today it passes because nothing is repaired at all;
-//         after the fix it passes because a string with no complete element must still degrade.
-//         Same assertion, two different reasons — the second is the one that can break.
+// C4, C5, C7 and C12 pass WITHOUT the repair too, BY DESIGN, and none is decoration:
+//     C4  guards against an OVER-EAGER repair: a string with no complete element must still degrade.
 //     C5  pins the existing contract for non-string junk. It can only red if the repair over-reaches
 //         into shapes that were never text.
 //     C7  pins that a well-formed native array never enters the repair path.
-//     C12 pins that a degrade still reveals held posts — existing behaviour this change must not
+//     C12 pins that a degrade still reveals held posts — behaviour the repair must not
 //         regress while touching the branch right next to it.
 //
 // THE ORACLE IS INDEPENDENT ONLY WHERE THE INPUT IS. Where a test needs to know what SHOULD be
-// recovered it computes it as `JSON.parse(captured + ']')` — naive bracket-closing. An earlier
-// version of this comment claimed that made the whole file implementation-independent. It does not,
-// and the claim was measured false: for a truncation at a CLEAN element boundary the scanner's
+// recovered it computes it as `JSON.parse(captured + ']')` — naive bracket-closing. That does not
+// make the whole file implementation-independent: for a truncation at a CLEAN element boundary the scanner's
 // `slice(0, cut+1) + ']'` and the oracle's `raw + ']'` differ by trailing whitespace only, so on C1
 // they agree BY CONSTRUCTION — replacing the scanner with the oracle leaves C1 green. C3, C13, C14
 // and C15 are where the oracle and the implementation can actually disagree, and they are the tests
@@ -50,8 +41,8 @@ const CAP1 = FIXTURE.truncated.find(c => c.id === 'capture-1');
 if (!CAP0 || !CAP1) throw new Error('fixture is missing capture-0 / capture-1');
 
 // The independent oracle: close the array naively and parse. Valid for these two captures precisely
-// because the truncation lands at a clean element boundary — which is the measured fact this whole
-// task rests on, so a test asserting it is a test worth having (C1 does exactly that).
+// because the truncation lands at a clean element boundary — which is the measured fact the whole
+// repair rests on, so a test asserting it is a test worth having (C1 does exactly that).
 const oracle = s => JSON.parse(s + ']');
 
 const toolUse = groups => ({ content: [{ type: 'tool_use', name: 'emit_groups', input: { groups } }] });
@@ -61,8 +52,8 @@ const idsOf = groups => groups.flatMap(g => g.item_ids || []);
 // ── C1-C9: the server-side parse ────────────────────────────────────────────────
 
 test('BUG-116 C1: the two real captured strings recover completely', () => {
-  // The measurement this task exists on. If this ever reds, re-read the fixture before the code:
-  // it means the captured shape is not what the amendment in tasks/BUG-116.md recorded.
+  // The measurement the repair rests on. If this ever reds, re-read the fixture before the code:
+  // it means the captured shape is not what the repair was built for.
   const g0 = parseGroupResponse(toolUse(CAP0.groups));
   assert.ok(g0, 'capture-0 must parse, not degrade');
   assert.equal(g0.groups.length, 10, 'capture-0 recovers 10 groups');
@@ -101,7 +92,7 @@ test('BUG-116 C3: a MID-OBJECT truncation yields only the complete prefix, never
 });
 
 test('BUG-116 C4: a string truncated before the first complete element degrades', () => {
-  // GREEN BEFORE THE FIX, declared. Guards against an over-eager repair inventing a group out of a
+  // Passes without the repair too. Guards against an over-eager repair inventing a group out of a
   // fragment.
   //
   // This test USED to claim it was the predicted killer of "close the array wherever you are"
@@ -117,7 +108,7 @@ test('BUG-116 C4: a string truncated before the first complete element degrades'
 });
 
 test('BUG-116 C5: non-string, non-array groups still degrade, exactly as before', () => {
-  // GREEN BEFORE THE FIX, declared. It can only red if the repair reaches into shapes that were
+  // Passes without the repair too. It can only red if the repair reaches into shapes that were
   // never text — which would be a new failure mode, not a fix.
   for (const junk of [{}, 42, true, null, undefined]) {
     assert.equal(parseGroupResponse(toolUse(junk)), null, `groups=${JSON.stringify(junk)} must degrade`);
@@ -143,7 +134,7 @@ test('BUG-116 C6: the repair never invents — every label and id appears verbat
 });
 
 test('BUG-116 C7: a well-formed native array is returned untouched', () => {
-  // GREEN BEFORE THE FIX, declared. Pins that the repair is reached only when it is needed.
+  // Passes without the repair too. Pins that the repair is reached only when it is needed.
   const native = [
     { label: 'AI news', item_ids: ['0', '1'], summary: ['a bullet'] },
     { label: 'Tesla', item_ids: ['2'] },
@@ -165,9 +156,9 @@ test('BUG-116 C8: groupItems reports `repaired` exactly when the repair produced
 
   assert.equal(repaired.truncated, true, 'and as truncated, because the scanner had to cut it');
 
-  // THE CASE THE FIRST VERSION MISSED, and an independent review caught: a COMPLETE array that the
+  // THE EASILY MISSED CASE: a COMPLETE array that the
   // model merely serialised. It travels the same string path and is equally worth recovering, but it
-  // is NOT the truncation this task was logged for. One flag for both would mean a rate that stopped
+  // is NOT a truncation. One flag for both would mean a rate that stopped
   // being about truncation went on looking identical.
   const stringified = await groupItems(
     { items, apiKey: 'k' },
@@ -187,15 +178,15 @@ test('BUG-116 C8: groupItems reports `repaired` exactly when the repair produced
 });
 
 test('BUG-116 C9: a group DROPPED by truncation leaves its posts unassigned, never misfiled', async () => {
-  // REBUILT after review. The first version fed the whole capture-0 string, which has NO partial
-  // trailing group — both fixtures are complete arrays missing one character — so it exercised
-  // `validatePartition`'s pre-existing forgotten-id sweep and not this change at all. Its comment
-  // said the unaccounted posts were "lost to truncation"; they were omitted by the MODEL. The
-  // criterion is about a group the SCANNER drops, so the input must actually have one.
+  // The whole capture-0 string will not do as input: it has NO partial
+  // trailing group — both fixtures are complete arrays missing one character — so it would exercise
+  // `validatePartition`'s forgotten-id sweep and not the repair at all; its unaccounted posts
+  // were omitted by the MODEL, not lost to truncation. This
+  // is about a group the SCANNER drops, so the input must actually have one.
   //
   // A mid-object cut does: 4 complete groups survive, the fifth is half-written and discarded, and
   // the posts it would have held must reach the client unfiled — readable in the chronological
-  // stream ([TASK-096]) — rather than filed under one of the four that did survive.
+  // stream — rather than filed under one of the four that did survive.
   const items = Array.from({ length: 70 }, (_, n) => ({ id: `x${n}`, source: 'twitter', text: `post ${n}` }));
   const cut = Math.floor(CAP0.groups.length * 0.5);
   const call = reply => groupItems({ items, apiKey: 'k' }, async () => fakeResponse(toolUse(reply)));
@@ -236,9 +227,9 @@ test('BUG-116 C9: a group DROPPED by truncation leaves its posts unassigned, nev
 });
 
 test('BUG-116 C13: an unbalanced bracket inside a LABEL cannot move the cut', () => {
-  // The scanner's `if (inStr) continue` had no fixture at all: neither captured reply contains
-  // `[ ] { }` inside any string, so deleting the guard left the whole suite green. An independent
-  // battery measured the cost over 200,000 randomised replies — 13% came back valid but SHORT,
+  // The fixture for the scanner's `if (inStr) continue`: neither captured reply contains
+  // `[ ] { }` inside any string. Without the guard, over 200,000 randomised replies,
+  // 13% came back valid but SHORT,
   // complete groups silently dropped with no degrade signal and no flag difference.
   //
   // The bracket must be UNBALANCED to bite, which is the part that is easy to get wrong: a label
@@ -257,8 +248,8 @@ test('BUG-116 C13: an unbalanced bracket inside a LABEL cannot move the cut', ()
 });
 
 test('BUG-116 C14: an escaped quote inside a string cannot desynchronise the scan', () => {
-  // Same shape as C13 for the `esc` half — also unfixtured, also survived a battery. Both captures
-  // happen to carry balanced quote pairs, so parity is preserved and the tests were blind. An ODD
+  // Same shape as C13 for the `esc` half. Both captures
+  // happen to carry balanced quote pairs, so parity is preserved and they cannot see it. An ODD
   // number of escaped quotes is what desynchronises string state; a sentence that opens a quotation
   // and is cut before closing it is exactly how that arises in real summaries.
   const groups = [
@@ -274,7 +265,7 @@ test('BUG-116 C14: an escaped quote inside a string cannot desynchronise the sca
 
 test('BUG-116 C15: a truncation landing EXACTLY on the final brace keeps that group', () => {
   // The loop bound. `i < s.length - 1` never examines the last character, and both captured strings
-  // end `}\n` — the newline absorbs the off-by-one, so the mutation survived. A reply cut with no
+  // end `}\n` — the newline absorbs the off-by-one. A reply cut with no
   // trailing whitespace is the case that exposes it, and "the truncation lands at a clean element
   // boundary" is the measured shape this whole fix is built for, which makes that byte load-bearing.
   const groups = [
@@ -330,10 +321,10 @@ function bootAnswering(body, { grouped = true, store = {}, fail = null } = {}) {
 
 test('BUG-116 C10: a degraded classify is recorded; one that answers is not', async () => {
   // The NEGATIVE half is load-bearing: without it the counter measures attempts, not failures, and
-  // the production rate this task exists to produce would be meaningless.
-  // `new` and `total` MUST DIFFER here. The first version rendered two posts of which two were new,
-  // so `new === total === 2` and swapping the two props survived a mutation battery — the assertion
-  // could not tell its own fields apart. One post is pre-assigned so the numbers separate:
+  // the production failure rate would be meaningless.
+  // `new` and `total` MUST DIFFER here. With two posts of which two are new,
+  // `new === total === 2` and swapping the two props goes unnoticed — the assertion
+  // cannot tell its own fields apart. One post is pre-assigned so the numbers separate:
   // three groupable unread, of which two are new to this classify.
   const seeded = {
     focus_groups: JSON.stringify({
@@ -396,8 +387,8 @@ test('BUG-116 C11: a repaired classify is recorded, and an unrepaired one is not
 });
 
 test('BUG-116 C12: a degrade still reveals held posts — nothing is left hidden', async () => {
-  // GREEN BEFORE THE FIX, declared. `revealPendingText()` runs unconditionally after the `finally`,
-  // and this change edits the branch immediately beside it. BUG-104 measured what regressing this
+  // Passes without the repair too. `revealPendingText()` runs unconditionally after the `finally`,
+  // and the degrade branch sits immediately beside it. What regressing this
   // costs: a badge reading "3 new" over a completely empty feed.
   const app = bootAnswering({ groups: null, reason: 'unavailable' });
   app.ctx.wireApp();
@@ -495,14 +486,14 @@ test('BUG-116 C19: a thrown fetch is a failure; an ABORT stays a timeout and is 
     'and NOT also as a failure — a double-counted timeout breaks the partition');
 });
 
-// ── [BUG-130] the sign-in gate's refusals, seen from the client ──────────────────────────────────────
+// ── The sign-in gate's refusals, seen from the client ────────────────────────────────────────────────
 //
-// Since BUG-130 our OWN handler answers 401 (no session) and 503 (session could not be checked). Until
-// then a non-2xx on this request came only from the edge, and C17 above drives 429/502/504 and asserts
-// analytics only. Review round 1 (M4) showed two things nothing pinned.
+// Our OWN handler answers 401 (no session) and 503 (session could not be checked), as well as the
+// non-2xx answers that come from the edge; C17 above drives 429/502/504 and asserts
+// analytics only. These pin two things C17 does not.
 
 test('BUG-130 C20: a 401 or 503 from the gate still reveals held posts, and is counted as a failure', async () => {
-  // Independent battery survivor A2: a `return` after the `group_classify_failed` track skips
+  // A `return` after the `group_classify_failed` track would skip
   // `revealPendingText()`, leaving a badge counting posts over an empty feed. Same positive-then-negative
   // form as C12, because "nothing is held" is vacuously true on an empty feed.
   for (const status of [401, 503]) {
@@ -523,7 +514,7 @@ test('BUG-130 C20: a 401 or 503 from the gate still reveals held posts, and is c
 });
 
 test('BUG-130 C21: the classify request does not opt out of the session cookie', async () => {
-  // Independent battery survivor A1: `credentials: 'omit'` on this fetch would have every signed-in user
+  // `credentials: 'omit'` on this fetch would have every signed-in user
   // refused, and the harness fetch models no cookies, so only the request's own options can show it. A
   // same-origin fetch sends the cookie unless it says otherwise; this pins that it does not say otherwise.
   const app = createApp({ store: { focus_device_id: DEVICE, focus_group_view: 'on' } });

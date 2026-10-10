@@ -1,6 +1,6 @@
-// Sign-in-with-Google (TASK-060) in ONE serverless function, dispatched on the trailing path
+// Sign-in-with-Google in ONE serverless function, dispatched on the trailing path
 // segment (req.query.action): /api/auth/google/{start,callback}. Collapsed into a dynamic [action]
-// route to stay under Vercel's 12-function-per-deployment ceiling (TASK-068 needed the slot); the
+// route to stay under Vercel's 12-function-per-deployment ceiling; the
 // /callback path is preserved so the Google redirect URI registered in the console still matches.
 import { db } from '../../_db.js';
 import {
@@ -30,7 +30,7 @@ async function start(req, res) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) {
     console.error('[google/start] GOOGLE_CLIENT_ID unset');
-    return res.redirect(302, '/app?auth=google_unavailable'); // app at /app (TASK-069)
+    return res.redirect(302, '/app?auth=google_unavailable'); // app at /app
   }
   const { token: state } = generateToken();
   const secure = isSecureRequest(req.headers);
@@ -73,7 +73,7 @@ async function callback(req, res) {
     if (!identity) return fail();
     const { sub, email } = identity;
 
-    // Resolve the account by *identity* (sub) first, falling back to email (BUG-013). A Google
+    // Resolve the account by *identity* (sub) first, falling back to email. A Google
     // sign-in must NEVER write accounts.email: the sub is what says "this is the same account",
     // and the email is a mutable attribute the user may have changed on our side.
     const accountId = await resolveGoogleAccount(sql, sub, email);
@@ -101,7 +101,7 @@ async function callback(req, res) {
   }
 }
 
-// Three-step resolution, in strict order (BUG-013). Returns an account id, or null.
+// Three-step resolution, in strict order. Returns an account id, or null.
 async function resolveGoogleAccount(sql, sub, email) {
   // 1. Identity match. Authoritative — even if this account's email is now something else entirely
   //    (the user changed it here, or Google renamed it upstream). We do not touch accounts.email.

@@ -1,22 +1,22 @@
-// [BUG-089] — a topic keeps bullets for posts you have already read.
+// A topic keeps bullets for posts you have already read.
 //
 // A summary is a flat array of sentences with no record of which post each describes, so nothing
-// knows what to remove when a post is read. Measured on a handset 2026-08-11: "1 post" above 8
+// knows what to remove when a post is read. Seen on a handset: "1 post" above 8
 // bullets, none about the post that was left.
 //
 // The fix types a bullet as `string | {text, item_ids}` — ids on the bullet, normalised on read,
 // serialised back to a bare STRING when it carries no ids. That last half is what keeps the change
 // additive: every fake model reply in the existing grouping suite uses id-less string bullets, so
-// they must round-trip byte-identically (criterion 9, and criterion 13 is the whole suite).
+// they must round-trip byte-identically.
 //
 // Everything here asserts on OBSERVABLE OUTPUT — the tile's rendered HTML, the stored state, the
 // request body that actually goes out, the value groupItems returns. Nothing imports a helper by
 // name: a missing named export is a link-time SyntaxError that takes the whole FILE down, and a
-// file-level crash is not the same as N named failing tests (CLAUDE.md's RED-step corollary).
+// file-level crash is not the same as N named failing tests.
 //
-// These tests can only bite because test-helpers/app-harness.mjs now seeds the elements
-// app/index.html ships hidden. Before that seed renderGroupGrid returned early on every call and
-// painted nothing: measured {tiles: 0} before, {tiles: 1} after.
+// These tests can only bite because test-helpers/app-harness.mjs seeds the elements
+// app/index.html ships hidden. Without that seed renderGroupGrid returns early on every call and
+// paints nothing.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../test-helpers/app-harness.mjs';
@@ -27,7 +27,7 @@ import { validatePartition, groupItems, buildGroupRequest, mergeSameLabel,
 // renderGroupGrid builds each tile with createElement + innerHTML, so the harness holds the card's
 // markup on `grid.children[n]`. `grid.innerHTML` itself is '' — assigning it is what CLEARS children
 // in the harness's model — so read the children, never the grid's own html.
-// [TASK-098] RE-POINTED. A topic is a `.topic-card` in the stream now, not a `.group-card` tile in a
+// A topic is a `.topic-card` in the stream, not a `.group-card` tile in a
 // `#group-grid` above it. The assertions below are unchanged — only where they look. The READERS got
 // stronger in the move: the old tile was one `innerHTML` blob, so its count and bullets could only be
 // scraped by regex over an unparsed string; the new card is appended nodes, so these are real queries.
@@ -37,7 +37,7 @@ const tileOf = (app, n = 0) => app.queryAll('#feed .topic-card')[n];
 const bulletsOn = card => [...(card.querySelectorAll('.tc-bullets')[0]?.children || [])].map(li => li.textContent);
 const countOn = card => card?.querySelectorAll('.tc-count')[0]?.textContent;
 
-// GROUPED VIEW SEEDED ([TASK-099]). Ungrouped is now the DEFAULT: every post renders into the
+// GROUPED VIEW SEEDED. Ungrouped is now the DEFAULT: every post renders into the
 // chronological stream and an assigned one is merely HIDDEN, so a fixture with no view key exercises
 // the plain feed — where tiles, the lift and the classify hold do not exist at all. This file's
 // subject is what happens INSIDE the grouped view, which is unchanged, so only the precondition had
@@ -70,8 +70,7 @@ test('BUG-089: a topic with 2 of 3 posts read shows only the remaining post\'s b
   assert.deepEqual(bulletsOn(card), ['about p3'], 'and the bullets now agree with it');
 });
 
-// The handset's exact shape: the count is right and the bullets are for posts already read. This is
-// the assertion that fails on main with the numbers from the bug report.
+// The reported shape: the count is right and the bullets are for posts already read.
 test('BUG-089: the reported 1-post-8-bullet tile is not reachable', () => {
   const ids = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9'];
   const app = boot({
@@ -125,9 +124,9 @@ test('BUG-089: an archived post counts as read for its bullet', () => {
 });
 
 // ── 3. the safe default: no ids means never pruned ───────────────────────────
-// Deliberately DISCRIMINATING. Asserting only "the legacy bullet survives" would pass on main too —
-// summaryHtml already drops non-strings, so main renders exactly ['legacy'] — a test green for the
-// wrong reason ([BUG-069]'s M1 shape). The linked bullet for the LIVE post is what makes it bite.
+// Deliberately DISCRIMINATING. Asserting only "the legacy bullet survives" would pass without the fix too —
+// summaryHtml already drops non-strings, so it would render exactly ['legacy'] — a test green for the
+// wrong reason. The linked bullet for the LIVE post is what makes it bite.
 test('BUG-089: a bullet carrying no ids is never hidden, whatever is read', () => {
   const app = boot({
     assignments: { p1: 'g_t', p2: 'g_t' },
@@ -144,13 +143,12 @@ test('BUG-089: a bullet carrying no ids is never hidden, whatever is read', () =
     'the unlinked bullet stays and the read post\'s bullet goes');
 });
 
-// REWRITTEN 2026-08-12, before the fix was committed, with Asli's explicit yes. The RED version of
-// this test asserted the opposite — that a bullet naming only UNKNOWN posts stays visible — and it
-// was written from a general "safe default" instinct rather than derived from the design. It is
-// wrong: an id outside the unread set means the post was read, or has left the app entirely, and in
-// both cases a bullet about it is the same staleness this task exists to remove.
+// A bullet naming only UNKNOWN posts must NOT stay visible, whatever a general "safe default"
+// instinct suggests:
+// an id outside the unread set means the post was read, or has left the app entirely, and in
+// both cases a bullet about it is stale.
 //
-// The safe-default rule it was reaching for is real but narrower: NO ids means keep (test above), and
+// The safe-default rule is real but narrower: NO ids means keep (test above), and
 // nothing here DELETES. Hiding is a render-time filter over untouched state, so the bullet returns
 // the moment its post does — an Undo on Mark-done, a re-added channel. The dangerous direction is
 // guarded by 'pruneGroupState never collects an id-less bullet' and by the second assertion below.
@@ -172,10 +170,9 @@ test('BUG-089: a bullet naming only posts outside the unread set is hidden, not 
 
 // ── 4. pruneGroupState garbage-collects a dead bullet ────────────────────────
 
-// p1 is proved gone by being READ, not by being missing from the set passed in. [BUG-098] retired
-// absence as evidence — the second argument no longer decides whether an assignment survives — so the
-// fixture states the premise the way the code now accepts it. Same claim, same guard, new evidence.
-// (Asli, 2026-08-22: "2-yes".)
+// p1 is proved gone by being READ, not by being missing from the set passed in. Absence is not
+// evidence — the second argument does not decide whether an assignment survives — so the
+// fixture states the premise the way the code accepts it.
 test('BUG-089: pruneGroupState drops a bullet once every post it names has gone', () => {
   const app = boot({ assignments: {}, groups: {}, updatedAt: 0 }, { done: ['p1'] });
   const state = {
@@ -194,10 +191,9 @@ test('BUG-089: pruneGroupState drops a bullet once every post it names has gone'
   assert.equal(state.groups.g_t.summary[0].text, 'about p2');
 });
 
-// RE-PREMISED for [BUG-098] (review round 1). Absence stopped removing p1's assignment, so BOTH ids
-// stayed assigned and the bullet survived because EVERY post was live — not because at least one was.
-// Measured: `ids.some` → `ids.every` is killed by this test on `main` and survived on the branch, with
-// all 712 tests green. The sibling above was re-premised onto `done` and this one was missed.
+// Absence does not remove p1's assignment, so the fixture marks p1 `done`: otherwise BOTH ids
+// stay assigned and the bullet survives because EVERY post is live — not because at least one is —
+// and `ids.some` → `ids.every` would pass.
 test('BUG-089: pruneGroupState keeps a bullet with at least one live post', () => {
   const app = boot({ assignments: {}, groups: {}, updatedAt: 0 }, { done: ['p1'] });
   const state = {
@@ -228,7 +224,7 @@ test('BUG-089: pruneGroupState never collects an id-less bullet', () => {
 
 test('BUG-089: the existing-topics block sent upstream omits bullets whose posts are all read', async () => {
   const app = createApp({ store: {
-    focus_group_view: 'on', // [TASK-099]: this assertion is about the grouped view
+    focus_group_view: 'on', // this assertion is about the grouped view
     focus_device_id: '33333333-3333-4333-8333-333333333333',
     focus_groups: JSON.stringify({
       assignments: { p1: 'g_t', p2: 'g_t' },
@@ -282,7 +278,7 @@ test('BUG-089: a bullet left with no ids by the partition SURVIVES as an unlinke
   assert.equal(typeof b === 'string' ? b : b.text, 'about a post that was invented');
 });
 
-// Lever A ([BUG-077]): posts go up as positions, so a bullet's ids come back as positions too and
+// Posts go up as positions, so a bullet's ids come back as positions too and
 // must be reversed by the SAME pass. A position with no post is dropped; the bullet survives.
 const replyWith = groups => async () => ({
   ok: true, status: 200,
@@ -333,18 +329,15 @@ test('BUG-089: an id-less bullet round-trips byte-identically as a bare string',
 // ── 8. the migration, keyed off a version stamp ──────────────────────────────
 // NOT off the bullet shape. Once an array of strings is legal NEW output, "the cache holds string
 // bullets" no longer distinguishes old state from new, so a shape predicate fires on every boot —
-// removeItem(SK.groups) plus schedulePush(), wiping synced grouping state on every load ([BUG-071]).
+// removeItem(SK.groups) plus schedulePush(), wiping synced grouping state on every load.
 
-// REWRITTEN 2026-08-12, before the fix was committed, with Asli's explicit yes. The RED version
-// asserted a FULL cache wipe — the migration originally scoped. Implementing it broke six existing
-// tests in test/group-sources.test.mjs, which pin that a clean feed load prunes assignments
-// correctly: the migration runs from renderFeedResults and was destroying the very state those loads
-// had just pruned. Keeping the full wipe meant editing those six fixtures, i.e. granting back the
-// test-editing licence this task withdrew.
+// The migration clears SUMMARIES only, not the whole cache. A FULL wipe, run from
+// renderFeedResults, would destroy the very assignments a clean feed load
+// had just pruned (pinned in test/group-sources.test.mjs).
 //
 // Only SUMMARIES are un-linkable. An assignment is `{itemId: groupId}` and a label is a string — both
-// valid at v2 — so wiping them destroyed good state to fix bad state beside it. The narrower
-// migration fixes the bug just as completely, costs no billed re-classify, and needs no test edited.
+// valid at v2 — so wiping them would destroy good state to fix bad state beside it. The narrower
+// migration fixes the bug just as completely and costs no billed re-classify.
 test('BUG-089: the migration clears summaries, keeps assignments and labels, and stamps', () => {
   const app = boot({
     assignments: { p1: 'g_t', p2: 'g_t' },
@@ -397,12 +390,11 @@ test('BUG-089: the migration does not fire a second time', () => {
   const after = JSON.parse(app.get('focus_groups'));
   assert.deepEqual(Object.keys(after.groups), ['g_new'],
     'a stamped cache built after the migration is not wiped by the next boot');
-  // THE ASSERTION THAT MATTERS, added after the mutation battery, 2026-08-12. The line above was the
-  // whole test and it was green for the wrong reason: deleting the version guard entirely — so the
-  // migration re-fires on EVERY boot — left the suite fully green (battery M7, 0 red). The topic KEY
+  // THE ASSERTION THAT MATTERS. The line above alone
+  // is green for the wrong reason: deleting the version guard entirely — so the
+  // migration re-fires on EVERY boot — leaves it passing. The topic KEY
   // survives a re-fire; it is the bullets that are destroyed, and destroyed on every page load, on
-  // every device, because migrateGroupSummaries also schedulePush()es. That is exactly [BUG-071]'s
-  // hazard and nothing could see it.
+  // every device, because migrateGroupSummaries also schedulePush()es.
   assert.deepEqual(after.groups.g_new.summary, [{ text: 'about p9', item_ids: ['p9'] }],
     'and its BULLETS survive — a re-firing migration wipes these while leaving the key behind');
 });
@@ -423,7 +415,7 @@ test('BUG-089: a stamped cache of ALL id-less string bullets is not mistaken for
 
 // ── The server half: the model must be ASKED for ids, and cached ids must survive ──
 // Everything above works on state the client already holds. These cover the round trip that puts
-// ids there in the first place, and the [BUG-067] machinery that must keep working around them.
+// ids there in the first place, and the bullet-forwarding machinery that must keep working around them.
 
 test('BUG-089: the tool schema lets a bullet name the posts it describes', () => {
   const req = buildGroupRequest({ items: [{ id: '0', source: 'twitter', text: 'x' }] });
@@ -441,16 +433,14 @@ test('BUG-089: the prompt tells the model to attribute each bullet', () => {
     'the schema alone is a shape; the rule is what makes the model actually fill it');
 });
 
-// REWRITTEN for [BUG-091]. [BUG-089] wrote this against a bug where a bullet that gained ids stopped
-// being forwarded, leaving the model to describe only the new posts while mergeGroups replaced the
-// whole summary. D removes the second half of that chain: the summary is no longer replaced, so a
-// topic reaching the model without bullets is now the DESIGN rather than the defect.
+// A topic reaches the model WITHOUT its bullets, by design: the summary is not replaced on merge,
+// so the model does not need them.
 //
-// What the original was really protecting — that a cached bullet is not silently dropped by a shape
-// test — is now protected by restoration instead of by forwarding, and is pinned in
-// `test/group.test.mjs` ('BUG-091: every cached bullet survives a revision…'). What survives here
-// unchanged is lever A's half: real post ids must never be retyped into a billed prompt. That half
-// is asserted more strongly now, since neither the text nor the ids go up.
+// That a cached bullet is not silently dropped by a shape
+// test is protected by restoration rather than by forwarding, and is pinned in
+// `test/group.test.mjs` ('BUG-091: every cached bullet survives a revision…'). What is pinned here
+// is that real post ids must never be retyped into a billed prompt:
+// neither the text nor the ids go up.
 test('BUG-091: a cached bullet with ids reaches the model neither as text nor as ids', () => {
   const req = buildGroupRequest({
     items: [{ id: '0', source: 'twitter', text: 'a new post' }],
@@ -468,10 +458,9 @@ test('BUG-089: a bullet returned verbatim recovers the ids it was cached with', 
   const res = await groupItems({
     items: [{ id: 'tweet_new', source: 'twitter', text: 'a new post' }],
     // `size` is what the BROWSER sends for every cached topic (app.js builds it from
-    // groupUnreadIds). Omitting it here was a fixture that did not model the real client: with no
+    // groupUnreadIds). A fixture omitting it does not model the real client: with no
     // size, collapseSingletons reads the topic as unpopulated and folds this one-post group into
-    // "Everything else" ([BUG-066]), so the label — and the assertion below — disappear. Verified
-    // by probe, 2026-08-12: the recovery itself was correct all along.
+    // "Everything else", so the label — and the assertion below — disappear.
     groups: [{ label: 'AI news', size: 1, summary: [{ text: 'a model shipped', item_ids: ['tweet_old'] }] }],
     apiKey: 'sk-test',
   }, replyWith([{

@@ -2,10 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseYouTubeUrl, buildCandidates } from '../api/resolve-channel.js';
 
-// resolve-channel.js fetches the URL buildCandidates() returns. Two holes (BUG-020 vector 1): a
+// resolve-channel.js fetches the URL buildCandidates() returns. Two holes: a
 // youtube.com SUFFIX match that also accepts notyoutube.com, and fetching the RAW input URL (attacker
-// host/port/path). These were the first tests for this file (CHR-011). The endpoint was unauthenticated
-// when they were written; since [BUG-025] it is signed-in only — the handler's own tests, including the
+// host/port/path). The endpoint is signed-in only — the handler's own tests, including the
 // refusals, are in test/signed-in-gate.test.mjs.
 
 // ── parseYouTubeUrl — used by the API path to pull an id/@handle out of a URL ──

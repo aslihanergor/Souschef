@@ -1,39 +1,37 @@
 #!/usr/bin/env node
-// Mutation battery runner (CHR-010).
+// Mutation battery runner.
 //
-//   npm run mutate mutations/CHR-010.mjs
+//   npm run mutate mutations/<spec>.mjs
 //
 // A green suite proves the code ran. It does not prove a defect would be noticed.
 // The only thing that answers that is deliberately breaking the code and checking
 // the suite screams. This runs that battery so it does not have to be hand-rolled
-// each time — five were in the month before it shipped, and three got one of the
+// each time, because a hand-rolled one easily gets one of the
 // properties below wrong.
 //
 //   1. Revert from a COPY of the file, never `git checkout` — that restores HEAD,
 //      silently deleting an uncommitted fix, so every later mutation runs against
-//      already-broken code and reports a triumphant RED.        (BUG-068, BUG-077)
+//      already-broken code and reports a triumphant RED.
 //   2. Assert the mutation is still present AFTER the suite runs, not only before.
 //      A batched harness was measured reporting false GREENs: `diff -q` passed
-//      before the run and the mutation was gone during it.               (BUG-077)
+//      before the run and the mutation was gone during it.
 //   3. Report which NAMED test killed each mutation. One killed only by an
-//      unrelated test is a coverage gap, not a kill.                     (BUG-077)
+//      unrelated test is a coverage gap, not a kill.
 //
 // This file NEVER touches git. Batteries run mid-build with an uncommitted fix on
 // disk, which is exactly the case property 1 exists for.
 //
 // SCOPE, stated so nobody over-credits it: this mechanises property 1, property 2
 // and the FIRST HALF of property 3 (it names the killer; it does not judge whether
-// the killer is related). CLAUDE.md family 2's other rules — recreate the defect
+// the killer is related). The other rules of a sound battery — recreate the defect
 // rather than delete the fix, mutate each term and every line, mutate the condition
 // your change made load-bearing, check all N new tests appear by name at RED, size
 // the fixture so only the guard under test can fire — are NOT mechanised here and
 // remain the author's job.
 //
-// KNOWN LIMITS, from the round-1 review. Each was measured, then judged not to
-// earn a task under /log-task's threshold — so they live here, where the next
-// person on this file actually looks, rather than in an Inbox nobody reads.
-// [CHR-066] holds the two that did earn one (a run misclassified as TIMEOUT, and
-// no baseline check on how many tests ran).
+// KNOWN LIMITS. Each was measured and judged minor, so they are recorded here, where the next
+// person on this file actually looks. Two larger ones are also open: a run can be
+// misclassified as TIMEOUT, and there is no baseline check on how many tests ran.
 //
 //   - TAP directives. A failing `todo` test emits `not ok N - x # TODO` but counts
 //     in `# todo`, not `# fail`, so the cross-check below reports ERROR for a real
@@ -59,20 +57,19 @@
 //   - report() and the CLI block have no unit tests; isMainPath is the piece
 //     extracted so that the part which silently skipped everything could have one.
 //
-// NOT built here, logged as CHR-065: a permanent fixed mutation set on a schedule.
+// NOT built here: a permanent fixed mutation set on a schedule.
 // This catches a NEW guard shipped with a test that cannot fail for it. A fixed set
 // would catch an EXISTING test that ROTS, which no ad-hoc battery points at.
 //
-// Crash behaviour is deliberate (round 2, after review). There is no backup file
+// Crash behaviour is deliberate. There is no backup file
 // and no signal handler: a hard kill leaves the mutated file on disk, and THE SPEC
 // IS THE RECOVERY RECORD — it states file/find/with, so undoing is applying it in
-// reverse. A hidden `.mutate-backup` was tried and removed: it made the damage look
+// reverse. A hidden `.mutate-backup` is deliberately not used: it makes the damage look
 // like your own edit in `git status`, which is the reflex that destroys uncommitted
 // work.
 //
-// TWO guards catch a leftover mutation, and it took both — round 4 proved preflight
-// alone insufficient in two ways, so the claim it "refuses to start" was too broad
-// and is stated precisely here:
+// TWO guards catch a leftover mutation, and it takes both — preflight
+// alone is insufficient in two ways:
 //
 //   - `preflight` checks that each target named in THE CURRENT SPEC is in the state
 //     that spec expects. It cannot see a file the current spec does not mention, and
@@ -151,8 +148,7 @@ export function applyMutation(source, mutation) {
   // destroying the file under test.
   //
   // There is NO `skip` flag in this runner. To retire a mutation, DELETE the entry and leave a
-  // comment saying why it went — see `mutations/BUG-092.mjs` M17, retired during [BUG-113], which is
-  // the near-miss that put this guard here.
+  // comment saying why it went.
   if (typeof mutation.find !== 'string' || mutation.find === '') {
     return { ok: false, reason: 'empty-find', count: 0 }
   }
@@ -253,8 +249,8 @@ export function baseline(deps) {
     }
   }
 
-  // `tests` is recorded but NOT enforced. Comparing it per mutation is [CHR-066];
-  // capturing it here is what makes that cheap when it is built.
+  // `tests` is recorded but NOT enforced. Comparing it per mutation is not built;
+  // capturing it here is what makes that cheap when it is.
   const count = result.stdout.match(/^# tests (\d+)$/m)
   return { ok: true, tests: count ? Number(count[1]) : null }
 }
@@ -264,7 +260,7 @@ export function baseline(deps) {
 // Checked before ANYTHING is written, and before the lock is taken — a stranded
 // lock must not hide the more urgent news that one of your files is still mutated.
 //
-// SCOPE, narrowed after round 4 found the original claim too broad: this sees only
+// SCOPE: this sees only
 // the targets named in the spec it is given, and its test is "does `find` still
 // match exactly once". A leftover in a file this spec does not mention is invisible
 // to it, and a leftover whose `with` CONTAINS its `find` still matches once and
@@ -337,7 +333,7 @@ export function runOne(mutation, deps) {
     } else if (readFile(mutation.file) !== applied.text) {
       // Property 2 — checked AFTER the run, not only before. A check that passes
       // beforehand and vanishes during the run produces a confident, meaningless
-      // GREEN, which is what a reviewer measured a batched harness doing.
+      // GREEN, which is what a batched harness was measured doing.
       outcome = err('the mutation vanished during the run — the suite did not test it')
     } else {
       const parsed = parseFailures(result.stdout)
@@ -383,8 +379,7 @@ export function runBattery(spec, deps) {
 // A mutation may declare `expectSurvive` when the gap it exposes is already known
 // and recorded. Then SURVIVED is the expected result and must not fail the run —
 // otherwise the battery that documents a known gap is permanently red, which
-// trains the reader to ignore the exit code that is the only thing criterion 8
-// delivers. The mirror matters more: if a declared survivor is KILLED, the gap
+// trains the reader to ignore the exit code. The mirror matters more: if a declared survivor is KILLED, the gap
 // closed (or the runner is lying) and the spec's stated assumption is stale, so
 // that fails loudly rather than passing as a bonus.
 export function summarise(results) {
@@ -554,7 +549,7 @@ if (isMainPath(process.argv[1], import.meta.url)) {
 
   const deps = realDeps()
 
-  // ORDER MATTERS, and this order is the round-5 fix. Preflight runs FIRST, before
+  // ORDER MATTERS. Preflight runs FIRST, before
   // the lock, because it reads files and needs no lock — and because putting the
   // lock first meant that after a Ctrl-C you were told "a battery is already
   // running" and never told which of your files was still mutated. The urgent fact

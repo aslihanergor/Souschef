@@ -1,4 +1,4 @@
-// The sign-in wall and its measurement (TASK-084).
+// The sign-in wall and its measurement.
 //
 // Removing "Continue without an account" makes the landing the only way into the app. That is a
 // product bet with no data behind it: we have never measured what share of visitors who see the
@@ -7,10 +7,10 @@
 // collected — saw the wall / got through it — so if it silently stops firing, the DAU drop this
 // change is expected to cause becomes indistinguishable from real users bouncing off a wall.
 //
-// These boot the REAL app.js through test-helpers/app-harness.mjs. Note that the harness could not
-// reach init() at all until TASK-084 added AbortController to its vm context: syncOnLoad and
-// checkAuth each build one on the first line of a try whose catch swallows everything, so both boot
-// fetches were dying as "offline" and init() completed having issued zero requests.
+// These boot the REAL app.js through test-helpers/app-harness.mjs. Note that the harness needs
+// AbortController in its vm context to reach init() at all: syncOnLoad and
+// checkAuth each build one on the first line of a try whose catch swallows everything, so without it both boot
+// fetches die as "offline" and init() completes having issued zero requests.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -32,7 +32,7 @@ function bootWith({ signedIn, store = {}, search = '' } = {}) {
       return { ok: true, status: 200, json: async () => ({ state: null, updatedAt: null }) };
     }
     if (url.includes('/api/state')) return { ok: true, status: 200, json: async () => ({ updatedAt: 1 }) };
-    // Routed because round 2 asserts on whether these fire AT ALL — see the wiring gate below.
+    // Routed because the wiring tests assert on whether these fire AT ALL — see the wiring gate below.
     if (url.includes('/api/resolve-channel')) {
       return { ok: true, status: 200, json: async () => ({ name: 'Real Channel Name', avatarUrl: null }) };
     }
@@ -83,7 +83,6 @@ test('landing_view survives the SERVER, not just the request body', async () => 
   // server has had it — the half that fails SILENTLY. normalizeEvent bins any name outside
   // EVENT_NAMES (api/_events.js), so deleting one line in that allowlist leaves the client emitting
   // it, the PUT carrying it, and the metric permanently empty, with every other test green.
-  // Round 1 named this as one of the three test-blindness HIGHs; it was still unpinned until now.
   //
   // Cross-seam on purpose: the real boot's real body, handed to the real handler. A test that
   // asserted `EVENT_NAMES.has('landing_view')` would pass on a client that stopped emitting it.
@@ -145,9 +144,9 @@ for (const value of ['invalid', 'ok', 'google_failed', 'google_unavailable']) {
       `?auth=${value} wired the app for an unauthenticated visitor`);
 
     // The strip is pinned HERE, across all four values, because it is unconditional and precedes
-    // every branch. Pinning it only on the `ok` path (as BUG-058 first did) left moving it inside
+    // every branch. Pinning it only on the `ok` path would leave moving it inside
     // `if (a === 'ok')` a fully green mutation, with the other three values re-toasting on every
-    // reload forever. (R3, M1.)
+    // reload forever.
     assert.ok(!app.ctx.location.search.includes('auth'),
       `?auth=${value} survived the landing, so every reload re-toasts: ${app.ctx.location.search}`);
   });
@@ -155,11 +154,11 @@ for (const value of ['invalid', 'ok', 'google_failed', 'google_unavailable']) {
 
 test('the expired-link toast action does not route a signed-out visitor into the app', async () => {
   // The wall's own error path, and the last route past it. "That sign-in link expired → Send a new
-  // one" used to call showView('view-setup') + initSetup() + openProfile() unconditionally —
-  // deliberate routing INTO the app, harmless before this task and a bypass of the only gate after
-  // it. The `!_authEmail` early return that closed it was the one new guard in the whole branch
-  // that no mutation could red: the ?auth= tests above assert on the BOOT, and never invoke the
-  // toast's callback. Reachable only since querySelector started memoising. (Round 5, M1.)
+  // one" calling showView('view-setup') + initSetup() + openProfile() unconditionally would be
+  // deliberate routing INTO the app — a bypass of the only gate.
+  // The `!_authEmail` early return closes it, and the ?auth= tests above cannot see that guard:
+  // they assert on the BOOT, and never invoke the
+  // toast's callback.
   const app = bootWith({ signedIn: false, search: '?auth=invalid' });
   await app.ctx.init();
 
@@ -190,7 +189,7 @@ test('a real signed-in auth landing is NOT walled', async () => {
 
 test('a signed-out visitor who dismissed the OLD skip still meets the wall', async () => {
   // The upgrade path for every existing anonymous user: they carry SK.landing = 'true' from
-  // TASK-027's permanent per-device dismissal. If landingSeen still suppressed the landing they
+  // the old permanent per-device dismissal. If landingSeen still suppressed the landing they
   // would be locked out of signing in entirely, and would never be counted.
   const app = bootWith({ signedIn: false, store: { focus_landing_seen: 'true' } });
 
@@ -200,17 +199,17 @@ test('a signed-out visitor who dismissed the OLD skip still meets the wall', asy
     'a previously-dismissed browser must still be walled, and still counted');
 });
 
-// ── Round 2: the app is not WIRED until a session resolves ────────────────────
-// Round 1 shipped a wall that only ever HID the app — every handler was wired on every boot, and
-// the drawer was hidden by `transform`, so four Tab presses from the landing reached
-// #btn-drawer-manage and its listener called showView('view-setup') with no session check. The
-// first fix proposed for that gated showView. A design review killed it: gating which view is
-// VISIBLE leaves the wall resting on CSS being correct, and the import modal was safe only because
-// its author happened to write `display:none` where the drawer's author wrote `transform`.
+// ── The app is not WIRED until a session resolves ─────────────────────────────
+// A wall that only HIDES the app is not a gate: with every handler wired on every boot and
+// the drawer hidden by `transform`, four Tab presses from the landing reach
+// #btn-drawer-manage and its listener calls showView('view-setup') with no session check.
+// Gating which view is
+// VISIBLE would leave the wall resting on CSS being correct (`display:none` leaves the tab order,
+// `transform` does not).
 //
-// So init() now wires nothing until _authEmail resolves. These tests come in PAIRS. The same review
-// demonstrated that absence-only assertions are worthless here: with the old fixes applied,
-// mutating showView to `return;` — an app that renders nothing, ever — left the suite fully green.
+// So init() wires nothing until _authEmail resolves. These tests come in PAIRS, because
+// absence-only assertions are worthless here:
+// mutating showView to `return;` — an app that renders nothing, ever — would leave them fully green.
 // Every "the gate blocks it" test is therefore paired with a "the gate does not over-block it" one.
 //
 // The harness cannot see addEventListener, focus or the tab order — but it CAN see wireApp(),
@@ -218,11 +217,10 @@ test('a signed-out visitor who dismissed the OLD skip still meets the wall', asy
 // So `focus_include_shorts` is a direct trace of the wiring having run, and it is the assertion
 // that matters here.
 //
-// Round 2 review round 1 got this wrong and it is worth saying why, because it is the same mistake
-// twice: these tests originally asserted only /api/resolve-channel — issued by migrateChannelNames,
+// Asserting only /api/resolve-channel is not enough: it is issued by migrateChannelNames,
 // a SIBLING statement inside the same `if (_authEmail)` block. That asserts the block ran, never
-// that wireApp did. Moving wireApp() above the gate (restoring the exact bug this task exists to
-// fix — all 14 drawer controls live behind the wall) left the suite 336/336 green. The request
+// that wireApp did. Moving wireApp() above the gate (all 14 drawer controls live behind the wall)
+// would leave such a suite green. The request
 // assertion is kept because it pins migrateChannelNames independently; the store assertion is what
 // pins the wiring.
 
@@ -238,10 +236,10 @@ test('a signed-out boot wires nothing — the app is not built behind the wall',
 
   // The two assertions above are both traces of ONE statement each — the Shorts block, and
   // migrateChannelNames (a sibling of the gate, not part of wireApp at all). Neither says anything
-  // about the controls that actually matter, so hoisting wireDrawer() out of the gate — the
-  // partial regression of round 2's bug, with sign-out, export, delete and manage-channels live
-  // behind the wall — was a 357/357-green mutation. The design argument for this gate is that it
-  // is ALL-or-nothing; that is what this asserts. (Round 5, M1.)
+  // about the controls that actually matter, so hoisting wireDrawer() out of the gate —
+  // with sign-out, export, delete and manage-channels live
+  // behind the wall — would otherwise go unnoticed. The design argument for this gate is that it
+  // is ALL-or-nothing; that is what this asserts.
   for (const id of ['acct-signout', 'acct-export', 'acct-delete-open', 'btn-drawer-manage', 'profile-btn']) {
     assert.equal(app.el(id).listeners.length, 0,
       `${id} was wired for a signed-out visitor — wireApp() is not all-or-nothing`);
@@ -264,7 +262,7 @@ test('a signed-in boot DOES wire the app — the gate does not over-block', asyn
     `a signed-in boot skipped the app's boot work: ${JSON.stringify(app.urls())}`);
 
   // The other half of all-or-nothing: deleting wireDrawer() from wireApp() leaves the Settings
-  // drawer dead for everyone — the BUG-016 failure, shipped once already — and was also green.
+  // drawer dead for everyone, and the request assertion alone would stay green.
   for (const id of ['acct-signout', 'acct-export', 'acct-delete-open', 'btn-drawer-manage', 'profile-btn']) {
     assert.ok(app.el(id).listeners.length > 0,
       `${id} was never wired for a signed-in user — the control is dead`);
@@ -272,11 +270,11 @@ test('a signed-in boot DOES wire the app — the gate does not over-block', asyn
 });
 
 test('a signed-out boot ends with the WALL on screen, not a blank page', async () => {
-  // The gap round 1 named and did not close: every wall assertion was an analytics counter, so
-  // nothing checked that the visitor can actually see the sign-in screen. Deleting showView's call
+  // An analytics counter does not
+  // check that the visitor can actually see the sign-in screen. Deleting showView's call
   // inside showLandingView() gives every signed-out visitor a blank page — landing_view still
-  // fires, so the counter tests stay green. Only reachable since the harness started memoising
-  // elements; before that, DOM writes were unreadable.
+  // fires, so the counter tests stay green. Readable because the harness memoises
+  // elements.
   const app = bootWith({ signedIn: false });
 
   await app.ctx.init();
@@ -306,10 +304,8 @@ test('showView refuses a non-landing target while signed out', async () => {
 
   // What is ON SCREEN, asserted first and on purpose. The two assertions below it are side effects
   // written AFTER the DOM is updated, and the coercion suppresses both from wherever it sits — so
-  // MOVING it below the render (the "present but ineffective" shape, not the "deleted" one) painted
-  // view-setup for a signed-out visitor with the whole suite green. Round 1 recorded this exact
-  // failure mode for the boot test and visibleViews() was built to answer it; this test, two below
-  // it in the same file, repeated it against a different neighbour. (Round 5, H4.)
+  // MOVING it below the render (the "present but ineffective" shape, not the "deleted" one) would paint
+  // view-setup for a signed-out visitor with those two still green.
   assert.deepEqual(app.visibleViews(), ['view-landing'],
     'showView painted an app screen for a signed-out visitor');
   assert.equal(app.get('focus_last_view'), null,
@@ -354,14 +350,13 @@ test('a signed-in ?import=youtube still runs — the gate does not over-block', 
     `a signed-in import was dropped: ${JSON.stringify(app.urls())}`);
 });
 
-// ── BUG-058: the wall must not claim you are signed in ───────────────────────
+// ── The wall must not claim you are signed in ────────────────────────────────
 // handleAuthLanding() (app.js) reads only the URL, so /app?auth=ok toasted "Signed in" and the boot
 // then rendered the sign-in wall underneath it. No access leaked — the gate is correct — the app
-// simply told the visitor the opposite of what it was showing them. Reproduced on PRODUCTION
-// 2026-08-03 in a cold private window, hours after code review had found it by reading the diff.
+// simply told the visitor the opposite of what it was showing them.
 //
 // Two indistinguishable people reach the wall carrying `?auth=ok`: someone opening a stale, shared
-// or hand-typed link, and a BUG-053 victim whose sign-in really did succeed but whose
+// or hand-typed link, and someone whose sign-in really did succeed but whose
 // /api/auth/me missed the 2.5s abort. So the copy states only what is observable — you are not
 // signed in — and the retry exists for the second. (Rationale lives in app.js; not restated here,
 // because the version that WAS restated here drifted into claiming a typed URL was impossible.)
@@ -393,7 +388,7 @@ test('?auth=ok with no session says what is actually observable, and shows it', 
   // DISPLAYED, not merely composed. `toasts` is fed by the .toast-msg write, which is the FIRST
   // thing showToast does — so without these two, deleting `classList.add('show')` leaves the whole
   // suite green while the visitor sees nothing, and hiding the action button leaves the remedy
-  // unreachable while the test still calls onclick() directly. Both were green mutations. (R1, H2.)
+  // unreachable while the test still calls onclick() directly.
   assert.ok(app.el('toast').classList.contains('show'),
     'the message was composed but never displayed — the visitor sees a bare wall');
   assert.ok(!app.el('toast').querySelector('.toast-action').classList.contains('hidden'),
@@ -402,7 +397,7 @@ test('?auth=ok with no session says what is actually observable, and shows it', 
 
 test('?auth=ok WITH a session still confirms the sign-in, and shows it', async () => {
   // Positive control — the fix must not just delete the toast. Doubles as the proof that `toasts` is
-  // populated at all: while it was a dead field (CHR-040) this assertion could not pass.
+  // populated at all: while it was a dead field this assertion could not pass.
   const app = bootWith({ signedIn: true, search: '?auth=ok' });
 
   await app.ctx.init();
@@ -429,9 +424,9 @@ test('the retry reloads and opens no app surface', async () => {
   // This test used to assert visibleViews() and focus_last_view. Neither could fail: showView
   // coerces to the wall while signed out, and view-landing is in neither of its maps, so both were
   // already true BEFORE the click. Giving the callback the shape that lives 15 lines below it in
-  // app.js — showView('view-setup'); initSetup(); openProfile() — left the suite 26/26 green while
-  // the Settings drawer opened over the wall for a signed-out visitor, which is the TASK-084
-  // round-2 bypass. These assert on state the callback can actually reach. (R1/R2/R3, H1.)
+  // app.js — showView('view-setup'); initSetup(); openProfile() — would stay green while
+  // the Settings drawer opened over the wall for a signed-out visitor.
+  // These assert on state the callback can actually reach.
   assert.ok(!app.el('profile-panel').classList.contains('open'),
     'the retry opened the Settings drawer over the wall for a signed-out visitor');
   assert.ok(!app.el('profile-scrim').classList.contains('show'),
@@ -444,9 +439,9 @@ test('the retry reloads and opens no app surface', async () => {
 
 test('a failed ?auth=ok strips the param, so the retry lands on a plain wall', async () => {
   // Why it matters HERE: the strip is what bounds the retry to one attempt. The strip itself is
-  // pinned for all four values in the loop at the top of this section — this test previously
-  // claimed to pin it and did not, because moving the strip inside `if (a === 'ok')` left every
-  // other value unstripped with the suite green. (R3, M1.)
+  // pinned for all four values in the loop at the top of this section — this test alone cannot
+  // pin it, because moving the strip inside `if (a === 'ok')` leaves every
+  // other value unstripped while this stays green.
   const app = bootWith({ signedIn: false, search: '?auth=ok' });
 
   await app.ctx.init();
@@ -456,13 +451,13 @@ test('a failed ?auth=ok strips the param, so the retry lands on a plain wall', a
 });
 
 test('the three failure values still explain themselves on the wall', async () => {
-  // Unchanged behaviour, pinned because this task edits the function they live in. These messages
+  // These messages
   // are CORRECT on the wall — they say why it is there — so a fix that silenced the toast wholesale
   // would be wrong in the opposite direction.
   //
-  // The two Google expectations must be DISTINCT. Both were /google/i, so swapping the two message
-  // bodies was a green mutation — and google_unavailable (GOOGLE_CLIENT_ID unset) would then tell
-  // the user "please try again", a remedy that cannot work. (R1/R3, M3.)
+  // The two Google expectations must be DISTINCT. With both as /google/i, swapping the two message
+  // bodies would stay green — and google_unavailable (GOOGLE_CLIENT_ID unset) would then tell
+  // the user "please try again", a remedy that cannot work.
   for (const [value, expected] of [
     ['invalid', /link expired/i],
     ['google_failed', /didn.t work/i],

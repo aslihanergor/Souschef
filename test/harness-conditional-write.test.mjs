@@ -1,14 +1,14 @@
-// Probing the fake BEFORE building on it (BUG-047, attempt 4).
+// Probing the fake BEFORE building on it.
 //
-// Attempt 3 built a refuse-a-stale-write mechanism on a fake that could not express one: it read the
-// `on conflict` TARGET and threw the ACTION away, so `do update … where <guard>` was applied as an
-// unconditional overwrite. Criterion 1's test would have gone green against an implementation
-// guarding nothing. A reviewer also showed the fake returned `rev` and `updatedAt` byte-identical,
-// so a client echoing the wrong field passed a test written to catch precisely that.
+// A refuse-a-stale-write mechanism cannot be built on a fake that cannot express one: one that reads the
+// `on conflict` TARGET and throws the ACTION away applies `do update … where <guard>` as an
+// unconditional overwrite, so a stale-write test would go green against an implementation
+// guarding nothing. And a fake that returns `rev` and `updatedAt` byte-identical lets
+// a client echoing the wrong field pass a test written to catch precisely that.
 //
 // These tests are the control for both. They drive the fake directly with the SQL shapes the handler
 // emits, and they exist so that "the guard bit" is a measured property of the instrument rather than
-// a claim in its header — the failure mode CLAUDE.md's "your instrument may be lying" family names.
+// a claim in its header.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeDb, toCharUS } from '../test-helpers/handler.mjs';
@@ -85,7 +85,7 @@ test('do nothing: creates when absent, never overwrites when present', async () 
 });
 
 test('the no-user-data UPDATE path takes the guard too', async () => {
-  // The branch the BUG-057 control showed an empty browser's blob actually lands through.
+  // The branch an empty browser's blob actually lands through.
   const sql = seeded();
   const before = JSON.stringify(sql.rows[0]);
   const stale = await sql`
@@ -112,15 +112,14 @@ test('an unrecognised guard shape THROWS rather than pretending to match', () =>
 
 // ── R18/R19: the canonical rev expression, and an instrument that can see it drift ──────────────
 //
-// Review round 4 found the guard above pinned nothing about the EXPRESSION. The fake matched
-// `to_char(users.updated_at, '<anything>')` and rendered the token with its own `toCharUS`
-// regardless, so the read could ask for one spelling and the write for another — or either could
-// drop the `at time zone 'UTC'` that makes the token GUC-stable — and the fake would hand back
-// matching strings and stay green. `REV_FORMAT` was exported and never imported: dead code standing
-// in for a guarantee.
+// The guard above pins nothing about the EXPRESSION. A fake that matches
+// `to_char(users.updated_at, '<anything>')` and renders the token with its own `toCharUS`
+// regardless lets the read ask for one spelling and the write for another — or either
+// drop the `at time zone 'UTC'` that makes the token GUC-stable — and still hands back
+// matching strings and stays green.
 //
 // These three tests are what makes it a guarantee. The first pins the SHIPPING statements to the
-// constant; the other two are controls showing the instrument now refuses what it used to serve.
+// constant; the other two are controls showing the instrument refuses a drifted expression.
 import { createStateHandler } from '../api/state.js';
 import { REV_EXPR, REV_EXPR_QUALIFIED } from '../api/_state.js';
 import { fakeReq, fakeRes } from '../test-helpers/handler.mjs';

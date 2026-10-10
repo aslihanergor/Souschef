@@ -1,7 +1,7 @@
 node_modules/
 .vercel
 .DS_Store
-# Concurrency lock from scripts/mutate.mjs (CHR-010). A clean run deletes it; one
+# Concurrency lock from scripts/mutate.mjs. A clean run deletes it; one
 # left behind means a battery died mid-run — delete it. Never committed.
 .mutate.lock
 # Local secrets (e.g. YOUTUBE_API_KEY) — never commit. Vercel gets these from its
@@ -20,5 +20,5 @@ MEETINGS.md
 CODE_REVIEW.md
 
 # Review/agent worktrees live here; they are transient and must never be committed.
-# A `git add -A` swept one into a commit on 2026-08-18 (BUG-092 round 3).
+# A `git add -A` can sweep one into a commit.
 .claude/worktrees/

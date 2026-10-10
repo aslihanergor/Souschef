@@ -1,4 +1,4 @@
-// Pure dashboard-aggregation tests (TASK-087 — owner-excluded DAU + returning-user retention).
+// Pure dashboard-aggregation tests (owner-excluded DAU + returning-user retention).
 // Zero-dep node:test. dauByDay() is the classification half of the metric; the SQL owns
 // owner-exclusion, the person-key coalesce(account_id, device_id), and each person's first-seen
 // day (over ALL history). This turns per-(person, day) rows into a day-by-day active-users series
@@ -46,7 +46,7 @@ test('dauByDay: the same (person, day) twice is one active user', () => {
 test('dauByDay: first-seen long before the window still classifies as returning', () => {
   // The 40-days-before case: firstDay predates every day in the window, so the person is
   // returning, never new. This only holds because firstDay is computed over ALL history — the
-  // exact bug the criterion guards against (a windowed first-seen would mislabel them "new").
+  // exact bug this guards against (a windowed first-seen would mislabel them "new").
   const rows = [{ person: 'p1', day: '2026-07-20', firstDay: '2026-06-10' }];
   assert.deepEqual(dauByDay(rows), [{ day: '2026-07-20', dau: 1, fresh: 0, returning: 1 }]);
 });
@@ -87,14 +87,14 @@ test('dauByDay: rows missing a person or day are skipped, not counted', () => {
   assert.deepEqual(dauByDay(rows), [{ day: '2026-07-20', dau: 1, fresh: 1, returning: 0 }]);
 });
 
-// ── X meter rollups (CHR-072) ───────────────────────────────────────────────
+// ── X meter rollups ───────────────────────────────────────────────
 // xMeterRollup is the arithmetic half of the "X cost & volume" panel. The SQL owns the two
 // aggregates (distinct posts per UTC day from x_posts_seen; per-owner posts per UTC day from
 // x_usage) and the email join; this turns them into the series the dashboard renders.
 //
-// The load-bearing rule is criterion 2: SPEND is distinct posts x price and must NEVER be derived
-// from x_usage, which overstates by design (scripts/init-db.mjs:163) and by ~2.8x today while
-// [BUG-110] is open. `today` is passed in rather than read from the clock so the zero-fill is
+// The load-bearing rule: SPEND is distinct posts x price and must NEVER be derived
+// from x_usage, which overstates by design (scripts/init-db.mjs:163), by ~2.8x as measured.
+// `today` is passed in rather than read from the clock so the zero-fill is
 // deterministic — and it is a UTC 'YYYY-MM-DD', because both tables store UTC dates.
 
 const spend = (day, posts) => ({ day, posts });
@@ -129,7 +129,7 @@ test('xMeterRollup: daily cost is distinct posts times the X post price', () => 
 });
 
 test('xMeterRollup: cost comes from x_posts_seen, never from x_usage volume', () => {
-  // The shape measured on production 2026-09-02: one person on two devices, 125 counted vs 45
+  // A shape measured on production: one person on two devices, 125 counted vs 45
   // distinct. Pricing the wrong meter overstates spend 2.8x and could talk us out of launching.
   const r = xMeterRollup({
     spendRows: [spend('2026-09-02', 45)],
@@ -179,7 +179,7 @@ test('xMeterRollup: a quiet day between active days is zero-filled, not dropped'
 });
 
 test('xMeterRollup: days after the last metered day fill to today (the metering-stopped tell)', () => {
-  // Criterion 8's real purpose: metering that silently stopped two days ago must LOOK stopped.
+  // The real purpose: metering that silently stopped two days ago must LOOK stopped.
   // recordUsage swallows every error by design, so trailing zeros are the only symptom there is.
   const r = xMeterRollup({ spendRows: [spend('2026-09-01', 10)], volumeRows: [], today: '2026-09-03' });
   assert.deepEqual(r.days.map((d) => d.day), ['2026-09-01', '2026-09-02', '2026-09-03']);
@@ -256,7 +256,7 @@ test('xMeterRollup: the owner table reads newest day first, heaviest reader firs
 });
 
 test('xMeterRollup: a malformed day is skipped, not bucketed (M13 in the CHR-072 battery)', () => {
-  // Added because the battery measured this as a survivor. An unvalidated day would become a
+  // An unvalidated day would become a
   // bucket key and the zero-fill would walk forward from garbage — up to its 366-day bound.
   const r = xMeterRollup({
     spendRows: [{ day: 'not-a-date', posts: 99 }, spend('2026-09-02', 4)],
@@ -269,11 +269,11 @@ test('xMeterRollup: a malformed day is skipped, not bucketed (M13 in the CHR-072
   assert.equal(r.totals.posts, 4);
 });
 
-// ── Guards the CHR-072 review found unpinned ────────────────────────────────
+// ── Guards on silent and malformed meters ───────────────────────────────────
 
 test('xMeterRollup: a silent volume meter reads as absent, never as a perfect dedup ratio', () => {
-  // Found in review. The guard protected the denominator only, so posts>0 with volume=0 returned
-  // ratio 0 and rendered "0.00x" — the most FAVOURABLE reading available, on the figure that
+  // A guard protecting the denominator only would let posts>0 with volume=0 return
+  // ratio 0 and render "0.00x" — the most FAVOURABLE reading available, on the figure that
   // decides whether twenty users cost ~$9 or ~$180 a month. Reachable: recordUsage writes
   // x_posts_seen unconditionally but x_usage only `if (owner)`, so an unattributed fetch meters
   // spend and not volume; if x_usage writes broke entirely, the headline would read "extra users
@@ -307,7 +307,7 @@ test('xMeterRollup: a non-numeric count is zeroed on the owner row, never propag
   // finite guard has NO observable effect there — `Number('lots')` is NaN, `NaN || 0` is 0, and a
   // clean number comes out either way. The guard is load-bearing on ONE path only: owners[].posts
   // takes asCount's result directly, with no fallback behind it. Asserting the quantity the guard
-  // actually protects is what turns this from decoration into a test (battery M13b).
+  // actually protects is what turns this from decoration into a test.
   const r = xMeterRollup({
     spendRows: [{ day: '2026-09-02', posts: 'lots' }, spend('2026-09-02', 4)],
     volumeRows: [vol('2026-09-02', 'account', 'a1', 'plenty', 'a@example.com')],

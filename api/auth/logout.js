@@ -1,6 +1,6 @@
-// POST /api/auth/logout  → delete the session row + clear the cookie (TASK-025).
+// POST /api/auth/logout  → delete the session row + clear the cookie.
 //
-// The contract the client depends on (BUG-017): **200 means this browser is signed out.** The
+// The contract the client depends on: **200 means this browser is signed out.** The
 // cookie is cleared on every 200, and the only way to reach a 200 is for the session delete to have
 // succeeded or for there to have been no session to begin with. Anything else answers non-2xx, so
 // `response.ok` is a signal the client can actually act on.
@@ -10,7 +10,7 @@
 // was *ended* (a failing DELETE still answered true), and it read false for a mere DB blip —
 // api/_session.js swallows the error and returns null — while the cookie was cleared regardless.
 // The client refused on that false, kept the previous user's state, and could never recover because
-// the retry had no cookie left to send. (BUG-017 review R4-H2 / R4-M1.)
+// the retry had no cookie left to send.
 import { db } from '../_db.js';
 import { hashToken, readSessionToken, clearSessionCookie, isSecureRequest } from '../_auth.js';
 
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'logout failed' });
     }
 
-    // Deliberately does NOT delete this browser's device row. Two review rounds killed that idea:
+    // Deliberately does NOT delete this browser's device row:
     // the row can be the only surviving copy of the user's state, and no cheap server-side gate
     // distinguishes "safe to drop" from "about to destroy the last copy" — an `exists` check on the
     // account row is true within seconds of every boot, including when that row is empty or was

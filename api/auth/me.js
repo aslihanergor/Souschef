@@ -1,4 +1,4 @@
-// GET /api/auth/me  → { email } for a valid session, else 401 (TASK-025).
+// GET /api/auth/me  → { email } for a valid session, else 401.
 import { db } from '../_db.js';
 import { sessionAccount } from '../_session.js';
 

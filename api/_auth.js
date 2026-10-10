@@ -1,4 +1,4 @@
-// Pure auth helpers for magic-link sign-in (TASK-025). No DB, no I/O — unit-tested in
+// Pure auth helpers for magic-link sign-in. No DB, no I/O — unit-tested in
 // test/auth.test.mjs. The endpoints (api/auth/*.js) wire these to Neon + Resend.
 //
 // Security posture: raw tokens live only in the emailed link / the cookie; the DB stores
@@ -87,10 +87,10 @@ export function clearSessionCookie({ secure = true } = {}) {
 // Behind Vercel's proxy the real client info is in x-forwarded-*. These read the first
 // hop and degrade sanely for local http dev (no forwarded headers → http/unknown).
 //
-// clientIp keys the per-IP sign-in limit, so it should not be a value the client chose (BUG-022).
+// clientIp keys the per-IP sign-in limit, so it should not be a value the client chose.
 // Any client can send x-forwarded-for. Vercel documents overwriting it, and documents
 // x-vercel-forwarded-for as identical except that a proxy on top of Vercel can overwrite
-// x-forwarded-for again — so the Vercel header is read first (BUG-022).
+// x-forwarded-for again — so the Vercel header is read first.
 // x-forwarded-for stays as the fallback for local dev, which has no Vercel header.
 export function clientIp(headers = {}) {
   const vercel = headers['x-vercel-forwarded-for'];

@@ -1,4 +1,4 @@
-// [BUG-023] — a remote URL reaches an `href` only if it is absolute http(s).
+// A remote URL reaches an `href` only if it is absolute http(s).
 //
 // A Substack feed chooses its own post links, and every card that renders one used to pass it through
 // `esc()` alone, which escapes HTML and says nothing about the scheme — so a feed whose <link> is
@@ -8,7 +8,7 @@
 // synced state and cached tweets keep theirs on the device; a parser fix reaches neither.
 //
 // Every assertion reads RENDERED MARKUP, never "was safeHref called". Three things keep them honest,
-// each added after review round 1 showed the first version could not tell them apart:
+// so the tests can tell a weak guard from a real one:
 //   - EVERY sink is driven with the whole HOSTILE list, not one `javascript:` string — otherwise a sink
 //     guarded by a weak blocklist (`/^javascript:/`) passes, while `java<TAB>script:` still executes;
 //   - the fixtures carry HTML-special characters, so the `esc()` at every sink this change touched is
@@ -16,7 +16,7 @@
 //   - expected markup is HARD-CODED, never built with `esc()` — a twin that computes its expectation
 //     with the function under test cannot see that function regress.
 // And every unsafe case has a safe twin asserting the anchor IS there, because "no href" is vacuously
-// true of markup that rendered nothing — [BUG-115]'s criterion that could not fail, in a new shape.
+// true of markup that rendered nothing — an assertion that could not fail.
 //
 // The harness injects EVERY lib/pure.js export into the vm (`...pure`) and strips app.js's import line,
 // while the browser sees only what that line imports — and parses the file as a MODULE. So the renderer
@@ -44,7 +44,7 @@ const HOSTILE = [
   `${SOH}javascript:alert(1)`,
   `javascript:alert(1)//${NL}https://example.com/`,
   // A non-http scheme WITH `//`: `//` opens a JS comment and `%0A` ends it. Without this entry no sink saw
-  // the "any scheme://" shape at all — only c1 did (author P5 / independent P8, round-2 re-run).
+  // the "any scheme://" shape at all — only c1 did.
   'javascript://%0Aalert(1)',
   'data:text/html,<script>alert(1)</script>',
   'vbscript:msgbox(1)',
@@ -84,10 +84,10 @@ test('BUG-023 c1: safeHref rejects every other scheme, relative forms and non-st
     ...HOSTILE,
     'JavaScript:alert(1)', '  javascript:alert(1)', `${NUL}javascript:alert(1)`, '/p/relative', '',
     null, undefined, 42, { toString: () => 'https://x.example' },
-    // Added after the author battery's first round, where each SURVIVED as predicted: without these the
+    // Without these the
     // `^` anchor (P4) and the http(s)-only scheme (P5) could be deleted and every case above still passed.
     'javascript:alert(1)//https://example.com/', 'javascript://%0Aalert(1)',
-    // Added after review round 1, alongside HOSTILE's raw-newline and `https:/api/state` entries: a RAW
+    // Alongside HOSTILE's raw-newline and `https:/api/state` entries: a RAW
     // newline defeats a multiline-flagged `^`, and a scheme with one or no slash is relative to the app's
     // own origin, not absolute (`https:/api/state` resolves to this site's /api/state).
     'https:evil.example', 'http:/x',
@@ -155,7 +155,7 @@ async function readerFor(branch, url) {
   return { readout: card.querySelector('.substack-readout').innerHTML, body: card.querySelector('.substack-body').innerHTML };
 }
 
-// One named test per branch, so a mutation battery can say WHICH branch a kill came from.
+// One named test per branch, so a failure says WHICH branch it came from.
 for (const branch of Object.keys(READOUT_BRANCHES)) {
   test(`BUG-023 c3 [${branch}]: the readout drops the link for every hostile url and keeps its explanation`, async () => {
     for (const bad of HOSTILE) {

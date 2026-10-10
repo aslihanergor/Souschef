@@ -1,17 +1,17 @@
 #!/usr/bin/env node
-// Production row health check — READ-ONLY (BUG-056, 2026-08-06).
+// Production row health check — READ-ONLY.
 //
-// Why this exists: BUG-059 was found by someone happening to look. An account row lost all 7 of its
+// Why this exists: a silent data loss was found only by someone happening to look. An account row lost all 7 of its
 // channels with no `remove_channel` event ever recorded, and four days later the mechanism still
 // could not be established from the data, because nothing had been watching. The sync bugs that
 // empty a row are silent by construction — the user sees an empty feed and assumes they did it.
 //
 // So this prints the fingerprint rather than raw rows: an account whose row holds ZERO channels while
 // its event log contains `add_channel` and no `remove_channel` has lost data it never asked to lose.
-// That is BUG-059's exact shape, and it is what BUG-065 can still produce.
+// That is the exact shape of that loss, and one the sync bugs can still produce.
 //
 // SAFE TO RUN ANY TIME. Selects only; no INSERT/UPDATE/DELETE, no DDL. It does not boot the app, so
-// it cannot trip the hazard in BUG-059's note (opening SousChef on the owner's trysouschef.vercel.app
+// it cannot trip the known hazard (opening SousChef on the owner's trysouschef.vercel.app
 // browser reconciles local against the row and destroys the evidence).
 //
 //   node scripts/check-rows.mjs          # production (DATABASE_URL)
@@ -44,7 +44,7 @@ if (!url) {
 }
 
 // Say which database this is BEFORE printing anything, so a reader never has to guess which numbers
-// they are looking at. A migration against prod looks identical to one against a branch (BUG-013).
+// they are looking at. A migration against prod looks identical to one against a branch.
 const host = (url.match(/@([^/]+)\//) || [, '(unknown)'])[1];
 console.log(`DB → ${host}  ${useDev ? '(dev branch)' : '(PRODUCTION)'}\n`);
 
@@ -81,8 +81,8 @@ console.log('');
 if (suspect.length === 0) {
   console.log(`✅ ${rows.length} account rows, none showing BUG-059's fingerprint.`);
 } else {
-  // Loud but not alarmist: the owner's own row is a KNOWN instance (BUG-059) that Asli has
-  // explicitly declined to restore, so a hit there is expected and must not read as a new incident.
+  // Loud but not alarmist: the owner's own row is a KNOWN instance that was
+  // deliberately not restored, so a hit there is expected and must not read as a new incident.
   console.log(`⚠️  ${suspect.length} account row(s) hold no channels despite having added some and never removed one:`);
   for (const r of suspect) console.log(`      ${r.email}  (${r.adds} adds, last written ${new Date(r.updated_at).toISOString()})`);
   console.log("\n    The owner's own account is the KNOWN case — BUG-059, test data, deliberately not restored.");

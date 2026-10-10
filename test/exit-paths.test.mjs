@@ -1,8 +1,8 @@
-// Exit-path regression tests (CHR-033, from BUG-017).
+// Exit-path regression tests.
 //
-// Every HIGH finding across BUG-017's eight review rounds lived in signOut/deleteAccount/pushNow,
-// and none of it had a test — the suite covered pure functions and the EXIT_DISPOSITION map, so a
-// no-op clearLocalIdentity() stayed green. These run the REAL app.js in a fake browser
+// The highest-severity defects in this app have lived in signOut/deleteAccount/pushNow,
+// where a suite covering only pure functions and the EXIT_DISPOSITION map lets a
+// no-op clearLocalIdentity() stay green. These run the REAL app.js in a fake browser
 // (test-helpers/app-harness.mjs) and assert on observable output: what the store holds afterwards,
 // what requests went out, where the page navigated.
 //
@@ -19,7 +19,7 @@ import { createApp, SIGNED_IN } from '../test-helpers/app-harness.mjs';
 const KEYS = ['focus_channels', 'focus_done', 'focus_archive', 'focus_groups',
               'focus_tweet_cache', 'focus_last_feed_load', 'focus_last_view',
               'focus_dirty', 'focus_events', 'focus_landing_seen', 'focus_include_shorts',
-              // [TASK-092] review round 1 (L8): the tour record clears on exit, and SIGNED_IN seeds it so this can fail.
+              // the tour record clears on exit, and SIGNED_IN seeds it so this can fail.
               'focus_tour'];
 
 /** Respond per URL; anything unmatched throws, so an unexpected request fails loudly.
@@ -36,7 +36,7 @@ function routes(map) {
 const OK = { ok: true, status: 200, json: async () => ({}) };
 const FAIL = { ok: false, status: 500, json: async () => ({}) };
 
-// ── Standing (BUG-056) ──────────────────────────────────────────────────────
+// ── Standing ──────────────────────────────────────────────────────
 // A push may only claim state on a document that ASKED the server what it holds and got an answer.
 // Every real document does: init() awaits syncOnLoad() and wireApp() connects the mutating controls
 // only afterwards, so no user tap can precede the read. Tests that jump straight to signOut() were
@@ -59,9 +59,9 @@ test('a clean sign-out clears the previous user, keeps theme, and rotates the de
 
   await app.ctx.signOut();
 
-  // The half the name promises and this fixture used to skip entirely: a CLEAN sign-out saves first.
+  // The half the name promises: a CLEAN sign-out saves first.
   // Without the boot above, the sign-out is events-only and this test is a duplicate of B4 wearing
-  // the canonical name. (Review round 1, M1.)
+  // the canonical name.
   assert.ok(app.requests.some(r => r.url.includes('/api/state') && (r.init.method || 'GET') === 'PUT'
                                    && 'state' in JSON.parse(r.init.body)),
     'a clean sign-out must SAVE before it clears');
@@ -75,7 +75,7 @@ test('a clean sign-out clears the previous user, keeps theme, and rotates the de
 
 test('a failed save refuses the sign-out BEFORE ending the session', async () => {
   // The ordering is the design: refusing after the session is gone leaves a browser that is signed
-  // out while still holding the previous user's channels — BUG-017 itself.
+  // out while still holding the previous user's channels.
   const app = createApp({ store: SIGNED_IN, fetch: routes({ '/api/state': stateRead(FAIL), '/api/auth/logout': OK }) });
   await app.ctx.syncOnLoad();   // standing: this browser read its row, so it has something to save
 
@@ -83,12 +83,11 @@ test('a failed save refuses the sign-out BEFORE ending the session', async () =>
 
   assert.ok(app.get('focus_channels'), 'local state must survive a refused sign-out');
   assert.equal(app.get('focus_device_id'), SIGNED_IN.focus_device_id, 'id must NOT rotate');
-  // Requirement change, annotated deliberately. This asserted `dirty === '1'` when the branch was
-  // written ("keep local and retry on the next boot"). Review round 9 demonstrated, with a red test
-  // and an isolation control, that setting it turns a refused sign-out into a cross-account leak:
+  // The refusal must NOT set `dirty` ("keep local and retry on the next boot"),
+  // because setting it turns a refused sign-out into a cross-account leak:
   // syncOnLoad reads dirty === '1' as "push local up" and returns without applySyncedState, so the
   // NEXT account to sign in never gets its row pulled down and inherits this user's channels — the
-  // second symptom of the very bug this task closes. The flag must not be set here.
+  // very bug these tests guard against. The flag must not be set here.
   assert.equal(app.get('focus_dirty'), null, 'must NOT mark dirty — see the note above (R9-H2)');
   assert.ok(!app.urls().some(u => u.includes('/api/auth/logout')),
     'the session must not be ended when we could not save');
@@ -96,8 +95,8 @@ test('a failed save refuses the sign-out BEFORE ending the session', async () =>
 });
 
 test('a failed retry after a successful first push does NOT wipe local state', async () => {
-  // R8-H3. `push = {ok: push.ok || retry.ok}` inside a branch already requiring push.ok is a
-  // tautology, so a failed retry became invisible and the newest mutation was wiped from both sides.
+  // `push = {ok: push.ok || retry.ok}` inside a branch already requiring push.ok is a
+  // tautology, so a failed retry becomes invisible and the newest mutation is wiped from both sides.
   const app = createApp({ store: SIGNED_IN });
   let n = 0;
   app.setFetch(routes({
@@ -118,8 +117,8 @@ test('a failed retry after a successful first push does NOT wipe local state', a
 });
 
 test('a mutation landing mid-push is re-sent, not mistaken for a failure', async () => {
-  // The other side of the same coin (R6-H1): gating on `confirmed` without a retry made a healthy
-  // 200 read as a failure, which kept the previous user's state and skipped rotation.
+  // The other side of the same coin: gating on `confirmed` without a retry makes a healthy
+  // 200 read as a failure, which keeps the previous user's state and skips rotation.
   const app = createApp({ store: SIGNED_IN });
   let n = 0;
   app.setFetch(routes({
@@ -149,8 +148,8 @@ test('a logout that does not answer 200 refuses and leaves everything intact', a
 test('a failed save with nothing to lose still signs out cleanly', async () => {
   // Refusing here would strand a user with an empty browser and no way to leave.
   //
-  // What this exercises changed under TASK-084 R1-H2 and the name no longer says it out loud: with
-  // nothing to save, signOut's push is now events-only, so the failing request is an analytics
+  // What this exercises is narrower than the name says out loud: with
+  // nothing to save, signOut's push is events-only, so the failing request is an analytics
   // flush rather than a state save. The claim is unaffected — the refusal branch is gated on
   // _hasUserData, which is false either way — but do not read this as still covering "a state PUT
   // failed". The state-carrying half is the test above.
@@ -164,9 +163,9 @@ test('a failed save with nothing to lose still signs out cleanly', async () => {
 });
 
 test('a refused sign-out does not release a seal taken by a delete in flight', async () => {
-  // R8-H1. signOut's early refusal called unsealPushes(), but it had not sealed — the only seal it
-  // could clear was deleteAccount's. A re-armed timer then fired mid-delete and wrote the state
-  // into a device row that rotation orphaned permanently.
+  // signOut's early refusal must not call unsealPushes(): it has not sealed, so the only seal it
+  // could clear is deleteAccount's. A re-armed timer would then fire mid-delete and write the state
+  // into a device row that rotation orphans permanently.
   const app = createApp({ store: SIGNED_IN, fetch: routes({ '/api/state': FAIL, '/api/auth/logout': OK }) });
   app.ctx.cancelPendingPushes({ sealed: true });   // stand in for the in-flight deleteAccount
 
@@ -178,8 +177,8 @@ test('a refused sign-out does not release a seal taken by a delete in flight', a
 });
 
 test('a failed delete releases its own seal so syncing resumes', async () => {
-  // R4-H1. `_leaving` was a one-way latch: after a failed delete every later push returned early,
-  // silently, and the next sign-out then took the non-clearing branch.
+  // `_leaving` must not be a one-way latch: otherwise after a failed delete every later push returns early,
+  // silently, and the next sign-out then takes the non-clearing branch.
   const app = createApp({ store: SIGNED_IN, fetch: routes({ '/api/auth/delete': FAIL, '/api/state': OK }) });
 
   await app.ctx.deleteAccount();
@@ -205,10 +204,10 @@ test('a successful delete clears local state and rotates the device id', async (
 });
 
 test('retry exhaustion refuses: a 200 that never confirms is not a save', async () => {
-  // Pins the crux decision of rounds 6-8: the gate is `confirmed`, NOT `ok`. Here the server always
+  // Pins the crux decision: the gate is `confirmed`, NOT `ok`. Here the server always
   // answers 200 but a mutation lands during every attempt, so the newest state never reaches it.
   // Gating on `ok` would read this as success and wipe the browser. Without this test, changing
-  // `!push.confirmed` to `!push.ok` leaves the whole suite green (review round 9 proved that).
+  // `!push.confirmed` to `!push.ok` leaves the whole suite green.
   const app = createApp({ store: SIGNED_IN });
   let attempts = 0;
   app.setFetch(routes({
@@ -241,14 +240,14 @@ test('a clean sign-out clears the dirty flag', async () => {
 
 test('a refused sign-out does not ITSELF mark state dirty (it does not close BUG-047)', async () => {
   // Narrow on purpose, and the name says so. This pins one thing: the refusal branch must not add
-  // `dirty` of its own accord (review R9-H2 — it used to, which turned a refusal into a
+  // `dirty` of its own accord (doing so turns a refusal into a
   // cross-account leak even for a user who had mutated nothing).
   //
-  // It does NOT show the cross-account leak is closed, and an earlier version of this test was
-  // named as if it did. That name was false for every refusal a real user can produce: the refusal
+  // It does NOT show the cross-account leak is closed.
+  // For every refusal a real user can produce, the refusal
   // is *reached* by an unsynced mutation, and any ordinary mutation already set `dirty` via
-  // schedulePush(). Reproduced with A adding a channel, sign-out refused, B signing in → A's
-  // channels land in B's account. The real fix is owner-stamping in syncOnLoad — BUG-047.
+  // schedulePush(). With A adding a channel, sign-out refused, B signing in → A's
+  // channels land in B's account. The real fix is owner-stamping in syncOnLoad.
   // This fixture deliberately has no prior `dirty`, which is exactly why it isolates the branch.
   const app = createApp({ store: SIGNED_IN, fetch: routes({ '/api/state': stateRead(FAIL), '/api/auth/logout': OK }) });
   await app.ctx.syncOnLoad();   // standing, so the failing PUT below is a real refusal
@@ -274,7 +273,7 @@ test('a refused sign-out does not ITSELF mark state dirty (it does not close BUG
 });
 
 test('a failed delete does not release a seal held by an in-flight sign-out', async () => {
-  // R9-H1. Both buttons live in the same drawer, so the exits can overlap. Releasing another exit's
+  // Both buttons live in the same drawer, so the exits can overlap. Releasing another exit's
   // seal lets a timer fire mid-exit and write the departing state into a device row.
   const app = createApp({ store: SIGNED_IN });
   let releaseLogout;
@@ -300,15 +299,14 @@ test('a failed delete does not release a seal held by an in-flight sign-out', as
 });
 
 test('a sign-out that throws does not release a seal held by an in-flight delete', async () => {
-  // R9-H3. The wrapper's catch used to reset _leaving unconditionally; _signOut can throw before it
+  // The wrapper's catch must not reset _leaving unconditionally; _signOut can throw before it
   // ever seals.
   //
-  // INSTRUMENT RE-POINTED by [BUG-051] (Asli, 2026-09-10), and the assertion below is untouched.
-  // This used to force the throw with a corrupt `focus_channels`, because collectSyncedState()
-  // parsed raw localStorage. It no longer throws there — `syncedDamaged()` short-circuits ahead of
-  // it — so the fixture stopped producing a throw and the test PASSED WHILE EXERCISING NOTHING.
-  // Verified vacuous before changing it, rather than assumed. `failGetItem` models the other real
-  // cause the original comment already implied: a browser blocking site data, which refuses reads.
+  // The throw is forced with `failGetItem`, not with a corrupt `focus_channels`: collectSyncedState()
+  // no longer throws on corrupt JSON — `syncedDamaged()` short-circuits ahead of
+  // it — so a corrupt-JSON fixture would produce no throw and the test would PASS WHILE EXERCISING NOTHING.
+  // `failGetItem` models another real
+  // cause: a browser blocking site data, which refuses reads.
   // `_statePending()` is the first getItem `_signOut` reaches, and it is before the seal.
   const app = createApp({ store: SIGNED_IN });
   app.failGetItem(k => k === 'focus_dirty');
@@ -323,9 +321,9 @@ test('a sign-out that throws does not release a seal held by an in-flight delete
   await new Promise(r => setImmediate(r));
   await app.ctx.signOut();                             // throws on the corrupt JSON
 
-  // NON-VACUITY GUARD (independent battery, O05). Without this the test cannot tell whether its own
-  // instrument fired: disabling `failGetItem` entirely left it 18/18 green, which is the exact
-  // vacuity class the re-point was made to fix. The wrapper's catch is the only thing that raises
+  // NON-VACUITY GUARD. Without this the test cannot tell whether its own
+  // instrument fired: with `failGetItem` disabled entirely it would stay green.
+  // The wrapper's catch is the only thing that raises
   // this toast, so seeing it is proof the throw happened.
   assert.ok(app.toasts.some(t => /couldn.t sign out/i.test(String(t))),
     `the instrument must actually have thrown; toasts: ${JSON.stringify(app.toasts)}`);
@@ -341,8 +339,8 @@ test('a sign-out that throws does not release a seal held by an in-flight delete
 test('a push refused by the seal reports failure, so an exit cannot mistake it for a save', async () => {
   // pushNow's early return under `_leaving` must be {ok:false}. Reading a skipped push as success
   // is catastrophic and silent: sign-out would wipe the browser and rotate the id having issued
-  // ZERO state PUTs. Mutating that return to {ok:true,confirmed:true} previously left the whole
-  // suite green (review round 10).
+  // ZERO state PUTs. Without this test, mutating that return to {ok:true,confirmed:true} leaves the whole
+  // suite green.
   const app = createApp({ store: SIGNED_IN, fetch: routes({ '/api/state': stateRead(OK), '/api/auth/logout': OK }) });
   await app.ctx.syncOnLoad();                        // standing, so a suppressed push is not the reason
   app.ctx.cancelPendingPushes({ sealed: true });     // an exit is already in flight
@@ -380,8 +378,8 @@ test('a concurrent sign-out issues no requests', async () => {
 });
 
 test('deleteAccount seals BEFORE its request, so a flush cannot write mid-delete', async () => {
-  // Reproduced in review round 1 (H2): a queued push landing during the delete re-inserted the
-  // state being deleted into a device row that rotation then orphaned.
+  // A queued push landing during the delete re-inserts the
+  // state being deleted into a device row that rotation then orphans.
   const app = createApp({ store: SIGNED_IN });
   let releaseDelete;
   app.setFetch(async (url) => {
@@ -401,8 +399,8 @@ test('deleteAccount seals BEFORE its request, so a flush cannot write mid-delete
 });
 
 test('keepalive is opt-in: interactive pushes are uncapped, the unload flush is not', async () => {
-  // R5-H1. keepalive caps the request body at 64KiB and answers a network error over it, which the
-  // bare catch swallowed — so sync died silently for exactly the users with the most to lose.
+  // keepalive caps the request body at 64KiB and answers a network error over it, which a
+  // bare catch swallows — so sync dies silently for exactly the users with the most to lose.
   const app = createApp({ store: SIGNED_IN, fetch: routes({ '/api/state': OK }) });
 
   await app.ctx.pushNow();

@@ -1,18 +1,18 @@
-// The PUBLIC landing page at `/` — index.html (TASK-091).
+// The PUBLIC landing page at `/` — index.html.
 //
 // Not to be confused with test/landing.test.mjs, which despite its name is entirely about the
 // APP's sign-in wall (`view-landing` in app.js). Different page, different file, no overlap.
 //
-// Why these are source-text assertions rather than behaviour: TASK-091 puts a scroll-driven canvas
-// animation on a page that carried zero JavaScript by design. The animation cannot be exercised
+// Why these are source-text assertions rather than behaviour: the page's only JavaScript is a
+// scroll-driven canvas animation. The animation cannot be exercised
 // here — there is no canvas, no scroll and no rAF in node — and building a harness for it would
 // cost more than the thing it guards; the project rule for animation is verify-by-looking.
 //
-// But ONE failure in this change ships silently, and it is not visual. `vercel.json` sets
+// But ONE failure ships silently, and it is not visual. `vercel.json` sets
 //   script-src 'self' '<sha256 of the app's theme script>'
 // with no 'unsafe-inline'. An inline <script> on this origin is therefore BLOCKED by the browser:
 // the page still renders, the headline still reads, and the stage is a dead black rectangle. No
-// test that looks at markup structure would notice, and a reviewer reading the diff sees ordinary
+// test that looks at markup structure would notice, and someone reading the diff sees ordinary
 // working code. So the external-file requirement is pinned here, at the only layer that can see it.
 //
 // Precedent for the shape: landing.test.mjs:479 asserts on style.css source text for the same
@@ -26,7 +26,7 @@ const ROOT = new URL('../', import.meta.url);
 const read = (p) => readFileSync(new URL(p, ROOT), 'utf8');
 
 // Commented-out markup is not markup. Both checks below run on the stripped text, so deleting the
-// script tag by wrapping it in <!-- --> reads as deletion rather than as "still there" (round-1 H5).
+// script tag by wrapping it in <!-- --> reads as deletion rather than as "still there".
 const stripComments = (html) => html.replace(/<!--[\s\S]*?-->/g, '');
 
 // An opening <script> tag, quote-aware: a `>` inside an attribute value does not end the tag.
@@ -84,11 +84,11 @@ test('index.html loads the animation from an external /landing.js', () => {
   );
 });
 
-// ── The guard's own bypasses (round-1 H5) ────────────────────────────────────────────
+// ── The guard's own bypasses ─────────────────────────────────────────────────────────
 //
 // Everything above asserts against the real index.html, which is the file we want to be right —
 // but it cannot show that the GUARD is right, and a tripwire nobody has tried to walk past is a
-// decoration. A reviewer walked past this one three ways. So these two tests attack the detector
+// decoration. So these two tests attack the detector
 // itself with fixtures, in both directions: things it must catch, and things it must not.
 
 test('the inline-script guard cannot be walked past by a lookalike attribute', () => {
@@ -157,7 +157,7 @@ test('landing.js exists at the path index.html asks for', () => {
   );
 });
 
-// ── Script ↔ markup coupling (round-1 H4) ────────────────────────────────────────────
+// ── Script ↔ markup coupling ─────────────────────────────────────────────────────────
 //
 // landing.js reaches into index.html by id and by class. Neither file imports the other, so every
 // one of those references is an unchecked assumption, and a rename in either direction is silent:
@@ -194,7 +194,7 @@ test('the tall scroll track is gated on the class landing.js hands over with', (
   // The two halves of one mechanism, in two files. index.html keeps the stage at its short height
   // until `js-stage` appears; landing.js adds it. Drop either and the stage is 100vh, so
   // progress()'s span is zero, p is pinned at 0 forever and the story never starts — while the
-  // page still renders a headline and looks, to a reviewer reading the diff, entirely fine.
+  // page still renders a headline and looks, to someone reading the diff, entirely fine.
   const html = read('index.html');
   const js = read('landing.js');
 
@@ -249,19 +249,18 @@ test('the mobile step-back fades the subhead, not the headline (BUG-085)', () =>
   // not light until p = FLY[0] + 0.02 = 0.60, i.e. INSIDE the fade. So its moment was never seen:
   // nine words dimmed together and returned fully lit at the end.
   //
-  // That matters because TASK-091's brief makes the three clauses the three beats of the page. On
+  // That matters because the three clauses are the three beats of the page. On
   // mobile the third beat did not exist.
   //
   // A source-text test because neither half is observable from the harness: it records the
   // `--copyfade` VALUE the writer emits, and cannot see which element the cascade applies it to.
   // The value is unchanged by this fix — only its owner moved — so every existing assertion about
   // it stays true and none of them could have caught this.
-  // Comments stripped FIRST, and that is not tidiness. The initial version of this test anchored
-  // the selector on a preceding `{` or `}` — then a comment was written directly above the `.copy`
-  // rule, so the character before it became `/` from `*/`, the pattern matched only the
-  // media-query `.copy`, and the top-level one was never examined. The mutation that restores the
-  // bug exactly went GREEN while two lesser mutations went red, which is precisely how a battery
-  // lulls you. A comment must not be able to hide a rule from its own guard.
+  // Comments stripped FIRST, and that is not tidiness. A selector anchored
+  // on a preceding `{` or `}` misses a rule with a comment directly above it:
+  // the character before it is `/` from `*/`, the pattern matches only the
+  // media-query `.copy`, and the top-level one is never examined.
+  // A comment must not be able to hide a rule from its own guard.
   const css = read('index.html').replace(/\/\*[\s\S]*?\*\//g, '');
 
   // Rules whose selector is exactly `.copy` — not `.copy h1`, not `.copy.day`. matchAll rather
@@ -287,8 +286,7 @@ test('the mobile step-back fades the subhead, not the headline (BUG-085)', () =>
 test("the CSP still has no 'unsafe-inline' for scripts", () => {
   // The pre-existing condition this whole design rests on, pinned deliberately.
   //
-  // CLAUDE.md's lesson from TASK-084 round 4: mutate the pre-existing condition your change made
-  // load-bearing, not only the code you added. If someone later adds 'unsafe-inline' to script-src,
+  // If someone later adds 'unsafe-inline' to script-src,
   // every test above still passes, the external file keeps working, and the *reason* it had to be
   // external evaporates with nothing recording that it did. This is the tripwire for that — and
   // relaxing script-src on a page that now runs JavaScript deserves to be a conversation, not a

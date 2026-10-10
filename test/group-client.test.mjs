@@ -1,4 +1,4 @@
-// Client half of the grouping contract (BUG-066). `test/group.test.mjs` covers the server helpers by
+// Client half of the grouping contract. `test/group.test.mjs` covers the server helpers by
 // direct import; this file covers what the BROWSER sends, which is where the missing fact lived: the
 // request carried each existing topic's name but never its size, so the server could not tell a post
 // joining a 40-member topic from a post about nothing.
@@ -26,8 +26,8 @@ const GROUP_STATE = {
     b1: 'g_about_football',
     c1: 'g_old_topic', c2: 'g_old_topic',
   },
-  // Each carries the bullets an earlier grouping produced — that is what BUG-067 sends back up, and
-  // no BUG-066 assertion below depends on these being empty.
+  // Each carries the bullets an earlier grouping produced — that is what the client sends back up,
+  // and no request-shape assertion below depends on these being empty.
   groups: {
     g_us_politics:    { label: 'US Politics', summary: ['the spending bill stalled', 'two senators retired'] },
     g_about_football: { label: 'About Football', summary: ['Arsenal signed a striker'] },
@@ -91,13 +91,12 @@ test('the new post itself is still the only item sent', async () => {
   assert.deepEqual(body.items.map(i => i.id), ['new1'], 'only genuinely-new posts are classified');
 });
 
-// ── The OUTCOME, not just the request (review round 1, H2) ──────────────────────
+// ── The OUTCOME, not just the request ───────────────────────────────────────────
 // The tests above stop at what the browser sends, and the server tests stop at what the endpoint
-// returns. Neither covers the thing the fix exists to produce: the post actually joining the topic.
-// That last step runs through `groupIdFor` — a PRE-EXISTING function this fix leans on and never
-// mutated — so grouping could be broken outright with the whole suite green. Three faithful
-// mutations proved it: groupIdFor returning a different id, deleting mergeGroups' assignment line,
-// and the handler stripping `size`. These two tests red all three.
+// returns. Neither covers the thing that matters: the post actually joining the topic.
+// That last step runs through `groupIdFor`, so without these grouping could be broken outright with
+// the whole suite green — by groupIdFor returning a different id, by deleting mergeGroups'
+// assignment line, or by the handler stripping `size`. These two tests red all three.
 
 // A classify whose endpoint SUCCEEDS, assigning the new post to an existing topic by label.
 async function classifyWithServerReply(groups) {
@@ -133,7 +132,7 @@ test('a genuinely new topic still creates its own tile', async () => {
   assert.equal(Object.keys(after.groups).length, 4, 'a fourth topic was added');
 });
 
-// ── BUG-067: the topic's own bullets go UP, and an untouched topic keeps its own ──
+// ── The topic's own bullets go UP, and an untouched topic keeps its own ──────────
 // The model is only ever shown the NEW posts, so the summary it returns can only describe those —
 // and mergeGroups assigns {label, summary} wholesale, captioning a 41-post topic with this morning's
 // single post. Sending each topic's current bullets is what lets the model return an updated summary.
@@ -162,18 +161,14 @@ test('a topic the model returns no group for keeps its summary byte-identical', 
 });
 
 test('a merged topic caches an ARRAY summary, never a string', async () => {
-  // KNOWN WEAK — this fixture is already an array, so the assertion below cannot fail from it.
-  // Recorded as [CHR-061] item (a) and re-confirmed 2026-08-12 while killing [BUG-071]: mutating
-  // `bulletsOf` (api/_group.js) to drop the string branch kills 0 of 577 tests. `group.test.mjs`'s
-  // "M3" looks like the missing coverage but asserts only Array.isArray, so a mutation returning []
+  // KNOWN WEAK — this fixture is already an array, so the assertion below cannot fail from it:
+  // changing `bulletsOf` (api/_group.js) to drop the string branch fails no test. `group.test.mjs`'s
+  // "M3" looks like the missing coverage but asserts only Array.isArray, so a version returning []
   // passes it while the bullet text is silently discarded.
   //
-  // The stakes are lower than the original comment here claimed. It said a string summary makes
-  // migrateGroupSummaries drop the whole grouping cache on the next boot — that stopped being true
-  // at [BUG-089]: the migration keys off a `v` stamp, never off summary shape, and clears only
+  // The stakes are low: the migration keys off a `v` stamp, never off summary shape, and clears only
   // `summary` while keeping assignments and labels. Every consumer (syncGroupPrune, liveBullets,
   // summaryHtml) guards Array.isArray independently, so a string is inert rather than destructive.
-  // Left as-is deliberately: [CHR-010] (committed mutation check) is the fix for this class.
   const after = await classifyWithServerReply([
     { label: 'US Politics', summary: ['a hearing was scheduled'], item_ids: ['new1'] },
   ]);
@@ -181,11 +176,11 @@ test('a merged topic caches an ARRAY summary, never a string', async () => {
   assert.equal(after.assignments.new1, 'g_us_politics', 'and the post really joined that topic');
 });
 
-// ── BUG-068: the server's topicKey is a hand copy of the browser's groupIdFor ──────
+// ── The server's topicKey is a hand copy of the browser's groupIdFor ───────────────
 // `api/_group.js` cannot import `lib/pure.js` (no api/ module does, and adding that dependency is an
-// architecture call to raise), so the transform exists twice. Two copies that must agree and nothing
-// checking it is how the round-2 HIGH happened in the first place — the server compared raw labels
-// while the browser compared slugs. This runs BOTH functions, the real one lifted out of the running
+// architecture call to raise), so the transform exists twice. Two copies that must agree with nothing
+// checking it is how they drift — the server comparing raw labels
+// while the browser compares slugs. This runs BOTH functions, the real one lifted out of the running
 // app.js, over the spellings that actually differ, and fails the moment either side drifts.
 test('the server-side topicKey matches the browser-side groupIdFor exactly', () => {
   const { ctx } = createApp({ store: {} });

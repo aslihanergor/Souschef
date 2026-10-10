@@ -1,5 +1,5 @@
-// Resend email client (TASK-025). No npm dep — just fetch. Sends the magic-link email.
-// Sends from focus-social.app, a Resend-verified sender domain (verified 2026-07-08), so
+// Resend email client. No npm dep — just fetch. Sends the magic-link email.
+// Sends from focus-social.app, a Resend-verified sender domain, so
 // magic-link emails deliver to anyone — not just the Resend account owner (the earlier
 // onboarding@resend.dev test-mode limitation is gone). `from` must stay on the verified domain.
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';

@@ -1,17 +1,17 @@
-// BUG-047 attempt 4 — refuse a stale write. The SERVER half.
+// Refuse a stale write. The SERVER half.
 //
 // Sync moves from last-write-wins to refuse-a-stale-write. The client echoes an opaque `rev` token
 // it can only have obtained from a pull it applied or a push the server accepted; the server writes
 // only if the row still carries that rev, and otherwise writes NOTHING and answers 409.
 //
-// Every assertion here is on the ROW, not on the status code. Attempt 2 reached review green with a
-// 409 branch that was dead code — asserting the status proves the handler decided something, never
+// Every assertion here is on the ROW, not on the status code. A suite can be green over a
+// 409 branch that is dead code — asserting the status proves the handler decided something, never
 // that the user's channels survived. `snapshot()` before/after is the claim.
 //
 // Two write paths, not one. `api/state.js` upserts when the state carries user data and bare-UPDATEs
-// when it does not, and BOTH replace the whole blob. The BUG-057 control (2026-08-23) measured an
-// empty browser's blob landing through the UPDATE branch onto a populated row, so a guard on the
-// upsert alone would leave the measured wipe path open while criterion 1 read as met.
+// when it does not, and BOTH replace the whole blob. An
+// empty browser's blob can land through the UPDATE branch onto a populated row, so a guard on the
+// upsert alone would leave that wipe path open.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createStateHandler } from '../api/state.js';
@@ -25,7 +25,7 @@ const SESSION    = { accountId: ACCOUNT_ID, email: 'a@example.com' };
 const VICTIM = { channels: [{ id: 'UCvictim', name: 'Victim channel', source: 'youtube' }], done: ['v1', 'v2'] };
 // What an intruding client would write over it. Carries user data, so it takes the UPSERT path.
 const INTRUDER = { channels: [{ id: 'UCintruder', name: 'Intruder', source: 'youtube' }], done: [] };
-// Prefs only — no channels/done/archive, so it takes the bare-UPDATE path (BUG-052 / BUG-057).
+// Prefs only — no channels/done/archive, so it takes the bare-UPDATE path.
 const PREFS_ONLY = { channels: [], done: [], archive: [], theme: 'dark', shorts: null, groups: null };
 
 function mk({ users = [{ kind: 'account', id: ACCOUNT_ID, state: VICTIM }], account = SESSION } = {}) {
@@ -103,8 +103,8 @@ test('S6 a prefs-only PUT with no row creates nothing and says so (BUG-052 prese
 });
 
 test('S7 a prefs-only PUT with a STALE rev cannot empty a populated row', async () => {
-  // The exact shape the BUG-057 control measured: local channels [], a populated account row,
-  // 200 OK, row silently emptied. This is the branch that did it.
+  // The exact shape of the wipe: local channels [], a populated account row,
+  // 200 OK, row silently emptied. This is the branch that does it.
   const a = mk();
   const before = snapshot(row(a.sql));
   const res = await put(a, { state: PREFS_ONLY }, { 'x-state-rev': '2020-01-01T00:00:00.000000' });
@@ -129,7 +129,7 @@ test('S9 a rev taken from a real response matches on the NEXT write (the round-t
   let { rev } = (await get(a)).body;
   for (let i = 0; i < 3; i++) {
     // Non-vacuity guard. Without it `rev` is `undefined` at every step, every write is accepted for
-    // reasons unrelated to the token, and the loop asserts nothing at all — the [BUG-091] shape.
+    // reasons unrelated to the token, and the loop asserts nothing at all.
     assert.equal(typeof rev, 'string', `round ${i} must carry a real base, not undefined`);
     const res = await put(a, { state: { ...INTRUDER, done: [`v${i}`] } }, { 'x-state-rev': rev });
     assert.equal(res.statusCode, 200, `write ${i} must be accepted`);
@@ -182,9 +182,9 @@ test('S13 a rev is ignored entirely on an events-only PUT', async () => {
 });
 
 test('S14 a prefs-only PUT with NO rev cannot empty a populated row either', async () => {
-  // The sibling of S7, and the gap M4 exposed: S7 covered a STALE base, nothing covered NO base.
-  // Both reach the same bare-UPDATE branch, and it is the branch the BUG-057 control measured an
-  // empty browser emptying a real row through. A guard that only catches the stale case leaves the
+  // The sibling of S7: S7 covers a STALE base, this covers NO base.
+  // Both reach the same bare-UPDATE branch, and it is the branch an
+  // empty browser can empty a real row through. A guard that only catches the stale case leaves the
   // commoner one — a browser that never read the row at all — wide open.
   const a = mk();
   const before = snapshot(row(a.sql));
@@ -248,7 +248,7 @@ test('S18 a malformed base may still CREATE — "no base" is weaker, never stron
   // Anything absent, empty or not a string is "no base declared", and a no-base write may create but
   // never overwrite. So a client sending a mangled header must still be able to claim an empty
   // namespace — refusing it there would be a denial of service to a client that has done nothing
-  // wrong, which is the consequence review round 4's R21 predicted.
+  // wrong.
   const empty = mk({ users: [] });
   const res = await put(empty, { state: INTRUDER }, { 'x-state-rev': ['a', 'b'] });
   assert.equal(res.statusCode, 200, 'a malformed base must not stop a legitimate CREATE');

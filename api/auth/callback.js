@@ -1,4 +1,4 @@
-// GET /api/auth/callback?token=…  → verify the magic link, open a session, redirect home (TASK-025).
+// GET /api/auth/callback?token=…  → verify the magic link, open a session, redirect home.
 // Atomic single-use: the token is claimed only if unused AND unexpired, in one UPDATE.
 import { db } from '../_db.js';
 import {
@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'method not allowed' });
   }
-  const fail = () => res.redirect(302, '/app?auth=invalid'); // app lives at /app (TASK-069)
+  const fail = () => res.redirect(302, '/app?auth=invalid'); // app lives at /app
 
   const raw = req.query?.token;
   if (!raw || typeof raw !== 'string') return fail();

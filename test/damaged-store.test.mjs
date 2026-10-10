@@ -1,12 +1,11 @@
-// [BUG-051] attempt 2 — a store with an unreadable value makes the app READ-ONLY until it heals.
+// A store with an unreadable value makes the app READ-ONLY until it heals.
 //
-// Attempt 1 coerced unreadable values to empty at the READER and guarded only the PUSH. Three
-// independent reviewers found four routes destroying data `main` preserves, every one the same
-// shape: a coerced empty is indistinguishable from a genuinely empty store, and it flows into a
-// decision the push guard never sees. So the predicate moves to the WRITE boundary and to every
+// Coercing unreadable values to empty at the READER and guarding only the PUSH is not enough:
+// a coerced empty is indistinguishable from a genuinely empty store, and it flows into
+// decisions the push guard never sees. So the predicate sits at the WRITE boundary and at every
 // destructive decision, rather than being repeated per leak.
 //
-// MEASURED BASELINE, 2026-09-10, against this branch's parent — each case booted signed-in with one
+// MEASURED BASELINE, without the guard — each case booted signed-in with one
 // key changed at a time. `views` is `visibleViews()`; `threw` is what escaped `init()`:
 //
 //   corrupt channels          []               SyntaxError                  ← blank page
@@ -20,17 +19,16 @@
 //   empty-string channels     ["view-setup"]   —                            ← laundered to "absent"
 //   corrupt tweet_cache       ["view-setup"]   —                            ← survives
 //
-// Two of those rows are NOT in the task file and were found by running the probe rather than by
-// reading: a `null` element blanks the boot outright (the task lists it only under "no channel is
-// ever dropped"), and the empty string does NOT blank it — it is silently read as absent, which is
-// the [BUG-052] laundering path and is why criterion 4 exists.
+// Two of those rows are easy to miss: a `null` element blanks the boot outright, and the empty
+// string does NOT blank it — it is silently read as absent, which launders damage into an empty
+// store and is why the empty string is treated as a corrupt value.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createApp } from '../test-helpers/app-harness.mjs';
 
 // A signed-in browser whose every protected key is readable and NON-EMPTY where that matters.
-// `focus_last_view` is deliberately NOT 'setup': criterion 1 turns on `noContent || lastView ===
+// `focus_last_view` is deliberately NOT 'setup': the boot's view decision turns on `noContent || lastView ===
 // 'setup'`, and seeding 'setup' makes both terms answer the same, so neither would be pinned.
 const HEALTHY = {
   focus_device_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
@@ -63,10 +61,10 @@ const noRow = async (u, init = {}) => {
   u = String(u);
   if (u.includes('/api/auth/me')) return { ok: true, status: 200, json: async () => ({ email: 'a@example.com' }) };
   // The PUT must answer like an ACCEPTED write. Answering it with the same no-row body makes the
-  // client read `updatedAt: null` as DISCARDED ([BUG-057]) — so every push reports failure and the
+  // client read `updatedAt: null` as DISCARDED — so every push reports failure and the
   // sign-out control below refuses on a perfectly healthy store, for a reason that has nothing to
-  // do with this task. Caught by that control failing; recorded because a fixture that manufactures
-  // the condition under test is how attempt 1 reported a branch it never actually reached.
+  // do with damage. A fixture that manufactures
+  // the condition under test reports a branch it never actually reached.
   if (u.includes('/api/state') && (init.method || 'GET') === 'PUT') {
     return { ok: true, status: 200, json: async () => ({ updatedAt: '2026-01-01T00:00:00.000Z', rev: 'r-put' }) };
   }
@@ -92,7 +90,7 @@ const rows = (app) => app.el('channel-list').children.map(c => c.innerHTML).join
 /** Settle the microtask queue so an un-awaited push resolves before we read the requests. */
 const settle = async () => { for (let i = 0; i < 6; i++) await new Promise(r => setImmediate(r)); };
 
-// ── criterion 1 — no corrupt synced key blanks the boot ──────────────────────
+// ── No corrupt synced key blanks the boot ────────────────────────────────────
 // The identity, not the length: "some view rendered" would pass on the feed, which is the wrong
 // answer for a store whose channels cannot be read.
 
@@ -114,7 +112,7 @@ test('c1 non-array channels: a parseable wrong shape renders setup instead of bl
 });
 
 test('c1 null element: a null inside the channels array does not blank the boot', async () => {
-  // Not in the task file — found by probing. `getChannels`' map reads `ch.source` off every element.
+  // `getChannels`' map reads `ch.source` off every element.
   const app = createApp({ store: { ...HEALTHY, focus_channels: '[{"id":"UC_a","name":"A"},null]', focus_archive: '[]' }, fetch: noRow });
   await assert.doesNotReject(() => app.ctx.init(), 'init() must survive a null channel element');
   assert.deepEqual(app.visibleViews(), ['view-feed'], 'one readable channel is still content');
@@ -132,9 +130,9 @@ test('c1 [BUG-117]: an archived item carrying no channel renders without throwin
   assert.deepEqual(app.visibleViews(), ['view-archive']);
 });
 
-// ── criterion 2 — no coerced-empty value is ever PERSISTED ───────────────────
-// Asserted on the STORED BYTES. Attempt 1's equivalent counted through `getChannels()` — the very
-// function doing the coercing — so it could not see the drop it was written to catch.
+// ── No coerced-empty value is ever PERSISTED ─────────────────────────────────
+// Asserted on the STORED BYTES. Counting through `getChannels()` — the very
+// function doing the coercing — could not see the drop this is written to catch.
 
 test('c2 saveChannels: a write derived from a coerced read never reaches the store', async () => {
   const app = await boot({ focus_channels: CORRUPT, focus_archive: '[]' });
@@ -170,11 +168,11 @@ test('c2 cross-key: damage in ONE key stops the writers that touch the OTHERS', 
   assert.equal(app.get('focus_channels'), before, 'a corrupt `done` must stop a channels write too');
 });
 
-// ── criterion 3 — no coerced-empty value is ever PUSHED, for all FOUR keys ───
-// Attempt 1 fixtured this on `channels` alone; dropping `done`, `archive` or `groups` from the
-// unreadable set survived its entire suite. One test per key.
+// ── No coerced-empty value is ever PUSHED, for all FOUR keys ─────────────────
+// A fixture on `channels` alone would let `done`, `archive` or `groups` be dropped from the
+// unreadable set unnoticed. One test per key.
 //
-// Each also asserts a PUT still WENT OUT. That is survivor E1: refusing instead of downgrading
+// Each also asserts a PUT still WENT OUT: refusing instead of downgrading
 // takes analytics from 3 events to none, so a corrupt-store session stops reporting entirely.
 
 for (const [key] of SYNCED) {
@@ -189,21 +187,20 @@ for (const [key] of SYNCED) {
     const sent = puts(app).slice(before);
     assert.equal(sent.length, 1, 'exactly one PUT — a downgrade, not a refusal');
     assert.ok(!('state' in sent[0]), `the body must omit \`state\` entirely when ${key} is unreadable`);
-    // NON-VACUOUS after review. This was `assert.ok(Array.isArray(sent[0].events))`, which cannot
+    // NON-VACUOUS on purpose. `assert.ok(Array.isArray(sent[0].events))` cannot
     // fail for ANY input: `_pushNow` always includes the key and `_readEvents()` always returns an
-    // array. Demonstrated by an auditor — blinding `_readEvents` to `[]` left all four of these
-    // green. It now seeds a real event and asserts THAT event rode the downgraded push, which is
-    // the quantity survivor E1 actually names.
+    // array, so blinding `_readEvents` to `[]` would stay green.
+    // This seeds a real event and asserts THAT event rode the downgraded push.
     assert.ok(sent[0].events.some(e => e && e.name === 'view'),
       `the buffered event must ride the downgraded push: ${JSON.stringify(sent[0].events)}`);
   });
 }
 
-// ── criterion 4 — the empty string is a corrupt value ────────────────────────
+// ── The empty string is a corrupt value ──────────────────────────────────────
 
 test('c4: an empty-string value is unreadable, not absent', async () => {
   // The residue of a quota-aborted write. `raw === null` reads it as "this key was never set", which
-  // is exactly the [BUG-052] path: an empty state PUT over a row holding the user's real channels.
+  // ends in an empty state PUT over a row holding the user's real channels.
   // Mutating the guard to `!raw` must red here.
   const app = await boot();
   const before = puts(app).length;
@@ -225,20 +222,19 @@ test('c4b: an ABSENT key is not damage — a fresh install must still be able to
   assert.ok(String(app.get('focus_channels')).includes('UC_new'), 'a fresh store must accept writes');
 });
 
-// ── criterion 5 — the reconcile branch does not clear dirty on an untrusted comparison ──
-// Across TWO boots, because the damage attempt 1 did here only became visible on the second one:
-// it cleared `dirty`, re-based, and the NEXT boot pulled the row down over the damaged key.
+// ── The reconcile branch does not clear dirty on an untrusted comparison ─────
+// Across TWO boots, because the damage only becomes visible on the second one: a reconcile that
+// clears `dirty` and re-bases lets the NEXT boot pull the row down over the damaged key.
 
 test('c5: an untrusted comparison leaves dirty set and the base unchanged, across two boots', async () => {
-  // FIXTURE SIZED SO ONLY THE GUARD UNDER TEST CAN FIRE, and it was not at first: the row held
-  // channels that differed from local, so `sameSyncedState` answered false for a reason that had
-  // nothing to do with the damage, and the test passed whether or not the guard existed. The author
-  // battery found it — M27 recreated attempt 1's route 1 and SURVIVED.
+  // FIXTURE SIZED SO ONLY THE GUARD UNDER TEST CAN FIRE: if the row held
+  // channels that differed from local, `sameSyncedState` would answer false for a reason that had
+  // nothing to do with the damage, and the test would pass whether or not the guard existed.
   //
   // The row below is byte-for-byte what a COERCING read of this store would produce: `done` is the
-  // damaged key, so its coerced value is `[]`, and every other key matches local exactly. Attempt
-  // 1's measured damage needs exactly that — it compared coerced empties to the row, MATCHED,
-  // cleared `dirty` and re-based with no push, and the next boot overwrote the damaged key.
+  // damaged key, so its coerced value is `[]`, and every other key matches local exactly. The
+  // damage needs exactly that — an unguarded reconcile compares coerced empties to the row, MATCHES,
+  // clears `dirty` and re-bases with no push, and the next boot overwrites the damaged key.
   const ROW = {
     state: {
       channels: JSON.parse(HEALTHY.focus_channels),
@@ -273,7 +269,7 @@ test('c5: an untrusted comparison leaves dirty set and the base unchanged, acros
   assert.equal(two.get('focus_dirty'), '1', 'and dirty must still assert the un-pushed work');
 });
 
-// ── criterion 6 — sign-out refuses rather than wipes ─────────────────────────
+// ── Sign-out refuses rather than wipes ───────────────────────────────────────
 
 test('c6: sign-out on a damaged store refuses, navigates nowhere and keeps the bytes', async () => {
   const app = await boot({ focus_channels: CORRUPT, focus_archive: '[]' });
@@ -286,14 +282,14 @@ test('c6: sign-out on a damaged store refuses, navigates nowhere and keeps the b
 
 test('c6b: sign-out still WORKS on a healthy store', async () => {
   // The non-vacuity control. Without it "sign-out refused" passes just as well on a guard that
-  // refuses always, which is the wedge the task names as a risk.
+  // refuses always, which would wedge the exit path.
   const app = await boot();
   await app.ctx.signOut();
   await settle();
   assert.equal(app.navigations.at(-1), '/app', 'a healthy sign-out must complete');
 });
 
-// ── criterion 7 — exportData never hands over a confident empty backup ───────
+// ── exportData never hands over a confident empty backup ─────────────────────
 
 const noServer = async (u) => {
   u = String(u);
@@ -303,10 +299,9 @@ const noServer = async (u) => {
 };
 
 test('c7: an export from a damaged store is partial and SAYS so, never silently short', async () => {
-  // AMENDED after independent review. The first version asserted NO file was offered, which met the
-  // criterion's letter and broke its spirit: with one key of four damaged this branch handed over
-  // nothing while `main` handed over a file carrying the channels and every read mark. Export is
-  // the user's own preservation action. What criterion 7 forbids is a CONFIDENT EMPTY — a backup
+  // Offering NO file would be wrong too: with one key of four damaged the user would get
+  // nothing, where a file could still carry the channels and every read mark. Export is
+  // the user's own preservation action. What is forbidden is a CONFIDENT EMPTY — a backup
   // whose damaged key is silently absent and is filed away as complete — so the fix is to name the
   // gap in the file, not to withhold the file.
   const app = createApp({ store: { ...HEALTHY, focus_channels: CORRUPT }, fetch: noServer });
@@ -337,11 +332,11 @@ test('c7b: a healthy export with no server still produces the local file', async
   assert.ok(files[0].text.includes('UC_a'), 'and must carry the real channels');
 });
 
-// ── criterion 8 — a read-time repair is never written back ───────────────────
+// ── A read-time repair is never written back ─────────────────────────────────
 
 test('c8: the display name for a nameless channel never reaches the store, across two boots', async () => {
-  // Attempt 1's repair fell through to `ch.id`, which MATCHES migrateChannelNames' broken-name
-  // regex — so it was persisted and re-pushed on every boot, forever.
+  // A repair that falls through to `ch.id` MATCHES migrateChannelNames' broken-name
+  // regex — so it would be persisted and re-pushed on every boot, forever.
   const stored = '[{"id":"UC_aaaaaaaaaaaaaaaaaaaaaa"}]';
   const one = await boot({ focus_channels: stored, focus_archive: '[]', focus_last_view: 'setup' });
   await settle();
@@ -352,10 +347,10 @@ test('c8: the display name for a nameless channel never reaches the store, acros
   await settle();
   assert.equal(two.get('focus_channels'), stored, 'boot 2 must not either');
 
-  // AND the general path, not just migrateChannelNames'. The two boots above only cover the route
-  // attempt 1 happened to take (a repair that matched the broken-name regex); routing ANY display
+  // AND the general path, not just migrateChannelNames'. The two boots above only cover one
+  // route (a repair that matches the broken-name regex); routing ANY display
   // name into the object `getChannels` returns persists it the next time the user edits or removes
-  // a different channel. The author battery's M42 survived the two-boot half and is killed here.
+  // a different channel.
   //
   // Asserted on the absence of a `name` key rather than on byte identity, because `getChannels`
   // ALREADY adds `source` at read time and that one is written back — pre-existing, and now
@@ -366,18 +361,17 @@ test('c8: the display name for a nameless channel never reaches the store, acros
     `a display name must never be persisted: ${one.get('focus_channels')}`);
 });
 
-// ── criterion 9 — no channel is ever dropped ─────────────────────────────────
+// ── No channel is ever dropped ───────────────────────────────────────────────
 
 test('c9: a non-object element is never DROPPED by a read/write round trip', async () => {
   // A dropping READ is invisible until something WRITES the result back, which is exactly how a
   // channel would be lost in the field: the user edits or removes a different channel, and
-  // `saveChannels(getChannels()…)` persists the shortened array. The first version of this test
-  // only booted and counted, so the author battery's M31 — the tempting `.filter(ch && typeof ch
-  // === 'object')` fix — SURVIVED it.
-  // NAME CORRECTED after review: the element is not preserved verbatim — the round trip rewrites
+  // `saveChannels(getChannels()…)` persists the shortened array. Booting and counting alone
+  // would not see the tempting `.filter(ch && typeof ch === 'object')` fix.
+  // The element is not preserved verbatim — the round trip rewrites
   // `null` as `{"source":"youtube"}`, because `getChannels` adds the source default at read time
-  // (pre-existing, and now documented at that function). What criterion 9 demands, and what this
-  // asserts, is that the SLOT is never deleted: three in, three out.
+  // (documented at that function). What this
+  // asserts is that the SLOT is never deleted: three in, three out.
   const stored = '[{"id":"UC_a","name":"Alpha"},null,{"id":"UC_b","name":"Beta"}]';
   const app = await boot({ focus_channels: stored, focus_archive: '[]', focus_last_view: 'setup' });
   await settle();
@@ -387,7 +381,7 @@ test('c9: a non-object element is never DROPPED by a read/write round trip', asy
     'counted on the STORED value: a read that drops an element loses it on the next write');
 });
 
-// ── criterion 10 — getTweetCache must not reset the cache ────────────────────
+// ── getTweetCache must not reset the cache ───────────────────────────────────
 
 test('c10: a corrupt tweet cache reads as empty but is never overwritten by that empty', async () => {
   // For a pay-per-post source, persisting the reset erases every other channel's cached posts and
@@ -398,10 +392,10 @@ test('c10: a corrupt tweet cache reads as empty but is never overwritten by that
   assert.equal(app.get('focus_tweet_cache'), CORRUPT, 'but the STORE keeps its bytes');
 });
 
-// ── criterion 11 — wrong-shaped-but-parseable is damage ──────────────────────
+// ── Wrong-shaped-but-parseable is damage ─────────────────────────────────────
 
 test('c11: a parseable non-array in focus_channels never reaches the server', async () => {
-  // Asli's call, 2026-09-10: inside the guard. On `main` this object is pushed verbatim and destroys
+  // Without the guard this object is pushed verbatim and destroys
   // the row's real channels.
   const app = await boot();
   const before = puts(app).length;
@@ -414,7 +408,7 @@ test('c11: a parseable non-array in focus_channels never reaches the server', as
   assert.ok(!('state' in sent[0]), 'a wrong shape must suppress the state claim like any other damage');
 });
 
-// ── criterion 12 — healthy state is byte-identical, and no repair fires ──────
+// ── Healthy state is byte-identical, and no repair fires ─────────────────────
 
 test('c12: a healthy boot leaves every protected key byte-identical', async () => {
   const app = await boot();
@@ -437,7 +431,7 @@ test('c12b: a healthy push still carries the real state', async () => {
 });
 
 test('c12c: a channel carrying BOTH name and title displays the name', async () => {
-  // Survivor C13 — a precedence inversion shows the wrong name for every channel that has both.
+  // A precedence inversion shows the wrong name for every channel that has both.
   const app = await boot({ focus_channels: '[{"id":"UC_a","name":"RealName","title":"WrongTitle"}]', focus_last_view: 'setup' });
   const html = rows(app);
   assert.ok(html.includes('RealName'), 'the stored name must win');
@@ -445,15 +439,14 @@ test('c12c: a channel carrying BOTH name and title displays the name', async () 
 });
 
 test('c12d: a channel with neither name nor title falls back to a readable label', async () => {
-  // Survivor C12 — an empty final fallback renders a blank row and an empty avatar letter.
+  // An empty final fallback renders a blank row and an empty avatar letter.
   const app = await boot({ focus_channels: '[{"id":"UC_a"}]', focus_archive: '[]', focus_last_view: 'setup' });
   const html = rows(app);
   assert.ok(html.includes('Channel'), `expected a fallback label, got: ${html.slice(0, 200)}`);
 });
 
-// ── criteria 13-16 — the damaged-store notice ───────────────────────────────
-// IN SCOPE by decision (Asli, 2026-09-10: "include the notice"). Its purpose changed with the
-// design and that matters for what it must say. Under attempt 1 it would have been a SAFETY
+// ── The damaged-store notice ─────────────────────────────────────────────────
+// Its purpose matters for what it must say. It is not a SAFETY
 // control — the thing between the user and a destructive action. Under read-only the predicate
 // already prevents the destruction, so this is a COMPREHENSION control: without it the user faces
 // an app that looks empty and silently refuses to accept a new channel, which reads as "the app is
@@ -461,10 +454,8 @@ test('c12d: a channel with neither name nor title falls back to a readable label
 //
 // INLINE, not a toast, and that is settled precedent rather than preference: `_pushNow`'s halt
 // guard records in app.js that a paused-sync condition "is a STATE, not an event, and the toast
-// auto-hides at 5s", and [BUG-047]'s attempt 3 shipped a notice that appeared once and then
-// no-opped in silence, which four reviewers found independently. (ATTRIBUTION CORRECTED after
-// independent review — this credited the sentence to `_showSyncConflict`, which does not contain
-// it. The precedent is real; the source named was not.)
+// auto-hides at 5s", and a notice that appears once and then
+// no-ops in silence leaves the user with no explanation.
 
 const notice = (app, view = 'setup') => app.el(`damaged-notice-${view}`);
 const noticeShown = (app, view = 'setup') => !notice(app, view).classList.contains('hidden');
@@ -566,8 +557,8 @@ test('c16: a signed-in user with NO server row is not told their data is safe in
   // It is not. The local copy is the only one there ever was, and it is unreadable.
   const app = await boot({ focus_channels: CORRUPT, focus_archive: '[]' });   // noRow answers updatedAt: null
   assert.ok(noticeShown(app), 'precondition: the notice is up');
-  // STRENGTHENED from a three-alternation phrase match to the whole word. The narrow version was
-  // the [BUG-115] shape — a regex a copy edit could slip past while still promising the account has
+  // Matches the whole word, not a three-alternation phrase: the narrow version is
+  // a regex a copy edit could slip past while still promising the account has
   // it. Paired with c16b, which asserts the with-row copy DOES say "account", so this cannot pass
   // on a notice that never mentions anything.
   assert.ok(!/account/i.test(noticeText(app)),
@@ -614,12 +605,11 @@ test('c13d: the notice appears on the FEED as well as setup', async () => {
   assert.ok(noticeText(app, 'feed').length > 0);
 });
 
-// ── gaps the author battery found, closed ───────────────────────────────────
-// Each of these was a mutation that SURVIVED the first run of mutations/BUG-051.mjs. They are here
-// because the battery measured them, not because they were reasoned about afterwards.
+// ── Gaps found by mutation, closed ──────────────────────────────────────────
+// Each of these pins a guard that a mutation showed nothing else covered.
 
 test('c1g: a PARSEABLE non-array in focus_done does not blank the boot', async () => {
-  // Survivor C14, and battery M13. `new Set({a:1})` throws "is not iterable", so a wrong SHAPE is
+  // `new Set({a:1})` throws "is not iterable", so a wrong SHAPE is
   // just as fatal on the boot path as unparseable bytes — and the c1 fixtures were all unparseable,
   // so nothing pinned the shape half of the guard.
   const app = createApp({ store: { ...HEALTHY, focus_channels: '[]', focus_archive: '[]', focus_done: '{"a":1}' }, fetch: noRow });
@@ -628,7 +618,7 @@ test('c1g: a PARSEABLE non-array in focus_done does not blank the boot', async (
 });
 
 test('c10c: an ARRAY in the tweet cache is damage, not a cache', async () => {
-  // Survivor C16, battery M14. `store[ch.id] = merged` on an array builds a hybrid that
+  // `store[ch.id] = merged` on an array builds a hybrid that
   // re-serialises as an array, silently losing every keyed entry.
   const app = await boot({ focus_tweet_cache: '[1,2]' });
   // Compared field-by-field, not with deepEqual: objects built inside the vm carry that realm's
@@ -641,40 +631,34 @@ test('c10c: an ARRAY in the tweet cache is damage, not a cache', async () => {
 });
 
 test('c2b removeDone: the Undo path is guarded too', async () => {
-  // Battery M17. `removeDone` rewrites the WHOLE done array from a read, exactly as addDone does,
-  // and the To-be list names it — but no criterion had its own test, so the guard was unpinned.
+  // `removeDone` rewrites the WHOLE done array from a read, exactly as addDone does,
+  // so it needs its own test or the guard is unpinned.
   const app = await boot({ focus_channels: CORRUPT, focus_archive: '[]' });
   app.ctx.removeDone(['v1']);
   assert.equal(app.get('focus_done'), HEALTHY.focus_done, 'Undo must not rewrite done from a damaged store');
 });
 
 test('c2c saveGroupState: the write that fires with no user action at all is guarded', async () => {
-  // Battery M19, and the one most likely to land unnoticed: the async /api/group resolve calls this
+  // The one most likely to land unnoticed: the async /api/group resolve calls this
   // on its own cadence, so it fires on a damaged store while the user is doing nothing.
   const app = await boot({ focus_channels: CORRUPT, focus_archive: '[]' });
   app.ctx.saveGroupState({ assignments: { x: 'g9' }, groups: { g9: { label: 'New' } }, unfiled: [] });
   assert.equal(app.get('focus_groups'), HEALTHY.focus_groups, 'a classify must not overwrite groups on a damaged store');
 });
 
-// ── Findings from the independent review round, 2026-09-10 ──────────────────
-// Each of these was found by a reviewer with no access to the author's reasoning, and each is a
-// defect in THIS branch rather than a gap in its tests. They are grouped here so the round that
-// found them stays legible.
+// ── Further damage classes and paths ────────────────────────────────────────
 
 test('r1: the reconcile branch is guarded for EVERY damage class, not just unparseable bytes', async () => {
-  // CONFIRMED DATA LOSS, reproduced before it was fixed. Criterion 5 rested entirely on
-  // `collectSyncedState` THROWING inside syncOnLoad's try — a decision taken deliberately, on the
-  // argument that an added term would be unpinnable belt-and-braces. That argument holds only for
+  // A DATA-LOSS path. Relying on
+  // `collectSyncedState` THROWING inside syncOnLoad's try holds only for
   // unparseable bytes: `collectSyncedState` reads `getItem(k) || '[]'`, so the EMPTY STRING coerces
-  // to `[]` and never throws. Measured on this branch before the fix, with `focus_done: ''`,
+  // to `[]` and never throws. Measured without the explicit guard, with `focus_done: ''`,
   // `dirty: '1'` and a row byte-equal to a coercing read:
   //
   //     unparseable   dirty "1"   rev r-local    1 PUT     ← guarded
-  //     empty string  dirty null  rev r-server   0 PUTs    ← attempt 1's route 1, reopened
+  //     empty string  dirty null  rev r-server   0 PUTs    ← the row overwrites the damaged key
   //     wrong shape   dirty "1"   rev r-local    1 PUT     ← safe only because sameSyncedState
   //                                                          happened to answer false
-  //
-  // The author's own battery could not see it: M27 mutates the READER, not this path.
   const ROW = {
     state: { channels: JSON.parse(HEALTHY.focus_channels), done: [], archive: [],
              theme: 'dark', shorts: 'false', groups: JSON.parse(HEALTHY.focus_groups) },
@@ -696,8 +680,8 @@ test('r1: the reconcile branch is guarded for EVERY damage class, not just unpar
     assert.equal(app.get('focus_rev'), 'r-local', `${label}: the base must not move`);
     assert.equal(app.get('focus_done'), val, `${label}: the damaged bytes must be left alone`);
     // ...and the boot must still have PUSHED. Marking the reconcile "done" in the catch would keep
-    // `dirty` and the base correct while silently dropping the events-only push — survivor E1's
-    // hazard on the one branch the c3 fixtures never take. (Independent battery, E02.)
+    // `dirty` and the base correct while silently dropping the events-only push —
+    // on the one branch the c3 fixtures never take.
     assert.ok(puts(app).length >= 1, `${label}: a damaged dirty boot must still drain analytics`);
   }
 });
@@ -774,10 +758,9 @@ test('r5: a refused write is never reported to the user as a success', async () 
 });
 
 test('r6: the FEED notice element really exists in the markup', async () => {
-  // Two independent reviewers found this: `c13d` cannot pin it. The harness mints a stub for any
+  // `c13d` cannot pin this. The harness mints a stub for any
   // getElementById id, so `noticeShown(app, 'feed')` answers from a phantom whether the element is
-  // in app/index.html or not — the author battery's M05 (delete the feed notice) was killed only by
-  // docs.test.mjs's HIDDEN_IDS mirror, and its predicted killer c13d never fired.
+  // in app/index.html or not.
   const html = await readFile(new URL('../app/index.html', import.meta.url), 'utf8');
   for (const id of ['damaged-notice-feed', 'damaged-notice-feed-text', 'damaged-heal-feed',
                     'damaged-notice-setup', 'damaged-notice-setup-text', 'damaged-heal-setup',
@@ -806,10 +789,10 @@ test('r7: a theme tap on a damaged store neither writes nor arms a push', async 
 
 test('r8: an ordinary boot never deletes damaged bytes — only a consented repair does', async () => {
   // The repair sweep was on the boot path, so a routine pull silently `removeItem`d user bytes with
-  // no action, no notice and nothing said. Measured by an independent reviewer against a `main`
-  // control: a `focus_channels` holding `{"UC_a":{"name":"Alpha"}}` parses fine, still spells out a
-  // readable channel name, and was deleted where `main` keeps every byte — and [BUG-059]'s standing
-  // recovery order works by reading exactly those bytes in devtools.
+  // no action, no notice and nothing said.
+  // A `focus_channels` holding `{"UC_a":{"name":"Alpha"}}` parses fine, still spells out a
+  // readable channel name, and must not be deleted — manual recovery
+  // works by reading exactly those bytes in devtools.
   const ROW = { state: { done: [], archive: [], groups: null },   // deliberately carries NO channels
     updatedAt: '2026-01-01T00:00:00.000Z', rev: 'r-server', kind: 'account' };
   const withRow = async (u, init = {}) => {
@@ -835,8 +818,8 @@ test('r8: an ordinary boot never deletes damaged bytes — only a consented repa
 });
 
 test('c10d: a HEALTHY tweet cache is still written while a synced key is damaged', async () => {
-  // Found by the battery, not by reading: M50 restores the over-broad guard and `c10b` did NOT
-  // kill it. c10b damages the CACHE and checks a channels write; nothing exercised the reverse —
+  // An over-broad guard is invisible to `c10b`.
+  // c10b damages the CACHE and checks a channels write; nothing exercised the reverse —
   // a readable cache while a synced key is damaged, which is the case that costs money. X is
   // pay-per-post, so blocking this makes the feed re-fetch every post on every load for as long
   // as read-only mode lasts.
@@ -846,12 +829,11 @@ test('c10d: a HEALTHY tweet cache is still written while a synced key is damaged
     'the cache is device-local and never uploaded, so damage elsewhere must not block it');
 });
 
-// ── The targeted repair (Asli, 2026-09-10: "do all three") ──────────────────
-// The notice's action used to be `adoptServerCopy`, which replaces EVERY key the row carries. With
+// ── The targeted repair ──────────────────────────────────────────────────────
+// The notice's action is not `adoptServerCopy`, which replaces EVERY key the row carries. With
 // `dirty` set — and that IS the affected population, because a clean boot auto-heals — one tap
-// discarded readable un-pushed work in the keys that were never damaged. An independent reviewer
-// measured 50 read marks going to 0 where `main` keeps all 50. Disclosing it in the copy was the
-// interim fix; repairing only what is broken is the real one.
+// would discard readable un-pushed work in the keys that were never damaged (50 read marks
+// going to 0). The repair replaces only what is broken.
 
 const ROWFULL = {
   state: { channels: [{ id: 'UC_row', name: 'Row' }], done: ['v-row'], archive: [], groups: null },
@@ -917,13 +899,13 @@ test('r11: a repair that cannot reach the server changes nothing at all', async 
 test('r12: the repair refuses a row from the wrong namespace', async () => {
   // The hardening `adoptServerCopy` carries must not be lost by the new path: `api/_session.js`
   // returns null on a DB blip as well as on expiry, so this GET can silently resolve to the DEVICE
-  // namespace while the user is signed in ([BUG-047] must-fix B).
+  // namespace while the user is signed in.
   // `focus_dirty` so syncOnLoad takes the KEEP-LOCAL branch and never applies the row itself —
-  // without it the boot healed the store before the click, and this passed on a store the repair
-  // had never touched. (This comment used to add that syncOnLoad does not check `kind`; since
-  // [BUG-063] it does, and refuses this device answer to a signed-in user at boot too. `focus_dirty`
-  // is kept anyway: it keeps this test independent of that boot check, so the click still exercises
-  // only the repair's own refusal. Comment corrected with Asli's approval, 2026-09-11.)
+  // without it the boot would heal the store before the click, and this would pass on a store the repair
+  // had never touched. (syncOnLoad checks `kind` too,
+  // and refuses this device answer to a signed-in user at boot. `focus_dirty`
+  // keeps this test independent of that boot check, so the click still exercises
+  // only the repair's own refusal.)
   const wrongKind = { ...ROWFULL, kind: 'device' };
   const app = await boot({ focus_channels: CORRUPT, focus_archive: '[]', focus_dirty: '1' }, rowFetch(wrongKind));
   app.click(app.el('damaged-heal-setup'));
@@ -955,8 +937,8 @@ test('r14: the repair and applySyncedState agree on which rows are acceptable', 
 });
 
 test('r15: adopting the saved copy also clears a damaged key the row cannot replace', async () => {
-  // Exposed by the battery: once the notice's action moved off `adoptServerCopy`, nothing
-  // exercised THAT path's own clearing any more, and M40 started surviving. It still matters —
+  // The notice's action does not go through `adoptServerCopy`, so nothing else
+  // exercises THAT path's own clearing. It still matters —
   // `adoptServerCopy` is the sync-conflict affordance and claims to leave the user on the saved
   // copy, so leaving them read-only afterwards would make "Using the saved copy" a false report.
   const ROW = { state: { channels: [{ id: 'UC_row', name: 'Row' }], done: [], archive: [], groups: null },
@@ -970,16 +952,13 @@ test('r15: adopting the saved copy also clears a damaged key the row cannot repl
   assert.equal(app.get('focus_dirty'), null, 'an adopt DOES clear dirty — unlike the targeted repair');
 });
 
-// ── Findings from the INDEPENDENT mutation battery, 2026-09-10 ─────────────
-// 108 mutations, 65 killed, 43 survived — against an author battery reporting 53/59 on the same
-// code. That ratio is the whole argument for this step: a battery inherits the blind spot of the
-// tests it checks, so its own number measures imagination rather than coverage.
+// ── Shape checks, mid-session damage and the way back to the feed ───────────
 
 test('r16: a wrong-shaped focus_archive does not blank the boot', async () => {
-  // THE WORST SURVIVOR, and it is the defect this task exists to remove. Neutering the archive
-  // shape check gives `visibleViews() === []` and `getArchive(...).map is not a function` — with
-  // all 1214 tests green. Every archive fixture in the suite was UNPARSEABLE, so the SHAPE half of
-  // the guard was pinned for `channels` and `done` and for neither of the other two.
+  // Neutering the archive
+  // shape check gives `visibleViews() === []` and `getArchive(...).map is not a function` —
+  // a blank page. Every other archive fixture in the suite is UNPARSEABLE, so without this the SHAPE half of
+  // the guard is pinned for `channels` and `done` and for neither of the other two.
   const app = createApp({ store: { ...HEALTHY, focus_channels: '[]', focus_archive: '{"a":1}' }, fetch: noRow });
   await assert.doesNotReject(() => app.ctx.init(), 'a non-array archive must not take down the boot');
   assert.deepEqual(app.visibleViews(), ['view-setup']);
@@ -987,7 +966,7 @@ test('r16: a wrong-shaped focus_archive does not blank the boot', async () => {
 
 test('r17: a wrong-shaped focus_groups is damage, and never reaches the row', async () => {
   // The same hole, milder: no blank page, but read-only lapses, the notice disappears, writes land
-  // and `collectSyncedState` PUTs the wrong shape at the account row — criterion 11's named hazard.
+  // and `collectSyncedState` PUTs the wrong shape at the account row.
   const app = await boot({ focus_groups: '[]', focus_channels: '[]', focus_archive: '[]' });
   assert.ok(noticeShown(app), 'a parseable wrong shape is damage like any other');
   const before = puts(app).length;
@@ -1033,8 +1012,8 @@ test('r21: damage appearing MID-SESSION raises the notice on the next refused wr
   // Why `refuseWrite()` repaints at all. Every other repaint hangs off a view change or a channel
   // -list render, so nothing covered the case the notice most needs to handle: a healthy boot, a
   // quota-aborted write corrupting a key while the user reads, and then a tap. Without this the
-  // toast says "Not saved" over a screen that never explains why — which is [BUG-017]'s
-  // "button looks dead" shape with an extra step.
+  // toast says "Not saved" over a screen that never explains why — a
+  // "button looks dead" failure with an extra step.
   const app = await boot({ focus_channels: '[{"id":"UC_a","name":"Alpha"}]', focus_archive: '[]' });
   app.ctx.showView('view-feed');
   assert.equal(noticeShown(app, 'feed'), false, 'precondition: a healthy session shows nothing');
@@ -1047,7 +1026,6 @@ test('r21: damage appearing MID-SESSION raises the notice on the next refused wr
 });
 
 test('r22: after a repair the "Open my feed" button comes back', async () => {
-  // FOUND ON THE HANDSET, and it is a logic bug rather than the CSS the walk was for.
   // The boot hides `#btn-go` because a damaged `focus_channels` reads as zero channels; the repair
   // restores them but never re-ran `toggleGoButton`, so the user is left on setup WITH their
   // channels listed and no way to reach the feed. `toggleGoButton()` sits beside
@@ -1065,9 +1043,7 @@ test('r22: after a repair the "Open my feed" button comes back', async () => {
 });
 
 test('r23: adopting the saved copy brings the button back too', async () => {
-  // The same omission in `adoptServerCopy` — pre-existing on `main`, but this task makes that shape
-  // reachable, and CLAUDE.md is explicit that excluding an adjacent bug is a claim to check rather
-  // than a neutral act.
+  // The same omission in `adoptServerCopy`, which the damaged-store notice makes reachable.
   const app = await boot({ focus_channels: CORRUPT, focus_archive: '[]', focus_dirty: '1' }, rowFetch());
   assert.equal(app.el('btn-go').classList.contains('hidden'), true, 'precondition');
   await app.ctx.adoptServerCopy();

@@ -1,38 +1,31 @@
-// [BUG-092] — A POST THE READER CAN SEE MUST NOT BE REMOVED UNDER THEM.
+// A POST THE READER CAN SEE MUST NOT BE REMOVED UNDER THEM.
 //
-// [TASK-096] made a classifier-unplaceable post render VISIBLE in the stream (it was held hidden on
-// every load before, a fifth of the backlog for 4.4-10.3s). But such a post carries no assignment, so
-// it is re-sent on every classify — and when one finally places it, `liftGroupedFromStream`
-// in `liftGroupedFromStream` does a bare `card.remove()` 4-10s after the feed paints, mid-read, un-animated.
+// A classifier-unplaceable post renders VISIBLE in the stream (holding it hidden on
+// every load would hide a fifth of the backlog for 4.4-10.3s). But such a post carries no assignment, so
+// it is re-sent on every classify — and when one finally places it, a bare `card.remove()`
+// in `liftGroupedFromStream` would take it away 4-10s after the feed paints, mid-read, un-animated.
 //
 // The rule this file pins: **the lift applies only to cards the user has never seen.** At lift time a
 // never-seen card still carries `grouping-pending` (`revealPendingText` runs AFTER the lift,
 // both in `updateGroupsForFeed`'s tail), so that class IS the "has the user seen this" flag. A visible card stays
 // and moves into its tile on the next feed load.
 //
-// These tests are only possible because of this task's deliverable 1: `remove()` was a no-op and
-// `querySelectorAll` answered `[]`, so the lift was unobservable. See test/harness-dom.test.mjs.
+// These tests rely on the harness's real `remove()` and `querySelectorAll`, without which the lift
+// is unobservable. See test/harness-dom.test.mjs.
 //
-// WHICH TESTS COULD RED BEFORE THE FIX, stated because a merely-red suite hides the one that passed
-// for the wrong reason. CORRECTED after review round 1, which ran the whole file against main:
-//   RED before the fix   — C1, C3, C3b, C3c, C4. The original note listed four and omitted C3c,
-//                          because C3c was written AFTER the fix was already in and so was never
-//                          present at the RED step. The omission was in the safe direction; it was
-//                          still wrong in the one artefact whose job is completeness.
-//   GREEN before the fix — C2, C5, C6, C7, C8. These guard defects only the FIX could introduce.
-//   ADDED IN ROUND 2     — C1b, C1c, C4b, C5b. Each exists because a mutation review round 1 ran
-//                          survived the whole suite: the guard's other term, the prototype-chain
-//                          `in` defect, the drill-in's own count, and a clear gated on a clean load.
-// Every test here is killed by a named mutation in mutations/BUG-092.mjs; none rests on the RED step
-// alone.
+// WHICH TESTS FAIL WITHOUT THE DEFERRAL:
+//   fail without it — C1, C3, C3b, C3c, C4.
+//   pass without it — C2, C5, C6, C7, C8. These guard defects only the deferral could introduce.
+//   C1b, C1c, C4b, C5b pin the guard's other term, the prototype-chain
+//   `in` defect, the rail's own count, and a clear gated on a clean load.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../test-helpers/app-harness.mjs';
 
-// A post's publish time. RELATIVE to now, not an absolute constant ([BUG-098] review round 1):
-// every post a live feed returns is inside `WINDOW_DAYS` by the server's clock, and the prune now
+// A post's publish time. RELATIVE to now, not an absolute constant:
+// every post a live feed returns is inside `WINDOW_DAYS` by the server's clock, and the prune
 // treats an in-hand post older than that window as evidence the DEVICE's clock is wrong. A frozen
-// 2025 timestamp made every fixture look like a broken clock — and would have drifted a suite that
+// timestamp would make every fixture look like a broken clock — and would drift a suite that
 // once passed into one that asserts the opposite, silently, as months went by.
 const PUBLISHED = Date.now() - 2 * 86400_000;
 
@@ -53,14 +46,11 @@ const STICKY_STATE = () => ({
 const PLACES_X2 = [{ label: 'AI news', summary: ['x2 says a thing'], item_ids: ['x2'] }];
 
 function boot({ store, reply = PLACES_X2 } = {}) {
-// GROUPED VIEW SEEDED ([TASK-099]). Ungrouped is now the DEFAULT: every post renders into the
+// GROUPED VIEW SEEDED. Ungrouped is the DEFAULT: every post renders into the
 // chronological stream and an assigned one is merely HIDDEN, so a fixture with no view key exercises
-// the plain feed — where tiles, the lift and the classify hold do not exist at all. This file's subject — [BUG-092]'s deferral — is
-// unchanged, so the seed only states a precondition. ⚠️ UNLIKE the other seeded files, TWO
-// assertions here DID have to change, and the earlier blanket claim that none did was false:
-// C1/C1b/C6/C5c addressed cards by INDEX, and `children[0]` is now the hidden `.grouped-out` card
-// rather than the post under test, so each was re-pointed at its card by `dataset.id`. Two of the
-// four had gone DEAD as a result (measured: killed before [TASK-099], surviving after).
+// the plain feed — where tiles, the lift and the classify hold do not exist at all. The seed only
+// states a precondition. C1/C1b/C6/C5c address cards by `dataset.id`, never by INDEX:
+// `children[0]` is the hidden `.grouped-out` card rather than the post under test.
   const app = createApp({ store: { focus_group_view: 'on', ...(store ?? { focus_groups: JSON.stringify(STICKY_STATE()) }) } });
   const bodies = [];
   app.setFetch(async (url, init) => {
@@ -76,42 +66,35 @@ function boot({ store, reply = PLACES_X2 } = {}) {
 
 const render = (app, items, failed = []) =>
   app.ctx.renderFeedResults({ items, failed, cappedNames: [], totalChannels: items.length + failed.length });
-// "In the stream" now means VISIBLE in the stream ([TASK-099] decision 1, Asli 2026-08-26: the lift
+// "In the stream" means VISIBLE in the stream (the lift
 // HIDES rather than removes). A lifted card is still a `#feed` child carrying `.grouped-out`
-// (display:none), so a raw `children` read reports a post the reader cannot see as present — the same
-// mistake the four production counting selectors had to be corrected for. The assertions below are
-// UNCHANGED; only what the instrument counts as "in the stream" moved, and it moved to match what a
-// browser shows.
-// [TASK-098]: `.card` is now REQUIRED rather than implied. Every child of `#feed` used to be a post
-// card, so mapping over `children` and mapping over post cards were the same set; a `.topic-card` is
-// now also a child, and it carries `data-gid` rather than `data-id` — so the un-narrowed version
-// reported `undefined` in the middle of the stream. The QUESTION is unchanged: which posts are here.
+// (display:none), so a raw `children` read reports a post the reader cannot see as present.
+// `.card` is REQUIRED rather than implied: a `.topic-card` is
+// also a child of `#feed`, and it carries `data-gid` rather than `data-id` — so an un-narrowed map
+// would report `undefined` in the middle of the stream. The QUESTION is: which posts are here.
 const streamIds = app => app.el('feed').children
   .filter(c => c.classList.contains('card') && !c.classList.contains('grouped-out')).map(c => c.dataset.id);
 const stateOf = app => JSON.parse(app.get('focus_groups') || '{"assignments":{},"groups":{}}');
-// [TASK-098] RE-POINTED. A topic is a `.topic-card` in the stream now, not a `.group-card` tile in a
-// `#group-grid` above it. The assertions below are unchanged — only where they look. The READERS got
-// stronger in the move: the old tile was one `innerHTML` blob, so its count and bullets could only be
-// scraped by regex over an unparsed string; the new card is appended nodes, so these are real queries.
+// A topic is a `.topic-card` in the stream. The card is appended nodes, not one `innerHTML` blob,
+// so its count and bullets are read by real queries.
 const countOn = card => card?.querySelectorAll('.tc-count')[0]?.textContent;
 // `.tc-bullets li` would be a TAG selector, which the harness refuses on purpose — read the list's
 // own children instead.
 const bulletsOn = card => [...(card.querySelectorAll('.tc-bullets')[0]?.children || [])].map(li => li.textContent);
 const tileFor = (app, gid) => app.queryAll('#feed .topic-card').find(c => c.dataset.gid === gid);
-// [TASK-098]: the drill-in is deleted (criterion 12). A topic's posts are ALWAYS on screen, on its
+// A topic's posts are ALWAYS on screen, on its
 // card's rail — so there is nothing to open, and each post's Done/Archive live on its own slide.
-// The QUESTION each of these answers is the one `#group-detail-list` used to answer: which posts does
+// The QUESTION each of these answers: which posts does
 // this topic actually show, and what happens when one of them leaves.
-// [TASK-107]: the rail's first slide is the SUMMARY, which carries no `data-id` — so the raw map
-// now leads with `undefined`. Filtered rather than re-worded: the question every caller asks is
-// "which POSTS does this rail list, in what order", and that question is unchanged.
+// The rail's first slide is the SUMMARY, which carries no `data-id` — so the raw map
+// leads with `undefined`. Filtered: the question every caller asks is
+// "which POSTS does this rail list, in what order".
 //
-// ⚠️ WHAT THE FILTER COSTS, stated honestly after an independent audit found the original note here
-// claiming it cost nothing. It drops only FALSY ids, so a summary that wrongly carried a `data-id`
-// is truthy, survives, and reds every ordered deepEqual on its own — that case is safe, but NOT for
-// the reason first written. What the filter genuinely hides is a summary appended in the wrong
-// PLACE: unfiltered, a trailing `undefined` failed every ordered comparison here; filtered, only
-// TASK-107 T1 and T6 look at where the summary sits.
+// ⚠️ WHAT THE FILTER COSTS. It drops only FALSY ids, so a summary that wrongly carried a `data-id`
+// is truthy, survives, and reds every ordered deepEqual on its own — that case is safe.
+// What the filter genuinely hides is a summary appended in the wrong
+// PLACE: unfiltered, a trailing `undefined` would fail every ordered comparison here; filtered, only
+// T1 and T6 look at where the summary sits.
 const railIds  = (app, gid) => app.queryAll(`#feed .topic-card[data-gid="${gid}"] .tc-slide`).map(s => s.dataset.id).filter(Boolean);
 const railPost = (app, gid, id) => app.queryAll(`#feed .topic-card[data-gid="${gid}"] .tc-slide[data-id="${id}"] .tc-post`)[0];
 const doneIn = app => JSON.parse(app.get('focus_done') || '[]');
@@ -119,16 +102,15 @@ const doneIn = app => JSON.parse(app.get('focus_done') || '[]');
 // classify RAN, so a too-short settle fails loudly instead of passing as "nothing happened".
 const settle = async (rounds = 5) => { for (let i = 0; i < rounds; i++) await new Promise(r => setImmediate(r)); };
 
-// ── C1: the card survives its own classify (RED before the fix) ────────────────
+// ── C1: the card survives its own classify ─────────────────────────────────────
 
 test('BUG-092 C1: a post the reader can SEE is not removed when its classify places it', async () => {
   const { app, bodies } = boot();
   render(app, [xPost('x1'), xPost('x2')]);
 
   assert.deepEqual(streamIds(app), ['x2'], 'the sticky post is on screen, unheld; the filed one is in the tile');
-  // BY ID, NOT BY INDEX. `children[0]` was x2's card only while an assigned post was SKIPPED at
-  // render; under [TASK-099] it is x1's HIDDEN card, so this silently changed subject and the
-  // assertion compared x1 with itself. Measured: KILLED before TASK-099, SURVIVED after.
+  // BY ID, NOT BY INDEX. `children[0]` is x1's HIDDEN card, so an index lookup would
+  // compare x1 with itself.
   const cardOf = (id) => app.el('feed').children.find(c => c.dataset.id === id);
   const cardBefore = cardOf('x2');
   // Without this the identity assertion below passes VACUOUSLY when the lookup finds nothing at
@@ -161,10 +143,10 @@ test('BUG-092 C6: a post the reader has never seen still lifts silently', async 
   assert.equal(bodies.length, 1, 'the classify ran');
   assert.deepEqual(streamIds(app), [],
     'a card the reader never saw is lifted out, exactly as before — the fix must not over-apply');
-  // …and it must ARRIVE in its tile. Round 2 review: moving `_liftDeferred.add` into the remove
+  // …and it must ARRIVE in its tile. Moving `_liftDeferred.add` into the remove
   // branch ("record everything we lifted") passes every other test, and puts the post in NEITHER
   // home — no card, no tile, badge blank, and checkEmpty then shows caught-up over an unread post.
-  // That is this bug's own headline symptom plus a false done-state. The add belongs only on the
+  // The add belongs only on the
   // branch that KEEPS a card.
   assert.equal(countOn(tileFor(app, 'g_ai_news')), '2 posts',
     'the lifted post is in its tile, counted — a card that was removed is not "deferred"');
@@ -172,11 +154,10 @@ test('BUG-092 C6: a post the reader has never seen still lifts silently', async 
 });
 
 test('BUG-092 C1b: a post the classify could NOT place is revealed, never removed', async () => {
-  // Guards the OTHER term of the rewritten guard. `liftGroupedFromStream` skips a card whose id is
+  // Guards the OTHER term of the guard. `liftGroupedFromStream` skips a card whose id is
   // not in `assignments`; drop that term and every held card is removed regardless — an unplaceable
-  // post ends up in NEITHER home, which is BUG-092's own symptom arriving by a new route. Review
-  // round 1 measured that mutation (E2) passing all 680 tests, because the battery only ever mutated
-  // this line as a whole (M12/M13) and CLAUDE.md requires each TERM.
+  // post ends up in NEITHER home. Mutating this line as a whole does not show that; each TERM
+  // needs its own test.
   const { app, bodies } = boot({
     store: { focus_groups: JSON.stringify({ ...STICKY_STATE(), unfiled: [] }) },
     reply: [{ label: 'AI news', summary: ['a point about AI'], item_ids: ['x2'] }], // x3 left unplaced
@@ -189,20 +170,16 @@ test('BUG-092 C1b: a post the classify could NOT place is revealed, never remove
   assert.equal(Object.hasOwn(stateOf(app).assignments, 'x3'), false, 'the other one was not');
   assert.deepEqual(streamIds(app), ['x3'],
     'the unplaceable post is still in the stream — revealed by revealPendingText, not removed');
-  // BY ID, NOT BY INDEX. `children[0]` was x2's card only while an assigned post was SKIPPED at
-  // render; under [TASK-099] it is x1's HIDDEN card, so this silently changed subject and the
-  // assertion compared x1 with itself. Measured: KILLED before TASK-099, SURVIVED after.
+  // BY ID, NOT BY INDEX. `children[0]` is x1's HIDDEN card, not the post under test.
   assert.equal(app.el('feed').children.find(c => c.dataset.id === 'x3').classList.contains('grouping-pending'), false,
     'and it is visible, not still held hidden');
 });
 
 test('BUG-092 C1c: a post whose id is "toString" is not swallowed by the prototype chain', async () => {
-  // Pins a PRE-EXISTING guard this change made observable and load-bearing — `Object.hasOwn` rather
+  // Pins a guard the deferral makes load-bearing — `Object.hasOwn` rather
   // than `in`. `assignments` comes from JSON.parse, so `'toString' in assigned` is true for every
-  // object, and a Substack card carries its remote `guid` as `dataset.id`. Before [BUG-092] no test
-  // could reach this function at all, and its own comment said so; review round 1 pointed out the
-  // comment was now false while the gap was still open. One fixture closes it.
-  // The fixture must be a HELD card, and finding that out cost a wrong first attempt worth recording:
+  // object, and a Substack card carries its remote `guid` as `dataset.id`.
+  // The fixture must be a HELD card:
   // with a Substack post (never held) the `in` defect takes the DEFER branch instead of the remove
   // branch, so the card survives and the test passed under the mutation — decoration. The bug only
   // still destroys a card the user has not seen, so the post has to be a first-pass X one.
@@ -220,7 +197,7 @@ test('BUG-092 C1c: a post whose id is "toString" is not swallowed by the prototy
     'and it is still in the stream — `in` matches Object.prototype and would have removed the card');
 });
 
-// ── C3: the tile owns what it says (RED before the fix) ────────────────────────
+// ── C3: the tile owns what it says ─────────────────────────────────────────────
 
 test('BUG-092 C3: the tile counts only what it owns; the deferred post is not in it', async () => {
   const { app, bodies } = boot();
@@ -256,7 +233,7 @@ test('BUG-092 C3c: the tile still carries the SENTENCE about the deferred post',
   // The deliberate divergence, pinned so it cannot be "tidied away". A deferred post is excluded from
   // the tile's COUNT (it is on screen in the stream) but included in the unread set that decides which
   // BULLETS are live — because that is the same question `liveBullets` answers for the /api/group
-  // payload, where under-reporting destroys the only restorable copy ([BUG-091]). Excluding it here
+  // payload, where under-reporting destroys the only restorable copy. Excluding it here
   // instead would make the sentence blink out of the tile and back on the next load.
   const { app } = boot({
     reply: [{
@@ -276,7 +253,7 @@ test('BUG-092 C3c: the tile still carries the SENTENCE about the deferred post',
     '…and still shows the sentence for the deferred one, rather than dropping it for a load');
 });
 
-// ── C4: one home at a time (RED before the fix) ────────────────────────────────
+// ── C4: one home at a time ─────────────────────────────────────────────────────
 
 test('BUG-092 C4: the topic rail does not list the deferred post', async () => {
   const { app, bodies } = boot();
@@ -324,7 +301,7 @@ test('BUG-092 C5: the next feed load moves the deferred post into its tile', asy
 
 test('BUG-092 C5b: a load with a FAILED channel still moves the deferred post', async () => {
   // C5 only ever renders with `failed: []`, so gating the clear on a complete load (mimicking
-  // syncGroupPrune, which legitimately is gated) survived every test in review round 1. An X 502 at
+  // syncGroupPrune, which legitimately is gated) would go unnoticed. An X 502 at
   // the plan's post cap is routine, so "the next load" must mean any load, not any clean one.
   const { app } = boot();
   render(app, [xPost('x1'), xPost('x2')]);
@@ -336,11 +313,9 @@ test('BUG-092 C5b: a load with a FAILED channel still moves the deferred post', 
 });
 
 test('BUG-092 C4b: clearing the rail removes the card, counting only what it listed', async () => {
-  // Pins the `finishGroupCardAction` call site specifically. M18 reverts the whole
-  // visibleGroupUnreadIds body, so it cannot say WHICH converted site is covered — reverting this one
-  // line alone survived review round 1. Symptom it permits: under [TASK-098] the topic card STAYS in
-  // the stream over an empty rail, headed "1 post", counting the deferred post it never showed —
-  // the same defect the drill-in used to express by staying open.
+  // Pins the `finishGroupCardAction` call site specifically. Symptom of reverting this one
+  // line: the topic card STAYS in
+  // the stream over an empty rail, headed "1 post", counting the deferred post it never showed.
   const { app } = boot();
   render(app, [xPost('x1'), xPost('x2')]);
   await settle();
@@ -358,12 +333,11 @@ test('BUG-092 C4b: clearing the rail removes the card, counting only what it lis
 });
 
 test('BUG-092 C5c: a render that does not rebuild the feed does NOT end the deferral', async () => {
-  // The other direction from C5/C5b, and the one round 2 got wrong. A deferral names a card in
+  // The other direction from C5/C5b. A deferral names a card in
   // `#feed`; the zero-item paths (total failure, empty refresh) hide `#feed` via showLoadError /
   // showCaughtUp WITHOUT rebuilding it, so the card is still there. Clearing the set above those
-  // returns — round 2's "fix" for a comment that was merely inaccurate — leaves the post counted
-  // twice: once as a stream card, once as a grouped post. Measured "3 new" over two unread posts,
-  // a double count neither main nor the original position had.
+  // returns leaves the post counted
+  // twice: once as a stream card, once as a grouped post — "3 new" over two unread posts.
   const { app } = boot();
   render(app, [xPost('x1'), xPost('x2')]);
   await settle();
@@ -386,16 +360,14 @@ test('BUG-092 C7: a payload built while a deferral stands still forwards the def
   // from exactly one place (`renderFeedResults`), which clears the deferred set when it rebuilds the
   // feed, before the classify runs — so in production a payload is NEVER built while a deferral
   // stands, and this state is unreachable today. It is driven directly here because the harm if it ever became reachable is
-  // [BUG-091]'s verbatim: `existing[].summary` is the ONLY copy the server can restore cached bullets
+  // data loss: `existing[].summary` is the ONLY copy the server can restore cached bullets
   // from, so a deferred post filtered out of the unread set silently destroys its topic's summary.
   // This test is what makes "the exclusion is display-side only" a checked property instead of a
   // comment.
-  // The fixture MUST carry a bullet linked to the DEFERRED post. Review round 1 found the original
-  // version vacuous: its only bullet was a bare string, and a bullet with no `item_ids` is treated as
-  // always-live by `bulletIsLive`, so `summary.length` was 1 whichever unread reader `liveBullets`
-  // received. The battery's M19 moved `size` and `summary` together, so it died on `size` while the
-  // destruction half went unexercised — CLAUDE.md §1's "green, correct, measuring the wrong
-  // quantity", in the test whose stated job is guarding against exactly that.
+  // The fixture MUST carry a bullet linked to the DEFERRED post. With only a bare-string bullet
+  // the test is vacuous: a bullet with no `item_ids` is treated as
+  // always-live by `bulletIsLive`, so `summary.length` is 1 whichever unread reader `liveBullets`
+  // receives.
   const { app, bodies } = boot({
     reply: [{
       label: 'AI news', item_ids: ['x2'],
@@ -430,15 +402,15 @@ test('BUG-092 C8: the deferral is in memory only and does not survive a reload',
   render(app, [xPost('x1'), xPost('x2')]);
   await settle();
 
-  // Against the ACTUAL SK inventory, not a name pattern. The pattern version was defeated by review
-  // round 1 simply by naming the key `focus_group_hold` — criterion 8 violated, test green. SK is a
+  // Against the ACTUAL SK inventory, not a name pattern. A pattern is defeated
+  // simply by naming the key `focus_group_hold`. SK is a
   // `const`, so the vm does not expose it; this list is transcribed from the `SK` object at the top of app.js and any key
   // outside it fails here, whatever it is called.
   const SK_KEYS = [
     'focus_channels', 'focus_done', 'focus_last_view', 'focus_theme', 'focus_include_shorts',
     'focus_last_feed_load', 'focus_tweet_cache', 'focus_archive', 'focus_device_id',
     'focus_landing_seen', 'focus_groups', 'focus_dirty', 'focus_events', 'focus_was_authed',
-    'focus_group_view', // [TASK-099] — device-local grouped-view preference
+    'focus_group_view', // device-local grouped-view preference
   ];
   const added = [...app.store.keys()].filter(k => !keysBefore.has(k));
   assert.deepEqual(added.filter(k => !SK_KEYS.includes(k)), [],
@@ -452,17 +424,16 @@ test('BUG-092 C8: the deferral is in memory only and does not survive a reload',
     'after a reload the post is in its tile, because nothing about the deferral persisted');
 });
 
-// ── The bullet recompute meets a deferral ([TASK-098], 2026-08-31) ────────────
+// ── The bullet recompute meets a deferral ────────────
 //
-// Asli's handset walk found that `finishGroupCardAction` never re-ran the bullet filter, so a card
-// went on summarising posts its rail no longer held (T31). The fix recomputes them — and that put a
-// SECOND caller on the divergence C3c above exists to protect, which nothing was watching.
+// `finishGroupCardAction` re-runs the bullet filter, so a card does not
+// go on summarising posts its rail no longer holds (T31). That recompute is a
+// SECOND caller on the divergence C3c above exists to protect.
 //
-// Written because the verification battery's H4 SURVIVED: swapping the recompute's unread source for
+// Swapping the recompute's unread source for
 // `visibleGroupUnreadIds` — the plausible wrong answer, since that is what the rail itself lists —
-// passed all 991 tests. C3c pins the divergence at BUILD time only, and no fixture combined a
-// deferral with a rail action. The comment on the fix claims it reads "the SAME source a repaint
-// reads"; this is what makes that claim falsifiable rather than decorative.
+// would otherwise go unnoticed: C3c pins the divergence at BUILD time only. The recompute must read
+// "the SAME source a repaint reads"; this is what makes that claim falsifiable.
 test('TASK-098 T32 (battery H4): a rail action does not drop the deferred post\'s sentence', async () => {
   const { app } = boot({
     store: {

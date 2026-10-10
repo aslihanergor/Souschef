@@ -7,15 +7,15 @@ import { sessionAccount, signedInGate, refuse } from './_session.js';
 import { utcDay, readQuotaLimit, quotaExceeded } from './_quota.js';
 
 // Outer bound on what any channel can return. A newly added channel is narrowed further to its
-// last 24h client-side (applyLookback, lib/pure.js — TASK-030); that stays off this endpoint on
+// last 24h client-side (applyLookback, lib/pure.js); that stays off this endpoint on
 // purpose, since a per-channel `?since=` would fragment the YouTube/Substack shared caches below
 // for no gain. (The X path is `no-store` for an unrelated reason — per-user cursor + per-app
 // credits — so cache fragmentation was never the argument there.)
 const WINDOW_DAYS = 14;
-const X_PAGE_CAP = 2;   // incremental catch-up ceiling: 2 pages × 100 = 200 posts/account/refresh (TASK-040)
-const METER_RETAIN_DAYS = 30;  // both meter tables are swept on write past this (TASK-100)
+const X_PAGE_CAP = 2;   // incremental catch-up ceiling: 2 pages × 100 = 200 posts/account/refresh
+const METER_RETAIN_DAYS = 30;  // both meter tables are swept on write past this
 
-// Injection seam (TASK-100). `xFetch` is a parameter so the X path can run in a handler test
+// Injection seam. `xFetch` is a parameter so the X path can run in a handler test
 // against a canned response. Before this, `api/feed.js` had NO handler tests — `test/feed.test.mjs`
 // covers only the pure parsers — so nothing could ask what this endpoint does with a real request.
 // Production behaviour is unchanged: the default export binds the real module and keeps Vercel's
@@ -34,7 +34,7 @@ export function createFeedHandler({
 export default createFeedHandler();
 
 async function handleFeed(req, res, ctx) {
-  // Signed-in only ([BUG-025]), and FIRST — ahead of validation and dispatch — so a refused request never
+  // Signed-in only, and FIRST — ahead of validation and dispatch — so a refused request never
   // reaches YouTube, X or Substack. X bills per post read and YouTube burns a shared daily quota; Substack
   // is keyless and gated so that one rule covers the endpoint. The app only calls this after sign-in, so a
   // refusal costs no real user. `signedInGate` (api/_session.js) owns the three answers.
@@ -43,7 +43,7 @@ async function handleFeed(req, res, ctx) {
   if (!gate) return refuse(res, 401, 'sign in required');
 
   const { channelId, hideShorts, source, sourceId, sinceId } = req.query;
-  // ONE clock per request ([BUG-122]). The window cutoffs below used to read Date.now() while the quota day
+  // ONE clock per request. The window cutoffs below used to read Date.now() while the quota day
   // read this, so a test pinning the clock pinned half the handler — and aged out of the real window.
   const { now } = ctx;
 
@@ -55,7 +55,7 @@ async function handleFeed(req, res, ctx) {
     if (!gate.account) return refuse(res, 503, 'could not verify sign-in');
     return handleTwitter(res, sourceId, sinceId, ctx, sql, gate.account);
   }
-  // Substack: keyless RSS per publication (sourceId = the publication host). (TASK-022)
+  // Substack: keyless RSS per publication (sourceId = the publication host).
   if (source === 'substack') return handleSubstack(res, sourceId, now);
 
   if (!channelId || !/^UC[\w-]{22}$/.test(channelId)) {
@@ -104,7 +104,7 @@ async function fetchViaApi(channelId, hideShorts) {
 }
 
 // RSS fallback (keyless): detects Shorts from the /shorts/ link path. The fetch (with its
-// transient retry — BUG-004) lives in fetchRssXml; here we just parse, filter, and shape.
+// transient retry) lives in fetchRssXml; here we just parse, filter, and shape.
 async function fetchViaRss(channelId, hideShorts) {
   const xml = await fetchRssXml(channelId);
   if (xml == null) return null;
@@ -121,14 +121,12 @@ async function handleTwitter(res, sourceId, sinceId, ctx, sql, account) {
     return res.status(400).json({ error: 'invalid sourceId' });
   }
 
-  // Quota gate (TASK-100). The owner is the account `signedInGate` CONFIRMED — never a client-supplied id,
-  // which is why the quota cannot be reset by rotating a header, and never missing: [BUG-025] refuses X
-  // before this function runs unless the session was confirmed, so no X read is unidentified. (Until
-  // BUG-025 a request with no session was served here and counted against an `X-Device-Id` if it sent
-  // one.) A confirmed read CAN still go unmetered, because metering is best-effort at both ends: a meter
+  // Quota gate. The owner is the account `signedInGate` CONFIRMED — never a client-supplied id,
+  // which is why the quota cannot be reset by rotating a header, and never missing: the signed-in gate refuses X
+  // before this function runs unless the session was confirmed, so no X read is unidentified.
+  // A confirmed read CAN still go unmetered, because metering is best-effort at both ends: a meter
   // query that errors must not refuse a confirmed user's feed, so this block fails OPEN — the only outcome
-  // that stops a fetch here is a quota we actually read — and `recordUsage` swallows a failed write. (This
-  // said "no unmetered … X read left" until review round 2, L4.)
+  // that stops a fetch here is a quota we actually read — and `recordUsage` swallows a failed write.
   const day = utcDay(now());
   const owner = { kind: 'account', id: account.accountId };
   try {
@@ -166,8 +164,8 @@ async function handleTwitter(res, sourceId, sinceId, ctx, sql, account) {
     res.setHeader('Cache-Control', 'no-store');
     res.status(200).json({ items, capped: result.capped });
   } catch (err) {
-    // Tell an app-wide CAP apart from a transient failure (TASK-100 criteria 9/10, absorbing
-    // BUG-024's open half). `xFetch` fails fast on a 4xx and attaches the status: 402 is credits
+    // Tell an app-wide CAP apart from a transient failure.
+    // `xFetch` fails fast on a 4xx and attaches the status: 402 is credits
     // exhausted, 429 is X rate-limiting us. Neither clears by retrying in the next minute, which is
     // exactly why the old bare 502 was harmful — the client rendered "Try reopening the feed" and
     // the retry spent more of the cap. Everything else stays an untagged 502 and keeps that message.
@@ -176,9 +174,9 @@ async function handleTwitter(res, sourceId, sinceId, ctx, sql, account) {
   }
 }
 
-// Write both TASK-100 meters, plus an opportunistic sweep. Best-effort by contract: the caller has
-// already served nothing yet, and a metering failure must not cost the user their feed (criterion
-// 12), so every error is swallowed here rather than propagated.
+// Write both X usage meters, plus an opportunistic sweep. Best-effort by contract: the caller has
+// already served nothing yet, and a metering failure must not cost the user their feed,
+// so every error is swallowed here rather than propagated.
 async function recordUsage(sql, owner, day, items) {
   if (!sql || !items?.length) return;
   const ids = items.map(it => it.id).filter(Boolean);
@@ -202,14 +200,14 @@ async function recordUsage(sql, owner, day, items) {
   }
 }
 
-// ── Substack feed (TASK-022) ──────────────────────────────────────────────────
+// ── Substack feed ──────────────────────────────────────────────────
 
 // Fetch a publication's keyless RSS, parse, and window to the last WINDOW_DAYS. Stateless
 // (like YouTube). `host` is the publication hostname stored as the channel id at resolve time.
 async function handleSubstack(res, host, now) {
   // Validate the NORMALISED hostname (new URL collapses 127.1 → 127.0.0.1, which the old raw-string
   // regex missed), then re-derive the fetch URL from it. Shared guard via _hosts.js; isSubstackFeed()
-  // below still rejects any non-Substack response. (SSRF, BUG-020)
+  // below still rejects any non-Substack response. (SSRF)
   let hostname = '';
   try { hostname = new URL(`https://${host}`).hostname; } catch { /* invalid → rejected below */ }
   if (!isSafePublicHost(hostname)) {
@@ -238,7 +236,7 @@ async function handleSubstack(res, host, now) {
 //   • First-ever fetch (no since_id): one shallow page (~20 newest), no pagination.
 //   • Incremental (since_id): page newest→older through everything newer than since_id,
 //     bounded by X_PAGE_CAP so a dormant high-volume account can't run up cost / an
-//     unfinishable feed. `capped` = stopped at the cap with more still pending. (TASK-040)
+//     unfinishable feed. `capped` = stopped at the cap with more still pending.
 async function fetchTweets(userId, sinceId, xf) {
   const base = {
     'tweet.fields': 'created_at,entities,note_tweet,referenced_tweets',

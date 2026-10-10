@@ -1,17 +1,17 @@
-// Who decides whether a PUT is claiming state — the caller, not the server (TASK-084 review R1-H2).
+// Who decides whether a PUT is claiming state — the caller, not the server.
 //
-// pushNow used to send `state: collectSyncedState()` on every push, whatever the push was for. So a
-// boot whose GET failed (500, or the 2.5s abort) reached track()'s 3s analytics flush holding an
-// EMPTY browser, PUT it, and the server — which cannot tell that apart from a deliberate "I removed
-// every channel" clear — emptied the signed-in account's row. BUG-052 had closed only the CREATING
-// direction; this is the destroying one, and it is the half with real user data behind it.
+// If pushNow sends `state: collectSyncedState()` on every push, whatever the push is for, then a
+// boot whose GET failed (500, or the 2.5s abort) reaches track()'s 3s analytics flush holding an
+// EMPTY browser, PUTs it, and the server — which cannot tell that apart from a deliberate "I removed
+// every channel" clear — empties the signed-in account's row. Refusing to CREATE a row from an empty
+// state covers only one direction; this is the destroying one, and it is the half with real user data behind it.
 //
 // The fix is a wire-level distinction the server can act on: an ABSENT `state` key means "analytics
 // only". That makes it a two-party contract, so the tests that matter here are the CROSS-SEAM ones
 // (X1, C7) — they take the real client's real request body and hand it to the real handler. A
 // client-only test proving "no state key in the body" and a server-only test proving "a body with no
 // state key writes nothing" can both pass while the two disagree about what absent means, and a seam
-// defect is exactly how R1-H2 survived a green suite in the first place.
+// defect is exactly what survives a green suite.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../test-helpers/app-harness.mjs';
@@ -32,12 +32,11 @@ const BUFFERED = JSON.stringify([{ name: 'view', section: 'feed', ts: 1753000000
 
 const OK = { ok: true, status: 200, json: async () => ({}) };
 
-// What PUT /api/state ACTUALLY answers, which is not what this file used to pretend ([BUG-047]
-// review round 4, must-fix F — test-quality R5, HIGH).
+// What PUT /api/state ACTUALLY answers.
 //
-// The `OK` fixture above was used for every PUT, and `{}` is a body the real server can never
-// produce. That made a [BUG-015] reintroduction invisible: dropping `!eventsOnly` from pushNow's
-// `discarded` predicate SURVIVED all 778 tests, because `{}.updatedAt` is `undefined` rather than
+// `{}` (the `OK` fixture above) is a body the real server can never
+// produce. Used for a PUT, it makes a stale-pull regression invisible: dropping `!eventsOnly` from pushNow's
+// `discarded` predicate passes every test, because `{}.updatedAt` is `undefined` rather than
 // the explicit `null` every events-only PUT really returns. Under the real shape that mutant clears
 // `dirty` on every analytics flush — telling the next boot the server is up to date and letting
 // syncOnLoad pull a stale row down over un-pushed local changes.
@@ -60,10 +59,10 @@ const GET_FAILS = { ok: false, status: 500, json: async () => ({}) };
 // where the client is supposed to PULL rather than push.
 //
 // Deliberately NOT `VICTIM_STATE`, whose channel carries `title` and no `name`. That is fine for a
-// fixture only ever stringified and compared server-side, and B2 is the first test to RENDER a pulled
+// fixture only ever stringified and compared server-side, but B2 RENDERS a pulled
 // row: renderChannelRow → avatarHtml → avatarColor does `str.length` on `ch.name` and throws, which
-// killed the boot before any assertion ran. Same id so the row-identity guards still read, real shape
-// so the render survives.
+// would kill the boot before any assertion ran. Same id so the row-identity guards still read, real shape
+// so the render works.
 const PULLED_STATE = { channels: [{ id: 'UCsecret', name: 'Private channel', source: 'youtube' }], done: ['v1'] };
 const HAS_ROW = { ok: true, status: 200, json: async () => ({ state: PULLED_STATE, updatedAt: '2026-08-02T18:36:39.699Z' }) };
 
@@ -97,7 +96,7 @@ function mk({ store = {}, stateGet = NO_ROW, signedIn = true, putFails = false }
 const settle = () => new Promise((r) => setImmediate(r));
 const carriesState = (raw) => 'state' in JSON.parse(raw);
 
-/** Boot far enough to establish STANDING (BUG-056), then discard the boot's own traffic.
+/** Boot far enough to establish STANDING, then discard the boot's own traffic.
  *
  *  A push may only claim state on a document that asked the server what it holds and got an answer.
  *  Every real document does — init() awaits syncOnLoad(), and wireApp() connects the mutating
@@ -168,8 +167,8 @@ test('C7 — signing out of a browser that could not read its row leaves that ro
   // push at all, so the property that keeps sign-out honest goes untested: `_stateOutstanding` is
   // cleared only by a CONFIRMED push and an events-only push can never confirm, so if the flush
   // ever latched it, it stays true for the life of the document, `_statePending()` is permanently
-  // true, `nothingToSave` is permanently false, and sign-out claims state again. Dropping the
-  // `if (!eventsOnly)` on that latch was a 357/357-green mutation. (Round 5, H2.)
+  // true, `nothingToSave` is permanently false, and sign-out claims state again. The
+  // `if (!eventsOnly)` on that latch is what this pins.
   app.runTimers(4);
   await settle();
   assert.ok(puts.length >= 1, 'guard: the analytics flush never fired, so this fixture proves nothing');
@@ -192,8 +191,8 @@ test('C7 — signing out of a browser that could not read its row leaves that ro
 test('C7b — a sign-out that DOES have something to save still saves it', async () => {
   // The control for C7. Without it, "sign-out no longer destroys the row" is satisfied by a
   // sign-out that stopped saving anything at all, which is a worse bug wearing this one's clothes.
-  // stateGet is NO_ROW, not GET_FAILS: since BUG-056 a browser whose read failed has nothing it is
-  // ALLOWED to save, which is C7's subject. "Has something to save" now means standing plus data.
+  // stateGet is NO_ROW, not GET_FAILS: a browser whose read failed has nothing it is
+  // ALLOWED to save, which is C7's subject. "Has something to save" means standing plus data.
   const { app, puts } = mk({ store: { focus_channels: MINE } });
   await standing(app, puts);
 
@@ -210,15 +209,14 @@ test('C7b — a sign-out that DOES have something to save still saves it', async
 });
 
 test('X-NOROW — a browser that read NO row cannot overwrite one that appeared meanwhile', async () => {
-  // The race the two replays above deliberately stopped modelling, kept here as its own subject
-  // rather than lost. The client's boot GET honestly answered "no row"; between that read and its
-  // push, a row appeared — another device of the same account, or another person signing in on this
-  // browser. Last-write-wins let the push flatten it. Since [BUG-047] it cannot: the client holds no
-  // base, and an unbound write may create a row but never replace one.
+  // The race the two replays above deliberately do not model, kept here as its own subject.
+  // The client's boot GET honestly answered "no row"; between that read and its push, a row appeared —
+  // another device, or another person signing in on this browser. Last-write-wins would let the push
+  // flatten it. It cannot: the client holds no base, and an unbound write may create a row but never replace one.
   //
   // This is the seam version of sync-conflict.test.mjs S4. It matters separately because the client
   // and the server can each be individually correct about "no base" and still disagree about how one
-  // is spelled on the wire — which is how R1-H2 survived a green suite.
+  // is spelled on the wire.
   const { app, puts } = mk({ store: { focus_channels: MINE } });
   await standing(app, puts);
 
@@ -279,9 +277,8 @@ test('C3 — an unload flush with nothing pending but buffered events is events-
 test('C3b — an unload flush DURING an in-flight adopt push still carries the state', async () => {
   // The adopt push (syncOnLoad's no-row branch) is fire-and-forget and deliberately never sets
   // `dirty` — syncOnLoad reads dirty as "keep local, don't pull", which is the cross-account leak of
-  // review R9-H2. So a flush that decided from `dirty` alone would drop a first sign-in's adoption
-  // if the tab was closed while it was in flight. That inference is the recorded TASK-084 trap, and
-  // this is the test that refuses it.
+  // a sign-out refusal. So a flush that decided from `dirty` alone would drop a first sign-in's adoption
+  // if the tab was closed while it was in flight. This is the test that refuses that inference.
   let releaseAdopt;
   const puts = [];
   const app = createApp({ store: { focus_device_id: DEVICE_ID, focus_channels: MINE, focus_events: BUFFERED } });
@@ -310,7 +307,7 @@ test('C3b — an unload flush DURING an in-flight adopt push still carries the s
 });
 
 test('C4 — the adopt-on-login push still carries the state', async () => {
-  // Acceptance criterion 4, and the tripwire for the fix this task explicitly forbids: "omit state
+  // The tripwire for a tempting wrong fix: "omit state
   // when dirty !== '1'". The adopt branch calls pushNow() directly with dirty already CLEAR, so
   // that fix breaks first sign-in silently. The guard below is what keeps this test honest — if any
   // boot-time side effect sets dirty, the forbidden fix would pass here too.
@@ -327,7 +324,7 @@ test('C4 — the adopt-on-login push still carries the state', async () => {
 test('C5 — an events-only push does not clear the dirty flag, and a state push does', async () => {
   // dirty means "the server does not have my latest state". An events-only push did not send it, so
   // clearing here would make the next boot pull a stale row down over un-pushed local changes —
-  // BUG-015, reintroduced.
+  // a stale pull.
   const { app, puts } = mk({ store: { focus_channels: MINE } });
   await standing(app, puts);
   app.set('focus_dirty', '1');
@@ -341,10 +338,10 @@ test('C5 — an events-only push does not clear the dirty flag, and a state push
 
 // ── The `dirty` half of the decision — the term that carries every ordinary mutation ──
 //
-// Round 4 found both of these unpinned: `nothingToSave = !_hasUserData(...)` and
-// `_statePending() = _stateOutstanding` each left the whole suite green while destroying user data.
-// C3b/C5/C6 pinned the NEW flag and made the change look covered; nothing watched the older term it
-// is OR'd with. Same shape as rounds 1-3 — the tests looked at the neighbour, not the thing.
+// `nothingToSave = !_hasUserData(...)` and
+// `_statePending() = _stateOutstanding` would each leave the rest of the suite green while destroying user data.
+// C3b/C5/C6 pin the NEW flag; these watch the older term it
+// is OR'd with.
 
 test('C8 — signing out right after removing every channel still SENDS the clear', async () => {
   // Removing every channel is a deliberate clear: local ends up empty, so _hasUserData is false and
@@ -386,7 +383,7 @@ test('C9 — an unload flush of a scheduled-but-unfired mutation still carries t
 test('C6 — an events-only push still drops the events it sent', async () => {
   // The adjacent line most likely to be "tidied" from `r.ok` to `confirmed`. Under the new
   // confirmed, that would mean an events-only push never drains its buffer: every metric duplicates
-  // on every flush forever, including the landing_view this task exists to produce.
+  // on every flush forever.
   const { app } = mk({ store: { focus_events: BUFFERED } });
 
   await app.ctx.pushNow({ eventsOnly: true });
@@ -394,19 +391,18 @@ test('C6 — an events-only push still drops the events it sent', async () => {
   assert.equal(app.get('focus_events'), null, 'the sent events stayed buffered and will re-ship forever');
 });
 
-// ── BUG-056: standing, not intent ───────────────────────────────────────────
+// ── Standing, not intent ───────────────────────────────────────────
 //
-// TASK-084 made the caller declare WHAT a push carries. That closed the three paths with nothing to
-// claim, and could never close this one: a theme tap genuinely IS claiming state. The missing fact is
+// The caller declares WHAT a push carries. That closes the three paths with nothing to
+// claim, and can never close this one: a theme tap genuinely IS claiming state. The missing fact is
 // whether the sender had any STANDING to claim it — a browser whose boot GET failed holds a copy of
 // nothing and does not know it. `_stateLoaded` is that fact, and it is set by syncOnLoad in all three
 // branches, because "no row", "dirty" and "applied" all mean the same thing here: this document
 // learned what the server holds.
 //
-// Two halves, and they must ship together. Suppressing the push alone is WORSE than today: a
+// Two halves, and they must ship together. Suppressing the push alone is WORSE than not suppressing: a
 // suppressed push can never confirm, so `dirty` can never clear, so the next healthy boot's dirty
-// branch pushes the same empty blob and never applies the row (B2). Measured on unmodified main
-// during scoping, 2026-08-06.
+// branch pushes the same empty blob and never applies the row (B2).
 
 test('B1 — a theme tap on a browser that could not read its row leaves that row untouched', async () => {
   // The production repro, through the control that actually caused it. `.theme-opt` is modelled in
@@ -427,7 +423,7 @@ test('B1 — a theme tap on a browser that could not read its row leaves that ro
   for (const raw of puts) {
     // Both halves: the row is untouched AND the key is absent. `state: null` is the forbidden wire
     // shape (app.js says "absent, never null") and 400s server-side, so a row-identity assertion
-    // alone would stay green through a regression to it. (Review round 1, L2.)
+    // alone would stay green through a regression to it.
     assert.ok(!carriesState(raw), `a PUT claimed state this browser never loaded: ${raw}`);
     const r = await replay(raw);
     assert.ok(r.before.includes('UCsecret'), 'guard: the victim row really was seeded with data to lose');
@@ -438,12 +434,11 @@ test('B1 — a theme tap on a browser that could not read its row leaves that ro
 // Both outage shapes, because they red at DIFFERENT times and only the pair covers the change.
 //
 //   putFails: true  — /api/state is down for both verbs, so boot 1's push cannot confirm and `dirty`
-//                     survives. RED before the fix this file pins.
-//   putFails: false — the GET failed but the PUT succeeded, so today `confirmed` clears `dirty` and
-//                     boot 2 is harmless. GREEN today, and it is the case that turns dangerous the
+//                     survives. RED without the suppression this file pins.
+//   putFails: false — the GET failed but the PUT succeeded, so without suppression `confirmed` clears `dirty` and
+//                     boot 2 is harmless. It is the case that turns dangerous the
 //                     moment pushes are suppressed: a suppressed push can never confirm, so `dirty`
-//                     can never clear. Pinned here so change 1 cannot ship without change 2; the
-//                     schedulePush mutation in the task's Verification table reds exactly this row.
+//                     can never clear. Pinned here so change 1 cannot ship without change 2.
 for (const putFails of [true, false]) {
   test(`B2 — the boot AFTER the failed one does not finish the job (boot-1 PUT ${putFails ? 'fails' : 'succeeds'})`, async () => {
     const b1 = mk({ stateGet: GET_FAILS, putFails });
@@ -491,7 +486,7 @@ test('B3 — a theme tap on a browser that DID read its row still saves', async 
 
   // Replayed against a store with NO row, because that is what this client's boot actually read
   // (stateGet is NO_ROW above). Seeding a row here would model a browser writing over something it
-  // never saw — which since [BUG-047] is refused by design, and would make this control fail for a
+  // never saw — which is refused by design, and would make this control fail for a
   // reason that has nothing to do with the theme tap it exists to prove. That race has its own
   // coverage: test/sync-conflict.test.mjs S4, and X-NOROW below.
   const r = await replay(withState[0], { users: [] });
@@ -500,12 +495,12 @@ test('B3 — a theme tap on a browser that DID read its row still saves', async 
 });
 
 test('B4 — signing out of an unloaded browser REFUSES, and destroys nothing', async () => {
-  // The first design of this fix asserted the opposite — that sign-out should COMPLETE here, on the
-  // reasoning that a browser which never read its row holds only a stale mirror the server still has.
-  // Review round 1 destroyed that premise: the code cannot know it, because it never read the row.
+  // Sign-out must NOT complete here on the
+  // reasoning that a browser which never read its row holds only a stale mirror the server still has:
+  // the code cannot know that, because it never read the row.
   // See B8 for the case that proves it. So there is no carve-out, and a browser holding data it could
-  // not save refuses exactly as it does when a save fails — main's behaviour, unchanged, which is the
-  // point: the most-reviewed function in the repo gains no new exit.
+  // not save refuses exactly as it does when a save fails:
+  // signOut gains no new exit.
   const { app, puts } = mk({ store: { focus_channels: MINE, focus_events: BUFFERED }, stateGet: GET_FAILS });
 
   await app.ctx.init();
@@ -530,11 +525,11 @@ test('B4 — signing out of an unloaded browser REFUSES, and destroys nothing', 
 });
 
 test('B8 — a channel added during the outage is not destroyed by signing out', async () => {
-  // The regression test for review round 1's H1, found by all three reviewers and reproduced against
-  // clean worktrees of both commits: the reverted design erased this channel from localStorage AND
-  // never sent it, where main uploaded it. Data that existed nowhere else, gone on a sign-out.
+  // The regression test for a sign-out carve-out on unloaded browsers:
+  // that design erased this channel from localStorage AND
+  // never sent it. Data that existed nowhere else, gone on a sign-out.
   //
-  // This is the BUG-060 migration path exactly — empty local store, existing account, failed read,
+  // This is a real path — empty local store, existing account, failed read,
   // the app looks broken, so the user re-adds a channel — which is why it earns its own test rather
   // than living as a clause inside B4.
   const { app, puts } = mk({ stateGet: GET_FAILS });
@@ -552,9 +547,8 @@ test('B8 — a channel added during the outage is not destroyed by signing out',
     `the only copy of the channel was destroyed: sent=${onTheWire} kept=${stillLocal}`);
 });
 
-// B5 runs BOTH ways on purpose. `putFails: true` was the original fixture and it pinned the refusal
-// for the WRONG reason — the failing PUT, not the suppression — which is why the task's Verification
-// table claimed a mutation reds this test when it reds C5 instead (review round 1, M1). The
+// B5 runs BOTH ways on purpose. `putFails: true` alone pins the refusal
+// for the WRONG reason — the failing PUT, not the suppression. The
 // `putFails: false` row is the one that matters: the server is perfectly healthy and the client still
 // cannot save, because it has no standing to.
 for (const putFails of [true, false]) {
@@ -591,9 +585,9 @@ test('B6 — a suppressed push still delivers and drains its events', async () =
 });
 
 test('B7 — a bare pushNow() on an unloaded browser carries no state', async () => {
-  // The property CHR-045 deferred pushNow's dangerous `eventsOnly: false` default to: suppression
+  // Why pushNow's dangerous `eventsOnly: false` default is tolerable: suppression
   // lives in ONE place, so today's four callers and tomorrow's inherit it without having to know.
-  // A future call site added by someone who has not read five review rounds is caught here.
+  // A future call site added by someone who does not know the history is caught here.
   const { app, puts } = mk({ store: { focus_channels: MINE }, stateGet: GET_FAILS });
 
   await app.ctx.syncOnLoad();
@@ -605,12 +599,12 @@ test('B7 — a bare pushNow() on an unloaded browser carries no state', async ()
   assert.ok(!carriesState(puts[0]), 'a bare pushNow() claimed state this browser never loaded');
 });
 
-// ── The two hasUserData copies must agree (Round 5, H3) ──────────────────────
+// ── The two hasUserData copies must agree ──────────────────────
 // `_signOut`'s `nothingToSave` reads the CLIENT copy (app.js) to decide whether a sign-out sends
 // state at all; `api/state.js` reads the SERVER copy (api/_state.js) to decide whether a PUT may
-// create a row. TASK-084's scoping named this duplication as a risk and promised exactly this test;
-// it was never written, and the client copy had no coverage of any kind. Dropping its `archive`
-// term was a 357/357-green mutation: a user whose only content is archived then signs out with
+// create a row. The duplication is a risk: if the client copy drops its `archive`
+// term,
+// a user whose only content is archived then signs out with
 // `nothingToSave === true`, the state is never sent, and clearLocalIdentity() wipes SK.archive —
 // destroyed on both sides. Every term gets a fixture that is true through that term ALONE, so no
 // single term can be deleted without a red.

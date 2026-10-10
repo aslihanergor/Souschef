@@ -1,8 +1,8 @@
-// Run the REAL app.js inside Node so the exit paths can be tested (CHR-033).
+// Run the REAL app.js inside Node so the exit paths can be tested.
 //
-// Why this exists: signOut/deleteAccount/pushNow/clearLocalIdentity are where every HIGH finding in
-// BUG-017's eight review rounds lived, and none of them had a single test — the suite covered pure
-// functions and the EXIT_DISPOSITION map, so `clearLocalIdentity(){}` as a no-op stayed green. The
+// Why this exists: signOut/deleteAccount/pushNow/clearLocalIdentity are where the data-destroying
+// defects live, and a suite covering only pure
+// functions and the EXIT_DISPOSITION map stays green with `clearLocalIdentity(){}` as a no-op. The
 // browser was never the hard part; the globals were. Fake the globals and the logic is ordinary
 // testable code.
 //
@@ -34,11 +34,10 @@ const APP = new URL('../app.js', import.meta.url);
 const IMPORT_RE = /^import\s+\{[\s\S]*?\}\s+from\s+'\.\/lib\/pure\.js';\s*$/m;
 
 // ── Selector matching ─────────────────────────────────────────────────────────
-// `querySelectorAll` used to answer `[]` for everything but `.view`/`.theme-opt`. That is why
-// [BUG-092] shipped invisible: `liftGroupedFromStream` reads `#feed .card`, so the function that
-// removes a card from under the reader could not be observed AT ALL, and its own source comment says
-// so. A hardcoded `[]` is not a stub, it is a wrong answer that never fails — the CHR-040 shape one
-// level up. These answer from the tracked `children` tree instead, so the reply is DERIVED.
+// A `querySelectorAll` that answers `[]` makes `liftGroupedFromStream` — which reads
+// `#feed .card`, and removes a card from under the reader — impossible to observe AT ALL.
+// A hardcoded `[]` is not a stub, it is a wrong answer that never fails.
+// These answer from the tracked `children` tree instead, so the reply is DERIVED.
 //
 // Deliberately NOT a CSS engine. It supports exactly the grammar app.js uses — `#id`, `.cls`,
 // `[attr="v"]`, `:not(.cls)`, chained by descendant spaces — and **throws on anything else**, the
@@ -111,11 +110,11 @@ function stubEl(id = '') {
     textContent: '',
     value: '',
     disabled: false,
-    // NUMERIC, like every real element. It was absent, and the gap was not cosmetic: the [TASK-098]
+    // NUMERIC, like every real element, and the gap would not be cosmetic: the
     // gesture guard walks ancestors asking `el.scrollTop > 0`, and against a stub with NO scrollTop
-    // that reads `undefined > 0` — false, by luck. Changing the guard to `>= 0` then survived the
+    // that reads `undefined > 0` — false, by luck. Changing the guard to `>= 0` would then survive the
     // whole suite, while in a browser it makes the FIRST ancestor answer true, so touchstart always
-    // bails and pull-to-refresh is dead on every screen. Found by an independent mutation battery.
+    // bails and pull-to-refresh is dead on every screen.
     // A stub that omits a property the code reads does not fail; it agrees with you.
     scrollTop: 0,
     style: {},
@@ -135,7 +134,7 @@ function stubEl(id = '') {
     // appends it and calls this; without it the whole function threw TypeError inside the vm, so
     // every assertion about what it exported would have passed for the wrong reason. Deliberately
     // does NOT fire listeners: a detached `<a download>` has none, and `app.click(el)` is the
-    // driver for controls that do. The payload itself is captured at URL.createObjectURL. ([BUG-051])
+    // driver for controls that do. The payload itself is captured at URL.createObjectURL.
     click() { el.clicks = (el.clicks || 0) + 1; },
     // Recorded, not run. The harness cannot dispatch events, but "was this control wired at all"
     // is a different question from "what does it do", and it is the one the sign-in wall turns on:
@@ -146,24 +145,22 @@ function stubEl(id = '') {
     listeners: [],
     // Tracked, not stubbed. `updateSectionHeads` decides whether the Topics/Posts headings show by
     // reading `children.length`, so an always-empty array would answer "no content" forever and let a
-    // test pass vacuously — the CHR-040 failure mode (a field declared, returned, never populated).
+    // test pass vacuously (a field declared, returned, never populated).
     children: [],
-    // `_parent` is what makes `remove()` real. It was a no-op — declared, called by production code,
-    // doing nothing — so a harness `#feed` grew forever and `liftGroupedFromStream` had no effect a
-    // test could see. [CHR-057] recorded exactly this in BUG-066 review round 1, measured FOUR
-    // faithful mutations of this tracking all passing GREEN, and was killed in 2026-08-07 triage as
-    // "shipped and working". It was not. Pinned now by test/harness-dom.test.mjs.
+    // `_parent` is what makes `remove()` real. As a no-op — declared, called by production code,
+    // doing nothing — a harness `#feed` grows forever and `liftGroupedFromStream` has no effect a
+    // test can see. Pinned by test/harness-dom.test.mjs.
     // ⚠️ DOES NOT DETACH, and a real `appendChild` does. Passing a node that is ALREADY in the tree
     // moves it in a browser; here it is pushed a second time, so the node appears at both its old
     // index and the end. A whole defect class — any re-parenting of an existing element — is
-    // therefore invisible to this suite: measured 2026-09-08 ([TASK-107]), where a mutation moving
+    // therefore invisible to this suite: measured, where a mutation moving
     // the topic card's summary slide to the end of its rail SURVIVED, because the slide stayed at
     // index 0 as well. A mutation in that shape must `remove()` first to be honest, and a test that
     // relies on this to catch re-ordering is not testing what it thinks. Not fixed here because
     // splicing on append changes the ordering every existing fixture already depends on.
     appendChild: c => { c._parent = el; el.children.push(c); return c; },
     // `insertIntoFeed` re-inserts an undone card at its chronological slot. Modelled for
-    // completeness, NOT because the suite exercises it: review round 1 measured that with the numeric
+    // completeness, NOT because the suite exercises it: with the numeric
     // epoch these fixtures use, `Date.parse(c.dataset.published)` is NaN, so `older` is undefined and
     // insertIntoFeed always APPENDS — insertBefore is reached only with an ISO-string `published`.
     insertBefore: (c, ref) => {
@@ -234,8 +231,8 @@ function stubEl(id = '') {
 /** Ids that ship with `class="… hidden"` in app/index.html. EXPORTED (and hoisted out of
  *  `createApp`) so test/docs.test.mjs can assert the contract this set depends on: every id here
  *  must really ship hidden in the markup, and its class must really have a `display: none` rule.
- *  An independent mutation battery (2026-08-27) removed `hidden` from the markup and `display:
- *  none` from the CSS and NOTHING failed — the harness seeds the class itself, so a seeded stub
+ *  Without that assertion, removing `hidden` from the markup and `display:
+ *  none` from the CSS fails NOTHING — the harness seeds the class itself, so a seeded stub
  *  agrees with you about markup it never read. That is the vacuity trap this set exists to close,
  *  reappearing at the other end. */
 // Elements that ship an INLINE `display:none` in the markup rather than a `hidden` class. Kept
@@ -244,20 +241,19 @@ function stubEl(id = '') {
 export const INLINE_HIDDEN_IDS = new Set(['feed']);
 
 export const HIDDEN_IDS = new Set([
-  // [TASK-101] Both ship as `class="… hidden"` in app/index.html, so both belong here. Measured
-  // rather than assumed, 2026-08-27: a control asserting "the ready bubble was shown" PASSED
+  // Both ship as `class="… hidden"` in app/index.html, so both belong here. Measured
+  // rather than assumed: a control asserting "the ready bubble was shown" PASSED
   // against a tree where neither the element nor the code existed, because a fresh stub starts
   // with an empty class set and `contains('hidden')` answered false. Seeded, the same control
-  // fails. `group-loading` left this list with the pill it belonged to.
+  // fails.
   'group-busy', 'group-ready-note',
-  // [TASK-098] deleted #topics-head, #group-grid and #group-detail with the Topics/Posts split.
-  // They HAD to leave this set in the same commit: docs.test.mjs asserts every id here really ships
-  // hidden in app/index.html with a display:none rule, so a seed left behind after the markup went
-  // would fail the suite — which is the check working, not a nuisance. #group-note stays: criterion
-  // 13 keeps it, revealed by `renderTopicCards` instead of the deleted `renderGroupGrid`.
+  // docs.test.mjs asserts every id here really ships
+  // hidden in app/index.html with a display:none rule, so a seed left behind after its markup goes
+  // fails the suite — which is the check working, not a nuisance. #group-note is revealed by
+  // `renderTopicCards`.
   'group-note',
   'videos-head', 'caughtup',
-  // [BUG-051]. Both notices and both actions ship `class="… hidden"`. Seeded because a fresh stub
+  // Both notices and both actions ship `class="… hidden"`. Seeded because a fresh stub
   // starts with an EMPTY class set and therefore reads as VISIBLE: at the RED step "the notice
   // survives a re-render" PASSED against a tree where neither the element nor the code existed.
   'damaged-notice-setup', 'damaged-notice-feed', 'damaged-notice-archive',
@@ -267,19 +263,19 @@ export const HIDDEN_IDS = new Set([
   // class set, so "the confirm was revealed" passes whether or not the code ever revealed it — and
   // a destructive confirm nobody can prove was shown is the worst place to keep that hole.
   'acct-delete-confirm', 'acct-signout-confirm',
-  // [TASK-104]. It ships `class="pref-manage btn-mark-all hidden"`, so a fresh stub starting with an
+  // It ships `class="pref-manage btn-mark-all hidden"`, so a fresh stub starting with an
   // EMPTY class set answered `false` to contains('hidden') — and every assertion that this control
   // was REVEALED passed whether or not updateCount ever revealed it. Dormant while the button lived
   // in the appbar and nothing asked; live the moment it does.
   'btn-mark-all',
-  // [TASK-092] The tour layer, its ring and its four blockers — every tour element the code shows or
-  // hides (amendment 4). Unseeded, "the tour ended and left nothing dimmed" would pass over stubs that
-  // were never hidden in the first place, which is criterion 4's whole claim.
+  // The tour layer, its ring and its four blockers — every tour element the code shows or
+  // hides. Unseeded, "the tour ended and left nothing dimmed" would pass over stubs that
+  // were never hidden in the first place.
   'tour', 'tour-ring', 'tour-block-top', 'tour-block-right', 'tour-block-bottom', 'tour-block-left',
   // The add flow's confirm panel ships `class="add-confirm hidden"`, and the tour's add step highlights it only
-  // while it is SHOWING ([TASK-092] review round 1, MED-2), so the stub is seeded to match the markup. NOT
+  // while it is SHOWING, so the stub is seeded to match the markup. NOT
   // load-bearing today, measured: `initSetup → showAddForm` hides the panel on every entry to setup before any
-  // card is drawn, and removing this seed changes no test (review round 2, Q12/C19). It protects a future path
+  // card is drawn, and removing this seed changes no test. It protects a future path
   // that draws a card before setup has run.
   'add-confirm',
   ]);
@@ -293,23 +289,21 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
   const requests = [];
   const navigations = [];
   const toasts = [];
-  // `toasts` records WHAT was said; `toastLog` records the state it was said INTO ([TASK-104]).
+  // `toasts` records WHAT was said; `toastLog` records the state it was said INTO.
   // "the panel was closed" and "the panel was closed FIRST" have IDENTICAL end states, so an
   // end-state assertion cannot tell them apart. This captures the panel at RAISE TIME, the only
   // moment the difference exists. Kept separate from `toasts` rather than folded into it: 40
   // assertions across three files read those entries as strings.
   //
-  // ⚠️ WHAT THIS IS NOT. An earlier version of this comment said a toast raised with the drawer open
-  // is painted BEHIND it and its Undo unreachable, citing [CHR-032]. That was true when CHR-032 was
-  // written and is NOT true now: `.toast` was raised to z-index 62 on 2026-08-24 (commit 12743cb,
-  // [BUG-047]) to clear the drawer (61) and its scrim (60). Measured live 2026-08-29 with the drawer
+  // ⚠️ WHAT THIS IS NOT. A toast raised with the drawer open is NOT painted behind it:
+  // `.toast` sits at z-index 62 to clear the drawer (61) and its scrim (60). Measured live with the drawer
   // open, `elementFromPoint` over the Undo returns `.toast-action`. So this field pins an ORDERING
   // decision, not a reachability guarantee — do not cite it as the latter.
   const toastLog = [];
   const timers = [];
   let clock = 0;               // virtual ms, moved only by advance(); see the driver below
   let uuidSeq = 0;
-  // UNIQUE PER DOCUMENT, not just per call ([BUG-123]). These ids used to restart at 1 for every
+  // UNIQUE PER DOCUMENT, not just per call. These ids used to restart at 1 for every
   // createApp, so two documents over the same storage — a reload, the second tab — minted the SAME
   // uuid, and anything keyed on one (an event id, a device id) had collisions no browser produces.
   // A dedupe test then read "two real boots" as one event and looked like a defect in the code.
@@ -317,20 +311,17 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
 
   let doFetch = fetchImpl || (async () => ({ ok: true, status: 200, json: async () => ({}) }));
 
-  // A programmable storage FAILURE ([BUG-047] review round 4, must-fix C). Quota, a private window
-  // and a browser blocking site data all make setItem throw, and the exit-paths reviewer measured
-  // what that does mid-adopt: the user's channel gone, `dirty` still set, the base not re-based, and
-  // `toasts: []` — a silent destruction, under a comment claiming nothing could be left half-adopted.
-  // A test cannot ask that question without being able to cause it, so the harness gains the ability
-  // rather than the assertion being written around what it could already see.
+  // A programmable storage FAILURE. Quota, a private window
+  // and a browser blocking site data all make setItem throw. Unhandled mid-adopt, that
+  // was measured as: the user's channel gone, `dirty` still set, the base not re-based, and
+  // `toasts: []` — a silent destruction.
+  // A test cannot ask that question without being able to cause it.
   //
-  // `failGetItem` is the READ counterpart, added by [BUG-051]. A browser blocking site data throws
-  // on `getItem` too, not only on `setItem` — and the gap was load-bearing rather than theoretical:
-  // once [BUG-051] stopped `_signOut` throwing on a corrupt VALUE, the R9-H3 seal test
-  // ("a sign-out that throws does not release a seal held by an in-flight delete") kept passing
-  // while exercising nothing, because it used corrupt JSON purely as an instrument to force a throw.
-  // Re-pointed at this instead. BUG-051's own task file named the absence as a boundary; a boundary
-  // that makes an existing test vacuous is a defect, so it is closed here.
+  // `failGetItem` is the READ counterpart. A browser blocking site data throws
+  // on `getItem` too, not only on `setItem` — and this is load-bearing rather than theoretical:
+  // `_signOut` does not throw on a corrupt VALUE, so the seal test
+  // ("a sign-out that throws does not release a seal held by an in-flight delete") cannot use
+  // corrupt JSON as its instrument to force a throw. It uses this instead.
   let failSetItem = null;
   let failGetItem = null;
   const localStorage = {
@@ -353,42 +344,31 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
   };
 
   // Elements are MEMOISED by id, so a class written in one statement can be read back in the next.
-  // They used to be a fresh stub per lookup, which made DOM state write-only — and that is exactly
-  // why nothing in the suite could assert WHICH VIEW a boot ended on. Deleting showView's call in
-  // showLandingView() left every signed-out visitor staring at a blank page with the suite green
-  // (TASK-084 round 2 review). The four views start `hidden`, matching app/index.html, so
+  // A fresh stub per lookup would make DOM state write-only, and nothing in the suite could then
+  // assert WHICH VIEW a boot ended on: deleting showView's call in
+  // showLandingView() leaves every signed-out visitor staring at a blank page with the suite green.
+  // The four views start `hidden`, matching app/index.html, so
   // showView's `add('hidden')` sweep + `remove('hidden')` on the target is observable via el().
   const VIEW_IDS = ['view-landing', 'view-setup', 'view-feed', 'view-archive'];
-  // Every OTHER element app/index.html ships with class="hidden". This was a KNOWN GAP recorded here
-  // by TASK-094 review round 1 (M6) and closed by [BUG-089], which needed to assert on tiles.
-  //
-  // The one that bit is #group-detail. renderGroupGrid's freeze guard is
-  // `if (detail && !detail.classList.contains('hidden')) return;`, so against an unseeded stub — whose
-  // class set starts EMPTY — it returned early ON EVERY CALL and painted nothing. Re-measured
-  // 2026-08-12 before the seed: {tiles: 0, innerHTML: 0 chars} with a populated topic in the store.
-  // Any assertion about a tile, the loading pill or the caught-up state passed VACUOUSLY.
-  //
-  // #group-grid was NOT in that note and is the same trap one step along: it also ships hidden, so an
-  // unseeded stub reads as VISIBLE from boot, and `updateSectionHeads` decides the Topics heading
-  // shows by asking `!grid.classList.contains('hidden')`. Found by running the control rather than by
-  // re-reading the note — which is the point of running one.
+  // Every OTHER element app/index.html ships with class="hidden" is seeded hidden too: an unseeded
+  // stub — whose class set starts EMPTY — reads as VISIBLE from boot, so a guard of the form
+  // `!el.classList.contains('hidden')` takes the wrong branch on every call and any assertion
+  // downstream of it passes VACUOUSLY.
   //
   // Seed a new id here the moment app/index.html ships it hidden; an unseeded stub does not fail, it
   // agrees with you.
   const docKids = new Map(); // memoised phantoms for document.querySelector's non-#id selectors
   // Every Blob handed to URL.createObjectURL, in order — i.e. every file the app offered the user.
-  // `exportData` is the only producer today, and criterion 7 of [BUG-051] turns on the DIFFERENCE
-  // between "no file was offered" and "an empty file was offered", which nothing could see before.
+  // `exportData` is the only producer today, and its tests turn on the DIFFERENCE
+  // between "no file was offered" and "an empty file was offered".
   const objectUrls = [];
   const scrolls = [];   // every window.scrollTo, in order — see ctx.scrollTo below
   const observers = []; // every IntersectionObserver constructed, with what each was told to watch
   // Listeners registered on `window` and on `document` — RECORDED, and run only when a test fires
-  // one, exactly like the element-scoped `listeners` array above stubEl. Both were `() => {}`
-  // until 2026-09-12, which meant `window.addEventListener('pagehide', flushPush)` and the
-  // `visibilitychange` wiring beside it were unreachable: no test could fire the unload flush
-  // through the path a real tab close takes, so deleting either line was a fully green mutation.
-  // BUG-039 review round 2 (claims MED-2) found that gap while measuring what a refused save owes
-  // when the page goes away — the one question that whole remediation turns on. ([BUG-039])
+  // one, exactly like the element-scoped `listeners` array above stubEl. As `() => {}`,
+  // `window.addEventListener('pagehide', flushPush)` and the
+  // `visibilitychange` wiring beside it would be unreachable: no test could fire the unload flush
+  // through the path a real tab close takes, so deleting either line would be a fully green mutation.
   const winListeners = [];
   const docListeners = [];
   // Run every `type` listener on one of those targets and report how many ran, so a test can tell
@@ -405,7 +385,7 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
     const i = list.findIndex(l => l.type === type && l.fn === fn);
     if (i !== -1) list.splice(i, 1);
   };
-  // `document.activeElement` ([TASK-092] criterion 14). `focus()` used to set a flag on the element
+  // `document.activeElement`. `focus()` used to set a flag on the element
   // and nothing else, so "focus moved INTO the card" was assertable and "focus came BACK on close" was
   // not — the second needs to know what was focused before, which is exactly this. Starts at `body`, as
   // a browser's does. Tracked only on elements the app can reach by id or create, which is every
@@ -426,15 +406,13 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
       if (VIEW_IDS.includes(id) || HIDDEN_IDS.has(id)) el.classList.add('hidden');
       // Same hazard as HIDDEN_IDS, one property over. `app/index.html:293` ships
       // `<div class="feed" id="feed" style="display:none">`, and a fresh stub starts with an EMPTY
-      // style object — so a cold-boot `#feed` read `''` here and `'none'` in a browser, and any
-      // guard phrased "is the feed showing" was answered by the harness rather than by the app.
-      // Found by an independent review of [TASK-104] round 5, which noted the round-5 test passed
-      // for a reason the browser does not share. Seeded, the two agree.
+      // style object — so a cold-boot `#feed` would read `''` here and `'none'` in a browser, and any
+      // guard phrased "is the feed showing" would be answered by the harness rather than by the app.
+      // Seeded, the two agree.
       if (INLINE_HIDDEN_IDS.has(id)) el.style.display = 'none';
-      // `toasts` used to be declared, returned, documented — and never written to, so
-      // `assert.equal(app.toasts.length, 0)` was permanently true no matter what the app did
-      // (CHR-040; the same dead-field shape that kept a no-op clearLocalIdentity() green through
-      // eight rounds of BUG-017). showToast's only record of the message is the textContent it
+      // `toasts` must actually be written to, or
+      // `assert.equal(app.toasts.length, 0)` is permanently true no matter what the app does.
+      // showToast's only record of the message is the textContent it
       // writes to `.toast-msg` (app.js), so recording that write is what makes a toast observable
       // as HISTORY rather than as last-value-wins.
       if (id === 'toast') {
@@ -453,10 +431,10 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
           enumerable: true,
         });
         // app/index.html ships the action as `class="toast-action hidden"`, and a fresh stub starts
-        // with an EMPTY class set — so an assertion that the button was revealed passed whether or
+        // with an EMPTY class set — so an assertion that the button was revealed passes whether or
         // not showToast ever removed the class. Seeding it is what makes that assertion bite;
-        // deleting `btn.classList.remove('hidden')` was otherwise a fully green mutation, leaving
-        // the remedy invisible while the test called onclick() directly. (Review round 1, H2.)
+        // deleting `btn.classList.remove('hidden')` is otherwise a fully green mutation, leaving
+        // the remedy invisible while the test calls onclick() directly.
         el.querySelector('.toast-action').classList.add('hidden');
       }
       els.set(id, el);
@@ -466,12 +444,12 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
 
   // The two theme buttons (app/index.html:338-343), memoised under pseudo-ids so their listeners
   // survive between statements exactly as a real node's would. Modelled because the THEME tap is the
-  // production repro of BUG-056 — a browser whose boot read failed, one tap, and the account's row is
-  // emptied 1.5s later. `wireApp` reaches them only through querySelectorAll('.theme-opt'), which
-  // used to answer `[]`, so the measured repro was the one mutation route no test could fire; the
+  // measured repro of a data loss — a browser whose boot read failed, one tap, and the account's row is
+  // emptied 1.5s later. `wireApp` reaches them only through querySelectorAll('.theme-opt'), so
+  // answering `[]` there would leave the measured repro as the one mutation route no test could fire; the
   // Shorts toggle runs the same code but is not the control that destroyed a real row. Their
   // `dataset.theme` is what the click handler reads to decide which theme to store, so it is seeded
-  // here rather than left undefined. (BUG-056; CHR-046 tracks this DOM model being a hand-copy.)
+  // here rather than left undefined.
   const THEME_OPTS = ['light', 'dark'];
   const themeOptFor = (theme) => {
     const el = elFor(`__theme-opt-${theme}`);
@@ -492,19 +470,18 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
     visibilityState: 'visible',
     get activeElement() { return activeEl ?? document.body; },
     getElementById: id => elFor(id),
-    // The SINGULAR sibling. Review round 1 (2026-08-18) found this left behind when
-    // `querySelectorAll` was made real — and it is the half that both document-level production
+    // The SINGULAR sibling — the half that both document-level production
     // reads actually use (`markGroupDone`'s card and tile lookups). Returning a fresh truthy
-    // detached stub made `if (card)` permanently true, so renaming `data-id`, deleting `CSS.escape`,
-    // or forcing the tile lookup to null were ALL fully green mutations. An instrument that is
+    // detached stub would make `if (card)` permanently true, so renaming `data-id`, deleting `CSS.escape`,
+    // or forcing the tile lookup to null would ALL be fully green mutations. An instrument that is
     // honest in one method and phantom in its sibling is worse than one that is uniformly crude.
     //
-    // `#id`-rooted selectors now go through the real matcher and can return null, exactly like a
+    // `#id`-rooted selectors go through the real matcher and can return null, exactly like a
     // browser. Bare-class selectors (`.appbar`, `.setup-scroll`, `.confirm-label`) still get a
     // phantom, because production dereferences those without a null check and the DOM model does not
-    // contain them — but it is now MEMOISED per selector, so a handler assigned in one statement is
+    // contain them — but it is MEMOISED per selector, so a handler assigned in one statement is
     // readable in the next, as with the element-scoped version. Narrowed rather than fixed, and said
-    // so: making those real needs the DOM model CHR-046 tracks, not a bigger matcher.
+    // so: making those real needs a full DOM model, not a bigger matcher.
     querySelector: sel => {
       const parts = String(sel).trim().split(/\s+/);
       if (parseCompound(parts[0]).id) return document.querySelectorAll(sel)[0] ?? null;
@@ -514,7 +491,7 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
     // `.view` and `.theme-opt` stay enumerated: those stubs are memoised under pseudo-ids and are
     // parented to nothing, so no tree walk can reach them. Everything else is ANSWERED FROM THE TREE
     // rather than hardcoded to `[]` — see the selector-matching note above stubEl for why that
-    // distinction is the whole of [BUG-092]'s invisibility.
+    // distinction matters.
     querySelectorAll: sel => {
       if (sel === '.view') return VIEW_IDS.map(elFor);
       if (sel === '.theme-opt') return THEME_OPTS.map(themeOptFor);
@@ -527,12 +504,12 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
         return queryWithin([root], parts.slice(1).join(' '));
       }
       // No id root: every element memoised BY ID, plus their subtrees. Narrower than a browser's
-      // document — review round 1 was right that the earlier wording ("every element this harness has
-      // ever handed out") was false: `document.body`, `createElement` products not appended under an
+      // document, and NOT "every element this harness has
+      // ever handed out": `document.body`, `createElement` products not appended under an
       // id'd element, and the phantoms from `el.querySelector()` are all invisible here, so a card
       // appended to `document.body` answers 0 where a browser answers 1. Adequate because every
-      // container app.js queries into is reached by id; widening it needs the DOM model [CHR-046]
-      // tracks. A class the model does not contain (`.chip`, `.nav-tab`) still answers `[]` — but now
+      // container app.js queries into is reached by id; widening it needs a full DOM model.
+      // A class the model does not contain (`.chip`, `.nav-tab`) still answers `[]` —
       // because nothing matched, not because the answer was written in advance.
       if (parts.length > 1) {
         throw new Error(`app-harness: document-level descendant selector needs an #id root: "${sel}"`);
@@ -553,7 +530,7 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
 
   // `search` is settable so the auth-landing paths are testable: a magic-link round-trip arrives as
   // `?auth=ok|invalid|google_failed`, and the FAILURE values are the ones that matter — an expired
-  // link used to skip the wall and drop an anonymous visitor into the app (found live 2026-07-31).
+  // link must not skip the wall and drop an anonymous visitor into the app.
   // history.replaceState clears it, exactly as the browser does, so a test sees the real sequence.
   let _search = search;
   const location = {
@@ -562,11 +539,8 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
     set href(v) { navigations.push(String(v)); this._href = String(v); },
     replace(v) { navigations.push(String(v)); this._href = String(v); },
     reload() { navigations.push('reload'); },
-    // GETTER ONLY — assigning `app.ctx.location.search = '?x'` is a SILENT NO-OP, and that is not
-    // a hypothetical: it cost time during [BUG-051]'s handset walk. A probe set it that way,
-    // believed it had configured the app, and read three identical "nothing happened" results; the
-    // one earlier run that appeared to work had ALSO passed `search` to createApp, which is the
-    // only thing that ever did anything. Pass `createApp({ search })`. Left a getter rather than
+    // GETTER ONLY — assigning `app.ctx.location.search = '?x'` is a SILENT NO-OP: a probe that sets it that way
+    // believes it has configured the app and reads "nothing happened". Pass `createApp({ search })`. Left a getter rather than
     // made settable, because `history.replaceState` below is what models the real strip and a
     // second write path would let a test diverge from the browser.
     get search() { return _search; },
@@ -601,18 +575,16 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
     requestAnimationFrame: fn => { timers.push({ fn, ms: 0, at: clock }); return timers.length; },
     fetch: async (url, init) => { requests.push({ url: String(url), init: init || {} }); return doFetch(String(url), init || {}); },
     // LOAD-BEARING, not housekeeping. syncOnLoad (app.js) and checkAuth both bound their boot fetch
-    // with `new AbortController()` on the FIRST line of a try whose catch swallows everything. While
-    // this was absent both threw ReferenceError, were swallowed as "offline", and init() completed
-    // having issued ZERO requests — so every boot-path assertion passed vacuously. Found by probing
-    // the harness during TASK-084's scoping; test/exit-paths.test.mjs:210 had been patching it
-    // inline per-test, which is why nothing noticed. The remaining absent globals are CHR-036.
+    // with `new AbortController()` on the FIRST line of a try whose catch swallows everything. Without
+    // this both throw ReferenceError, are swallowed as "offline", and init() completes
+    // having issued ZERO requests — so every boot-path assertion passes vacuously.
     AbortController,
     // A real `URL` (so `new URL()` and its statics keep working) plus the two object-url statics
     // Node does not provide. Subclassed rather than replaced: `URL.canParse` and friends stay
-    // reachable through the constructor's prototype chain. ([BUG-051])
+    // reachable through the constructor's prototype chain.
     URL: HarnessURL,
     // Content-preserving, so a test can read back exactly what the app put in the file rather than
-    // only that it made one. ([BUG-051])
+    // only that it made one.
     Blob: class {
       constructor(parts = [], opts = {}) {
         this.parts = [...parts];
@@ -631,15 +603,12 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
     matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
     // Rendering ANY X card reaches wireCarouselDots, which constructs one of these — so without it
     // renderFeedResults throws ReferenceError and no test can drive the feed render at all. Inert on
-    // purpose: the harness cannot scroll, and nothing asserts on carousel dots. Added by [TASK-094],
-    // whose whole subject is which cards the render holds hidden. The remaining absent globals are
-    // still [CHR-036].
-    // RECORDS what it was told to watch. A no-op stub made "wired to the right elements" and
-    // "wired to nothing at all" indistinguishable — and that is not hypothetical: [TASK-098] WROTE
+    // purpose: the harness cannot scroll, and nothing asserts on carousel dots.
+    // RECORDS what it was told to watch. A no-op stub makes "wired to the right elements" and
+    // "wired to nothing at all" indistinguishable — and that is not hypothetical: calling
     // `wireCarouselDots(rail, dots, '.tc-slide', '.tc-dot')` against a two-parameter function that
-    // hardcodes `.tweet-slide`/`.tweet-dot`, so the extra arguments were silently dropped, both lists
-    // came back empty, the observer watched nothing, and the carousel's dots never moved. An
-    // independent mutation battery found it by deleting the call and seeing NOTHING fail.
+    // hardcodes `.tweet-slide`/`.tweet-dot` silently drops the extra arguments, both lists
+    // come back empty, the observer watches nothing, and the carousel's dots never move.
     // `observed` is the side-effect that makes the wiring assertable without dispatching an event.
     IntersectionObserver: class {
       constructor(cb, opts) { this.cb = cb; this.opts = opts; this.observed = []; observers.push(this); }
@@ -650,8 +619,7 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
     ...pure,                       // esc, exitKeyPlan, filters… the same bindings the browser loads
   };
   // `openGroupDetail` ends with `window.scrollTo(0, 0)`, so without this the drill-in
-  // threw `window.scrollTo is not a function` and could not be driven AT ALL — found by [BUG-092]'s
-  // C4 test, not by reading. Recorded rather than silently swallowed: "did opening a group scroll the
+  // throws `window.scrollTo is not a function` and cannot be driven AT ALL. Recorded rather than silently swallowed: "did opening a group scroll the
   // reader to the top" is a real question, and a no-op would make it permanently unanswerable.
   ctx.scrollTo = (x = 0, y = 0) => { scrolls.push({ x, y }); };
   ctx.window = ctx;
@@ -687,8 +655,7 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
      *  Models a browser blocking site data, which refuses READS as well as writes. */
     failGetItem: (pred) => { failGetItem = pred; },
     /** Every file the app offered the user, as `{ type, text }`, in order. Empty means NO download
-     *  was produced — which is a different fact from an empty one, and the whole of [BUG-051]
-     *  criterion 7. */
+     *  was produced — which is a different fact from an empty one. */
     exports: () => objectUrls.map(b => ({ type: b.type, text: typeof b.text === 'function' ? b.text() : '' })),
     timers,
     scrolls,
@@ -705,7 +672,7 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
     el: id => elFor(id),
     /** `document.querySelectorAll`, exposed so the selector model itself is assertable.
      *  Needed because the app's own reads of `#feed .card` are internal, and an instrument that
-     *  cannot be interrogated is how [BUG-092] stayed invisible. Pinned by test/harness-dom.test.mjs. */
+     *  cannot be interrogated hides defects. Pinned by test/harness-dom.test.mjs. */
     queryAll: sel => document.querySelectorAll(sel),
     visibleViews: () => VIEW_IDS.filter(id => !elFor(id).classList.contains('hidden')),
     /** The memoised `.theme-opt` button for 'light' | 'dark'. */
@@ -713,8 +680,7 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
     /** Run every click listener registered on `el`, and report how many ran.
      *  The count is returned rather than swallowed so a test can assert the control was WIRED —
      *  a tap on an unwired button is silently a no-op, which is indistinguishable from a tap whose
-     *  handler correctly did nothing, and that is precisely the confusion BUG-017's re-verification
-     *  lost time to (three sign-out clicks that never ran, read as "the toast never fires"). */
+     *  handler correctly did nothing (clicks that never ran read as "the toast never fires"). */
     click: (el) => {
       const fns = el.listeners.filter(l => l.type === 'click');
       fns.forEach(l => l.fn());
@@ -735,28 +701,22 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
     /** Set `document.visibilityState` ('visible' | 'hidden'). Sugar for the line above. */
     setVisibility: (state) => { document.visibilityState = state; },
     /** Run every timer queued so far (and any they queue), up to `rounds` passes. */
-    // TWO BLIND SPOTS, measured 2026-08-24 (BUG-047 round 6) rather than suspected — read them
+    // TWO BLIND SPOTS, measured rather than suspected — read them
     // before writing a test that claims to pin a timeout.
     //   - DELAY is ignored: this fires every pending timer whatever its `ms`, so nothing here can
     //     tell an 8s bound from a 0s one, and calling it before a short operation completes
-    //     MANUFACTURES a timeout. ✅ CLOSED 2026-08-27 — but only for callers who use the OTHER
+    //     MANUFACTURES a timeout. Closed only for callers who use the OTHER
     //     driver: `advance(ms)` above models a virtual clock and fires just what is due. This
     //     blind spot is still real for `runTimers` itself, which is kept unchanged because 38 call
     //     sites depend on its fire-everything semantics. Use `advance` for a TIMEOUT or a DEBOUNCE;
     //     `runTimers` for "flush whatever is pending".
-    //     (History, because it cost something: a delay-aware driver was built once during round 6
-    //     and cut with the change that needed it, and its only copy — an uncommitted file in a
-    //     review worktree — was destroyed by a cleanup that judged it scratch WITHOUT READING IT.
-    //     Verified unrecoverable, then re-derived from scratch. A worktree's uncommitted files are
-    //     the only copy there has ever been.)
-    //   - CANCELLATION is invisible TO runTimers, and is now observable through `advance`: a
-    //     cancelled timer never fires there, pinned by "a cancelled timer never fires" and killed by
-    //     the battery's M4. The paragraph below still holds for everything driven by runTimers.
+    //   - CANCELLATION is invisible TO runTimers, and is observable through `advance`: a
+    //     cancelled timer never fires there, pinned by "a cancelled timer never fires".
+    //     The paragraph below still holds for everything driven by runTimers.
     //     Making `clearTimeout` a no-op survives the whole suite. Every
     //     clearTimeout in app.js — cancelPendingPushes, schedulePush's debounce coalescing — is
     //     unobservable, so a test asserting "the timer was cancelled" is decoration by construction.
     //     The exit tests that look like they cover it actually pin `_leaving` and the seals.
-    // Tracked with [BUG-035], which is where the timeout work will land.
     /** Move the virtual clock forward by `ms`, firing ONLY the timers that come due inside that
      *  window, in due order. Returns how many fired.
      *
@@ -805,8 +765,8 @@ export function createApp({ store: initial = {}, fetch: fetchImpl, search = '' }
 /** A signed-in browser with real content in EVERY key an exit is supposed to clear.
  *
  * Seeding all of them matters: `assert.equal(get(k), null)` passes trivially for a key that was
- * never in the store, so a fixture that omits one turns its own assertion into decoration. Review
- * round 9 found seven such assertions here. If you add an SK key, seed it. */
+ * never in the store, so a fixture that omits one turns its own assertion into decoration.
+ * If you add an SK key, seed it. */
 export const SIGNED_IN = {
   focus_device_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   focus_channels: JSON.stringify([{ id: 'UC_prev', name: "Previous user's channel" }]),
@@ -823,7 +783,7 @@ export const SIGNED_IN = {
   focus_theme: 'dark',
   focus_was_authed: '1',
   focus_landing_seen: 'true',
-  // [TASK-092] The tour record. Device-local and cleared on exit, so an exit test that forgot it would
+  // The tour record. Device-local and cleared on exit, so an exit test that forgot it would
   // pass `get('focus_tour') === null` over a key that was never there.
   focus_tour: JSON.stringify({ at: 'done' }),
 };

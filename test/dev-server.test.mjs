@@ -1,9 +1,9 @@
-// dev-server.mjs: what it serves, to whom, and on which addresses ([BUG-131]).
+// dev-server.mjs: what it serves, to whom, and on which addresses.
 //
 // The dev server used to serve any file under the repo root that had an extension, with
 // `Access-Control-Allow-Origin: *`, on every network interface. So while it ran, any website open in
 // the same browser — and any device on the same network — could read `.env.local`, `Users.md` or
-// `tasks/*.md`. Reproduced against a running server on 2026-10-08 (table in tasks/BUG-131.md).
+// `tasks/*.md`.
 //
 // Three tiers here, because each one can be wrong while the others are right:
 //   1. the two decisions as functions (`staticFileFor`, `listenHosts`);

@@ -19,7 +19,7 @@ const MIME = {
   '.ico':  'image/x-icon',
 };
 
-// Response headers from vercel.json (TASK-062/065) so local dev mirrors production's
+// Response headers from vercel.json so local dev mirrors production's
 // security headers — including the CSP, which can only be exercised against real embeds.
 // Read fresh each call so editing vercel.json takes effect on the next reload (no restart).
 // Vercel applies these to every route; we apply them to static responses, which carry the
@@ -32,7 +32,7 @@ function vercelHeaders(root) {
   } catch { return {}; }
 }
 
-// What this server will serve ([BUG-131]): the app's own files, by name, and nothing else. It used
+// What this server will serve: the app's own files, by name, and nothing else. It used
 // to serve any path under this folder that had an extension — `.env.local`, private notes, `tasks/`
 // — to any website open in the same browser. A file the app gains must be added here;
 // test/dev-server.test.mjs fails when a page references one that is missing.
@@ -56,7 +56,7 @@ export function staticFileFor(pathname) {
   return listed ? rel : null;
 }
 
-// Which addresses the server listens on ([BUG-131]). This computer only, unless started with
+// Which addresses the server listens on. This computer only, unless started with
 // `--lan` (a handset walk): the /api handlers run with the keys of whoever started the server, and
 // every device on the same network could call them. `undefined` is Node's "every interface".
 export function listenHosts(argv) {
@@ -75,7 +75,7 @@ function staticFile(res, root, rel) {
     const data = fs.readFileSync(file);
     // Never cache in dev. Without this the server sends no Cache-Control, no ETag and no
     // Last-Modified, so a browser applies HEURISTIC caching and may serve a stale copy with no way
-    // to tell — which is exactly what happened while verifying BUG-084 on a handset: several rounds
+    // to tell — which is exactly what happened while verifying a fix on a handset: several rounds
     // of "the fix did nothing" against a page that may never have been re-fetched. A dev server
     // that can silently serve yesterday's file is not a dev server.
     res.writeHead(200, {
@@ -137,7 +137,7 @@ export function createHandler(root = __dir) { return async function handle(req, 
   catch { res.writeHead(400); res.end('Bad request'); return; }
   const pathname = url.pathname;
 
-  // No Access-Control-Allow-Origin header, on purpose ([BUG-131]). The app is same-origin with this
+  // No Access-Control-Allow-Origin header, on purpose. The app is same-origin with this
   // server and needs none; `*` let any website read every answer.
 
   if (pathname.startsWith('/api/')) {
@@ -232,7 +232,7 @@ async function main() {
     ? 'Net → open to your network (--lan). Anyone on it can use this server.'
     : 'Net → this computer only. For a handset walk, start with --lan.');
 
-  // TASK-064: say which database this dev server writes to. `vercel env pull` writes the Neon
+  // Say which database this dev server writes to. `vercel env pull` writes the Neon
   // integration's DATABASE_URL, which is the production one — so "localhost" has never implied
   // "a safe database", and nothing here used to say so.
   const { dbHost, isProductionDb, resolveDatabaseUrl } = await import('./api/_db.js');
@@ -248,7 +248,7 @@ async function main() {
 }
 
 // Start only when run directly (`node dev-server.mjs`), so a test can import the functions above
-// without opening a port or loading `.env` into its own process ([BUG-131]).
+// without opening a port or loading `.env` into its own process.
 function isRunDirectly() {
   // `argv[1]` need not be a file at all (`node -e '…' some-word`), and realpath throws on that.
   try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); }

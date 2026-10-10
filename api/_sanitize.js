@@ -1,4 +1,4 @@
-// Server-side HTML sanitizer for remote article HTML (Substack reader, TASK-059).
+// Server-side HTML sanitizer for remote article HTML (Substack reader).
 //
 // The reader fetches a Substack post's HTML and injects it into the page via innerHTML, so this
 // module is the trust boundary. There is no build step and no dependencies (vanilla, zero-dep),
@@ -13,7 +13,7 @@
 //
 // Step 3 fails CLOSED: anything the tokenizer cannot parse becomes visible text rather than markup.
 // Step 4 is genuinely redundant and must stay that way — when it was the only thing catching
-// malformed tags, a quote-glued handler defeated it (BUG-018).
+// malformed tags, a quote-glued handler defeated it.
 
 // Elements removed entirely, content and all — never safe to surface.
 const REMOVE_WITH_CONTENT = [
@@ -88,14 +88,14 @@ export function sanitizeHtml(input) {
 
   // 3. Scan the remaining tags left to right. The attribute run is matched quote-aware ("…"/'…'
   //    consumed whole) so a '>' *inside* a quoted value can't end the tag early and spill the rest
-  //    as text — that was the Substack tweet-embed JSON leak (BUG-012).
+  //    as text — that was the Substack tweet-embed JSON leak.
   //
   //    This is a SCAN, not a replace, and the difference is the security property. At every '<' the
   //    tokenizer is tried ANCHORED at that position (sticky flag). A match is allow-listed and
   //    cleaned as before. A NON-match means the tag could not be fully parsed — most often an
   //    unbalanced quote — and such a tag is neither allow-listed nor removed, so a plain replace
   //    left it in the output as live markup. Escaping the '<' makes it visible text instead: the
-  //    sanitizer now fails CLOSED. That was BUG-018, a zero-click XSS, because step 4 below only
+  //    sanitizer fails CLOSED. Leaving it in was a zero-click XSS, because step 4 below only
   //    strips a handler preceded by whitespace and a quote-glued one slipped past both layers.
   //
   //    Text between tags is copied verbatim, never re-escaped, so existing entities (&amp;, &lt;)

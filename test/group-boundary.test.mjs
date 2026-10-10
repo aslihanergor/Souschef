@@ -1,5 +1,4 @@
-// The BOUNDARY of POST /api/group — what the endpoint accepts before an Anthropic call is billed
-// ([BUG-069]).
+// The BOUNDARY of POST /api/group — what the endpoint accepts before an Anthropic call is billed.
 //
 // These drive the REAL handler through fakeReq/fakeRes with only Anthropic faked, for the reason
 // test/group-seam.test.mjs exists: `const body = ...; const groups = body?.groups` in api/group.js is
@@ -11,11 +10,10 @@ import assert from 'node:assert/strict';
 import { fakeReq, fakeRes } from '../test-helpers/handler.mjs';
 import { createGroupHandler } from '../api/group.js';
 
-// [BUG-130] made the endpoint signed-in only, so this file presents a confirmed session: these tests are
+// The endpoint is signed-in only, so this file presents a confirmed session: these tests are
 // about what a signed-in caller's request does, and the gate itself is covered in signed-in-gate.test.mjs.
-// Only how the handler is built changed (the import above and this block); no assertion did (Asli,
-// 2026-10-07: "yes to all three, go ahead"). The DEFAULT export, which these files used to run, is now
-// covered by test/group-default-export.test.mjs (review round 1, H1).
+// The DEFAULT export is
+// covered by test/group-default-export.test.mjs.
 const handler = createGroupHandler({
   db: () => ({}),
   sessionAccount: async () => ({ accountId: 'acct-test', email: 'test@example.com' }),
@@ -26,7 +24,7 @@ const POSTS = [
   { id: 'n2', source: 'twitter', text: 'The budget vote is scheduled for Thursday' },
 ];
 
-// Lever A ([BUG-077]): posts reach the model as positional indices, so a fake reply must answer in
+// Lever A: posts reach the model as positional indices, so a fake reply must answer in
 // the same language. Two posts in one group, so collapseSingletons has no singleton to fold and the
 // label survives — this file is about the boundary, not about the fold.
 const REPLY = {
@@ -71,8 +69,8 @@ test('BUG-069: a string `groups` no longer takes the whole classify down', async
 
 test('BUG-069: the non-array `groups` values that already worked keep working', async () => {
   // {} / 42 / true have a FALSY .length, so buildGroupRequest ignores them and the call succeeds
-  // today. A `|| []` guard once turned them into a throw after the call was billed (BUG-066 review
-  // round 1, M3), so this pins the direction the fix must NOT regress. Normalising to [] preserves
+  // today. A `|| []` guard once turned them into a throw after the call was billed,
+  // so this pins the direction the fix must NOT regress. Normalising to [] preserves
   // it exactly: no labels either way.
   for (const bad of [{}, 42, true]) {
     const res = await callHandler({ items: POSTS, groups: bad });
@@ -83,8 +81,8 @@ test('BUG-069: the non-array `groups` values that already worked keep working', 
 });
 
 test('BUG-069: a non-array `items` is rejected at the boundary, before anything is billed', async () => {
-  // The handler's oldest guard, and nothing has ever asserted it. Pinned here because the validation
-  // this task adds sits on the line directly below it — the easiest thing in the world to break
+  // The handler's oldest guard. Pinned here because the size
+  // validation sits on the line directly below it — the easiest thing in the world to break
   // while rewriting its neighbour.
   for (const bad of [undefined, null, 'abc', 42, {}]) {
     const res = await callHandler({ items: bad, groups: [] });
@@ -98,9 +96,9 @@ test('BUG-069: a non-array `items` is rejected at the boundary, before anything 
 // request body and the Anthropic call can bypass it — so these read `init.body`, the exact string
 // handed to fetch, and never a payload the test reconstructs.
 //
-// That distinction cost a wrong diagnosis on this very task. A probe that rebuilt the payload itself
-// reported 688,291 bytes for a batch of oversized `id`s and the number was fiction: lever A
-// ([BUG-077]) rewrites every id to its position BEFORE the prompt is built, so the real wire figure
+// The distinction matters. A probe that rebuilds the payload itself
+// reports 688,291 bytes for a batch of oversized `id`s and the number is fiction: index aliasing
+// rewrites every id to its position BEFORE the prompt is built, so the real wire figure
 // is 15,862 bytes and the ids appear nowhere in it. Measure the bag you actually carry home.
 const HOSTILE = [
   {

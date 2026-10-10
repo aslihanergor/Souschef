@@ -1,6 +1,6 @@
-// Host canonicalisation config guard (BUG-060).
+// Host canonicalisation config guard.
 //
-// The fix for BUG-060 is a `redirects` key in vercel.json making one host canonical, so a browser
+// A `redirects` key in vercel.json makes one host canonical, so a browser
 // gets ONE localStorage and ONE device id instead of one per origin. There is no way to test the
 // deployed behaviour here: `dev-server.mjs`'s `vercelHeaders` reads only `cfg.headers` and never looks at
 // redirects, and a host-conditional rule is meaningless against localhost:3000. Production is the
@@ -15,7 +15,7 @@
 // trailing-delimiter group, so the named-parameter form `/:path*` does NOT match the bare root `/`,
 // nor `/app/`, nor `/privacy/` — measured against path-to-regexp 6.1.0 with Vercel's exact options.
 // The first version of this change shipped `/:path*` and would have left the apex of every
-// secondary host answering 200, plus `/app/` still booting the app on a non-canonical origin: BUG-060
+// secondary host answering 200, plus `/app/` still booting the app on a non-canonical origin: the split
 // unfixed, on a live URL, past a green suite. So a rule is not judged by whether it has a parameter.
 // It is judged by whether its pattern actually matches the paths that must be folded.
 //
@@ -38,14 +38,12 @@ import { readFileSync } from 'node:fs';
 const ROOT = new URL('../', import.meta.url);
 const config = JSON.parse(readFileSync(new URL('vercel.json', ROOT), 'utf8'));
 
-// The canonical host (Asli's call 2026-08-03, re-confirmed 2026-08-22 against the finding that
-// focus-social.app is the project's registered domain and production URL). index.html:25 already
-// declares og:url as this host.
+// The canonical host. index.html:25 already declares og:url as this host.
 const CANONICAL = 'trysouschef.vercel.app';
 
 // Every OTHER host serving this deployment. Hand-maintained, and it can only make noise about a host
-// that is IN it: a domain added in the Vercel dashboard and not added here re-opens BUG-060 silently
-// and no unit test can see that. That obligation lives in the task's DoD and in docs/architecture.md,
+// that is IN it: a domain added in the Vercel dashboard and not added here re-opens the split silently
+// and no unit test can see that. That obligation lives in docs/architecture.md,
 // not here — stated so nobody mistakes this list for a mechanism that covers it.
 const NON_CANONICAL = ['focus-social.app', 'focus-social.vercel.app'];
 
@@ -179,7 +177,7 @@ test('no redirect rule can match the canonical host itself', () => {
 
 test('the redirects are temporary (307) and no statusCode overrides that', () => {
   for (const rule of rulesOrFail()) {
-    // Asli's call at scoping: souschef.app belongs to a different company, so the branded apex we
+    // souschef.app belongs to a different company, so the branded apex we
     // might have wanted is unavailable and the canonical host is not final. A 308 is cached hard by
     // browsers and would strand anyone who visited during this period.
     assert.equal(

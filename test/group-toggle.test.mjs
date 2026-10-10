@@ -1,48 +1,46 @@
-// [TASK-099] — UNGROUPED IS THE DEFAULT, AND GROUPING IS A CHOICE.
+// UNGROUPED IS THE DEFAULT, AND GROUPING IS A CHOICE.
 //
-// Today grouping is unconditional: `renderFeedResults` skips every already-assigned groupable post
-// when it builds the chronological stream (app.js), so a post that a classify has filed exists ONLY
-// in its tile and the plain chronological feed the product promises is unreachable. Nobody chose
+// If grouping were unconditional — `renderFeedResults` skipping every already-assigned groupable post
+// when it builds the chronological stream (app.js) — a post that a classify has filed would exist ONLY
+// in its tile and the plain chronological feed the product promises would be unreachable. Nobody chooses
 // that — the feed simply arrives reorganised — and everyone pays for it, because a genuinely-new X
-// post is held hidden (`grouping-pending`) for 4.4-10.3s so it cannot flash under "Posts" and then
+// post has to be held hidden (`grouping-pending`) for 4.4-10.3s so it cannot flash under "Posts" and then
 // be yanked into a tile.
 //
 // This file pins the reverse: every post renders into the stream, an assigned one additionally
 // carries `.grouped-out` (display:none) ONLY while the reader has grouping on, and one switch in the
-// feed appbar moves between the two views. The lift HIDES rather than removes (decision 1,
-// 2026-08-26), which is what makes the toggle symmetric and idempotent — and which transfers a cost
+// feed appbar moves between the two views. The lift HIDES rather than removes,
+// which is what makes the toggle symmetric and idempotent — and which transfers a cost
 // to every selector that counts `#feed` cards, because a hidden card is still in the DOM.
 //
-// WHICH TESTS COULD RED BEFORE THE FIX, stated because a merely-red suite hides the one that passed
-// for the wrong reason (CLAUDE.md, Mutation batteries):
+// WHICH TESTS FAIL WITHOUT THE SWITCH, stated because a merely-red suite hides the one that passed
+// for the wrong reason:
 //
-//   RED before the fix   — T1, T2, T3, T4, T5, T6, T7, T9, T10a, T10b, T10c, T12, T13, T14, T14b,
-//                          T15. Sixteen of the SEVENTEEN that existed at the RED step; each fails on
-//                          a criterion `main` violates today, and each names the value it read.
+//   RED without it   — T1, T2, T3, T4, T5, T6, T7, T9, T10a, T10b, T10c, T12, T13, T14, T14b,
+//                          T15. Each names the value it read.
 //
-//   ADDED LATER, so they were never part of that accounting and this file now holds TWENTY-THREE:
-//     T14c, T14d, T16 — after the mutation battery reported survivors. T14 exercised BOTH [BUG-103]
-//                       guards at once, so either alone satisfied it and it pinned NEITHER.
-//     T17, T18, T19   — after independent review found three defects (see tasks/TASK-099.md).
-//   GREEN before the fix — T8 alone. It guards a defect that ONLY decision 1 can introduce: under
-//                          hide-not-remove the hidden cards are still in `#feed`, so
+//   COVERAGE for guards on the new behaviour:
+//     T14c, T14d, T16 — T14 exercises BOTH duplicate-card
+//                       guards at once, so either alone satisfies it and it pins NEITHER.
+//     T17, T18, T19   — the writers that take a post out of its tile.
+//   GREEN without it — T8 alone. It guards a defect that ONLY hide-not-remove can introduce: the
+//                          hidden cards are still in `#feed`, so
 //                          `liftGroupedFromStream` drops every one into `_liftDeferred`, the grid's
 //                          `counts[gid] > 0` filter then removes every tile, and the grouped view
-//                          collapses on the next background classify. It cannot fire on `main`,
-//                          where those cards were removed outright and there is nothing to defer.
-//                          Declared rather than quietly counted as coverage.
+//                          collapses on the next background classify. It cannot fire
+//                          where those cards are removed outright and there is nothing to defer.
 //
-// NOT TESTABLE HERE, and deliberately (see the task's Verification section): criterion 11 (reduced
-// motion), the switch's appearance, the bloom's timing and its 44px hit target at 375px. A desktop
+// NOT TESTABLE HERE, and deliberately: reduced
+// motion, the switch's appearance, the bloom's timing and its 44px hit target at 375px. A desktop
 // browser is the wrong instrument for all four and a resized desktop window is not a substitute —
-// they go to Asli on a handset.
+// they need a handset.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp, SIGNED_IN } from '../test-helpers/app-harness.mjs';
 
 // RELATIVE to now, never a frozen constant: the prune treats an in-hand post older than WINDOW_DAYS
 // as evidence of a wrong device clock, so a fixed 2025 timestamp would drift a passing suite into
-// one asserting the opposite as months go by ([BUG-098] review round 1).
+// one asserting the opposite as months go by.
 const PUBLISHED = Date.now() - 2 * 86400_000;
 
 const xPost = (id, text = `post ${id} says something`) => ({
@@ -87,19 +85,18 @@ const render = (app, items, failed = []) =>
   app.ctx.renderFeedResults({ items, failed, cappedNames: [], totalChannels: items.length + failed.length });
 
 // Every card in the stream, hidden or not — the DOM truth.
-// [TASK-098]: `.card` is now REQUIRED rather than implied. Every child of `#feed` used to be a post
-// card, so mapping over `children` and mapping over post cards were the same set; a `.topic-card` is
-// now also a child, and it carries `data-gid` rather than `data-id` — so the un-narrowed version
-// reported `undefined` in the middle of the stream. The QUESTION is unchanged: which posts are here.
+// `.card` is REQUIRED rather than implied. A `.topic-card` is
+// also a child of `#feed`, and it carries `data-gid` rather than `data-id` — so an un-narrowed
+// map over `children` reports `undefined` in the middle of the stream. The QUESTION is: which posts are here.
 const streamIds = app => app.el('feed').children.filter(c => c.classList.contains('card')).map(c => c.dataset.id);
-// What the READER can actually see. `.grouped-out` is this task's hide; `.grouping-pending` is
-// [TASK-073]'s hold; `.removing` is a card mid-slide-out. A test that asserts on streamIds alone
+// What the READER can actually see. `.grouped-out` is the grouped view's hide; `.grouping-pending` is
+// the classify hold; `.removing` is a card mid-slide-out. A test that asserts on streamIds alone
 // cannot tell "present and visible" from "present and hidden", which is the whole subject here.
 const visibleIds = app =>
   app.queryAll('#feed .card:not(.grouped-out):not(.grouping-pending):not(.removing)').map(c => c.dataset.id);
 const heldIds = app => app.queryAll('#feed .card.grouping-pending').map(c => c.dataset.id);
 const badge = app => app.el('feed-count').textContent;
-// [TASK-098] RE-POINTED. A topic is a `.topic-card` in the stream now, not a `.group-card` tile in a
+// A topic is a `.topic-card` in the stream, not a `.group-card` tile in a
 // `#group-grid` above it. The assertions below are unchanged — only where they look. The READERS got
 // stronger in the move: the old tile was one `innerHTML` blob, so its count and bullets could only be
 // scraped by regex over an unparsed string; the new card is appended nodes, so these are real queries.
@@ -107,7 +104,7 @@ const badge = app => app.el('feed-count').textContent;
 // reader being shown topics right now" — is whether any topic card is in the stream.
 const gridHidden = app => app.queryAll('#feed .topic-card').length === 0;
 const tileFor = (app, gid) => app.queryAll('#feed .topic-card').find(c => c.dataset.gid === gid);
-// [TASK-098]: the drill-in is deleted (criterion 12). A topic's posts are ALWAYS on its card's rail,
+// There is no drill-in. A topic's posts are ALWAYS on its card's rail,
 // so there is nothing to open and nothing to close. `querySelectorAll`, not `querySelector`: the
 // reduced post's buttons are real appended nodes now, and the element-scoped singular form answers
 // with a memoised PHANTOM rather than the node the app wired.
@@ -128,8 +125,7 @@ const settle = async (rounds = 5) => { for (let i = 0; i < rounds; i++) await ne
 
 /** Wire the real controls, then tap the switch. Returns the number of handlers that ran.
  *  Asserted as 1 at every call site: a tap on an unwired button is silently a no-op, which is
- *  indistinguishable from a handler that correctly did nothing — the confusion [BUG-017]'s
- *  re-verification lost three sign-out clicks to. */
+ *  indistinguishable from a handler that correctly did nothing. */
 const tapSwitch = (app) => app.click(sw(app));
 
 // ── Default: grouping OFF ─────────────────────────────────────────────────────
@@ -163,9 +159,9 @@ test('TASK-099 T2 (C2): OFF — the badge counts the visible stream once, not tw
 
   render(app, ids.map(id => xPost(id)));
 
-  // Both halves, and the first is what makes the second non-vacuous. On main the badge already
-  // reads "6 new" — but over ZERO visible cards, because the count is 0 stream + 6 grouped. Asserting
-  // the string alone would pass against exactly the screen this task exists to fix.
+  // Both halves, and the first is what makes the second non-vacuous. With unconditional grouping the badge
+  // also reads "6 new" — but over ZERO visible cards, because the count is 0 stream + 6 grouped. Asserting
+  // the string alone would pass against exactly the screen this guards against.
   assert.equal(visibleIds(app).length, 6, 'all six posts must be on screen');
   assert.equal(badge(app), '6 new',
     'six visible cards must read "6 new" — not "12 new", which is what an ungated countGroupedUnread '
@@ -223,7 +219,7 @@ test('TASK-099 T5 (C5): ON — every assigned post leaves the visible stream for
 
   assert.equal(tapSwitch(app), 1, 'the switch was never wired, so this test taps nothing');
 
-  // The posts have been on screen since the render — exactly the case [BUG-092]'s deferral refuses
+  // The posts have been on screen since the render — exactly the case the lift deferral refuses
   // for a BACKGROUND classify. A tap is bidden, so the rule is suspended for this path only.
   assert.deepEqual(visibleIds(app), ['x3'], 'only the unassigned post stays in the visible stream');
   assert.deepEqual(streamIds(app), ['x1', 'x2', 'x3'],
@@ -242,11 +238,11 @@ test('TASK-099 T6 (C6): OFF again returns every post and empties the grid, with 
   render(app, [xPost('x1'), xPost('x2'), xPost('x3')]);
 
   assert.equal(tapSwitch(app), 1, 'guard: the switch was never wired');
-  // NOT evidence for criterion 6's badge clause: the badge is INVARIANT under the toggle by
-  // construction (the stream and the grid partition the unread set — see the note above T24,
-  // and `mutations/TASK-099-item4.mjs` M2, a declared survivor). This pair still earns its place
-  // by killing a COUNTING defect — the TASK-099 battery's M3 drops updateCount's `.grouped-out`
-  // exclusion and this test catches it — but it cannot fail on a TOGGLE defect. Review finding 12.
+  // NOT evidence that the badge survives a toggle: the badge is INVARIANT under the toggle by
+  // construction (the stream and the grid partition the unread set — see the note above T24).
+  // This pair still earns its place
+  // by catching a COUNTING defect — dropping updateCount's `.grouped-out`
+  // exclusion fails this test — but it cannot fail on a TOGGLE defect.
   assert.equal(badge(app), '3 new', 'grouped: one stream card plus two in the tile');
 
   assert.equal(tapSwitch(app), 1, 'guard: the switch was never wired');
@@ -280,17 +276,16 @@ test('TASK-099 T7 (C7): the toggle is idempotent — ON/OFF/ON/OFF equals never 
 });
 
 test('TASK-099 T8 (C8): ON — a background classify does not empty the grid (two consecutive classifies)', async () => {
-  // GREEN before the fix, and the one test here that is. It guards a defect ONLY decision 1 can
+  // GREEN without the switch too. It guards a defect ONLY hide-not-remove can
   // introduce: hidden cards are still `#feed .card`, so liftGroupedFromStream drops every one into
   // _liftDeferred, renderGroupGrid skips deferred ids when building `counts`, `counts[gid] > 0`
-  // filters every tile out and the grid hides itself. Measured 2026-08-26: tile "3 posts" -> grid
-  // empty, with a control confirming _liftDeferred was [] immediately before. It cannot fire on main,
-  // where those cards were removed outright and there is nothing left to defer.
+  // filters every tile out and the grid hides itself: tile "3 posts" -> grid
+  // empty. It cannot fire
+  // where those cards are removed outright and there is nothing left to defer.
   //
   // TWO classifies. NOT because the collapse needs two: for a RETURNING reader — this fixture — the
   // hidden card exists before any classify runs, so the FIRST one already defers it and this test
-  // fails at the guard below. Measured; commit 8eb9a48 corrects the task file's original "very next
-  // background classify" wording, and this comment used to repeat the error that commit fixed.
+  // fails at the guard below.
   // The second classify stays because it is where a SAME-SESSION reader is hit.
   const { app, bodies } = boot({
     grouped: true,
@@ -326,12 +321,12 @@ test('TASK-099 T9 (C9): the switch is inert until a topic would ACTUALLY paint a
   const { app } = boot({
     grouped: false,
     store: {
-      // `x_absent` is assigned but NOT in this render's items. [BUG-098] keeps such an assignment on
+      // `x_absent` is assigned but NOT in this render's items. Such an assignment is kept on
       // purpose — absence is not evidence the post is gone — so the topic survives the prune, which
       // is exactly what makes this fixture bite: the group EXISTS while owning nothing showable.
       // An archived post does not work here: prune rule 1 deletes its assignment and then drops the
       // emptied group, so `Object.keys(groups).length` is 0 and the WRONG live test agrees with the
-      // right one by accident. Measured — the first version of this test survived M8.
+      // right one by accident.
       focus_groups: groupState({ assignments: { x_absent: G_AI }, groups: { [G_AI]: AI_NEWS } }),
     },
   });
@@ -385,13 +380,13 @@ test('TASK-099 T10b (C10): no bloom on a quiet open — nothing new was classifi
 });
 
 test('TASK-099 T10c (C10): no bloom when every post the classify placed was deferred', async () => {
-  // The [BUG-047] G5 shape, and the reason the design fragment's version of this guard CANNOT FAIL:
-  // it computes `showable` BEFORE the lift, and no newItems id can be in _liftDeferred at that point
+  // A guard that computes `showable` BEFORE the lift CANNOT FAIL:
+  // no newItems id can be in _liftDeferred at that point
   // (_liftDeferred only ever receives ids that ARE assignment keys, and is cleared each render). The
   // filter reads as protection and is vacuous by construction.
   //
-  // Here x2 is a [TASK-096] sticky post: examined once, unplaceable, so rendered VISIBLE. When a
-  // later classify finally places it, [BUG-092]'s deferral keeps it in the stream — so the tile
+  // Here x2 is a sticky post: examined once, unplaceable, so rendered VISIBLE. When a
+  // later classify finally places it, the lift deferral keeps it in the stream — so the tile
   // cannot show it, and announcing a topic over it would be a promise the grid does not keep.
   const { app, bodies } = boot({
     grouped: true,
@@ -456,7 +451,7 @@ test('TASK-099 T12 (C12): the view is device-local — it survives a reload and 
 
 test('TASK-099 T13 (C13): signing out clears the view key', async () => {
   // Device-local means "not uploaded", NOT "survives account deletion". The default for a forgotten
-  // key is to SURVIVE a sign-out, which is [BUG-017]'s exact shape — the next account on this
+  // key is to SURVIVE a sign-out — the next account on this
   // browser inheriting the previous person's setup.
   const app = createApp({
     store: { ...SIGNED_IN, focus_group_view: 'on' },
@@ -486,7 +481,7 @@ test('TASK-099 T14 (C14/BUG-103): ON — un-archiving a grouped post produces ex
   assert.deepEqual(visibleIds(app), ['x3'], 'guard: grouped — only the unassigned post is on screen');
 
   // Archive x1 where a grouped post is now reachable: on its topic card's rail, with no drill-in to
-  // open or close. That is [TASK-098]'s point — the post was always one tap away behind a view.
+  // open or close.
   actOnRail(app, G_AI, 'x1', '.btn-archive');
 
   // Un-archive it. The assignment OUTLIVES the archive — pruneGroupState rule 1 only fires at the
@@ -538,11 +533,9 @@ test('TASK-099 T14b (C14/BUG-103): OFF — un-archiving returns exactly one VISI
 });
 
 test('TASK-099 T15 (C15): every classify emits one group_classify event carrying both counts', async () => {
-  // [CHR-012]'s one-line instrument. Every absolute backlog figure on record today is synthetic, so
-  // this is the first real measurement of how big a groupable backlog actually gets. It is evidence
-  // for TASK-099's own deferred N threshold — NOT, as an earlier version of this comment claimed, a
-  // thing that unblocks [TASK-097] (scoped to re-sending stuck posts) or [TASK-090] (blocked on a
-  // real 50-70-post corpus). Both numbers are already in hand where the classify starts.
+  // A one-line instrument. Every absolute backlog figure otherwise on record is synthetic, so
+  // this is the first real measurement of how big a groupable backlog actually gets.
+  // Both numbers are already in hand where the classify starts.
   const { app, bodies } = boot({
     grouped: false,
     store: { focus_groups: groupState({ assignments: { x1: G_AI }, groups: { [G_AI]: AI_NEWS } }) },
@@ -562,11 +555,10 @@ test('TASK-099 T15 (C15): every classify emits one group_classify event carrying
     + 'unrecoverable and the event answers a different question');
 });
 
-// ── Guards the battery found unpinned ─────────────────────────────────────────
-// Each of these exists because a mutation SURVIVED. The T14 pair is the sharper lesson: `insertIntoFeed`'s
+// ── Guards one at a time ─────────────────────────────────────────
+// The T14 pair is the sharp case: `insertIntoFeed`'s
 // de-duplication and `archiveInGroup`'s cleanup each stop the same duplicate, so a test that exercises
-// both pins NEITHER — CLAUDE.md's "size the fixture so only the guard under test can fire", measured
-// rather than recited. T14 killed neither M13 nor M14 while reading as full coverage of [BUG-103].
+// both pins NEITHER. The fixture must be sized so only the guard under test can fire.
 
 test('TASK-099 T14c (C14/BUG-103): archiving from the rail leaves no card behind', async () => {
   // Pins archiveInGroup ALONE — the upstream cause. No insertIntoFeed involved, so its de-duplication
@@ -606,21 +598,17 @@ test('TASK-099 T14d (C14/BUG-103): insertIntoFeed never adds a second card for a
 });
 
 test('TASK-099 T16 (re-pointed, [TASK-098]): "Posts" does not label a section showing nothing', async () => {
-  // ⚠️ THE REQUIREMENT REVERSED, deliberately, and this test asserted the OLD half. It used to
-  // demand that "Posts" HIDE when every stream card belongs to a tile — correct while the tiles sat
-  // under their own "Topics" head above the feed. [TASK-098] criterion 6 makes "Posts" the only head
-  // over ONE stream, so a feed of only topic cards must now SHOW it. That half is pinned by
-  // group-topic-card T6. Rewritten rather than deleted, on Asli's call (2026-08-29), because this
-  // test pinned something T6 cannot see.
+  // "Posts" is the only head
+  // over ONE stream, so a feed of only topic cards must SHOW it; that half is pinned by
+  // group-topic-card T6.
   //
-  // WHAT IT PINS NOW: the `:not(.grouped-out)` exclusion in `updateSectionHeads` — its original M1.
-  // That exclusion went LOOSE in this task: the new condition is the `.card` term OR the
+  // WHAT THIS PINS: the `:not(.grouped-out)` exclusion in `updateSectionHeads`.
+  // That exclusion is easy to leave unpinned: the condition is the `.card` term OR the
   // `.topic-card` term, so wherever topics paint the second satisfies it alone and the first cannot
-  // be falsified. The fixture is sized so ONLY the `.card` term can answer, which is CLAUDE.md's
-  // "size the fixture so only the guard under test can fire" applied to a guard this change weakened.
+  // be falsified. The fixture is sized so ONLY the `.card` term can answer.
   //
   // The state is an assignment whose GROUP RECORD is absent — a pruned topic whose assignments have
-  // not been swept yet. Measured before being written down: 0 topic cards, 1 `.grouped-out` card.
+  // not been swept yet: 0 topic cards, 1 `.grouped-out` card.
   const { app } = boot({
     grouped: true,
     store: { focus_groups: groupState({ assignments: { x1: G_AI }, groups: {} }) },
@@ -641,9 +629,9 @@ test('TASK-099 T16 (re-pointed, [TASK-098]): "Posts" does not label a section sh
     + 'updateSectionHeads shows the head over an empty screen');
 });
 
-// ── Review remediation, 2026-08-27 ────────────────────────────────────────────
-// Both found by an independent reviewer driving the harness, and both are the SAME root cause the
-// review named: the nine-site audit enumerated every selector that READS `#feed` and missed the
+// ── The writers ────────────────────────────────────────────
+// Both share one root cause:
+// it is easy to enumerate every selector that READS `#feed` and miss the
 // WRITERS. Under hide-not-remove a post has two homes, so the question is not "who counts cards" but
 // "who takes a post out of its tile".
 
@@ -678,9 +666,9 @@ test('TASK-099 T17: toggling the view on the caught-up screen does not resurrect
 });
 
 test('TASK-099 T18: a post marked done on the rail does not come back when the view flips', async () => {
-  // The THIRD writer ([TASK-074]'s per-post Done), absent from the nine-site audit entirely.
-  // `markGroupDone` sweeps the hidden stream card and `archiveInGroup` was fixed to; this one was
-  // not, so the orphan survived and `setGroupedCardsHidden` un-hid it on the next OFF.
+  // The THIRD writer (the per-post Done).
+  // `markGroupDone` sweeps the hidden stream card and so does `archiveInGroup`; if this one does
+  // not, the orphan remains and `setGroupedCardsHidden` un-hides it on the next OFF.
   const { app } = boot({
     grouped: true,
     store: { focus_groups: groupState({ assignments: { x1: G_AI, x2: G_AI }, groups: { [G_AI]: AI_NEWS } }) },
@@ -728,11 +716,8 @@ test('TASK-099 T19 (C4): toggling OFF mid-classify reveals the cards it was hold
 });
 
 test('TASK-099 T20: "Mark N done" takes the hidden stream cards with it', async () => {
-  // `markGroupDone`'s stream-card lookup was DEAD CODE before this task (an assigned post had no
-  // stream card at all) and `mutations/BUG-092.mjs` M32/M33 declare themselves survivors on exactly
-  // that premise. [TASK-099] falsified it: every assigned post now has a hidden card, so the lookup
+  // Every assigned post has a hidden stream card, so `markGroupDone`'s stream-card lookup
   // is the only thing stopping "Mark N done" leaving orphans that the next toggle un-hides as unread.
-  // Measured by review: breaking the lookup survived all 847 tests.
   const { app } = boot({
     grouped: true,
     store: { focus_groups: groupState({ assignments: { x1: G_AI, x2: G_AI }, groups: { [G_AI]: AI_NEWS } }) },
@@ -754,9 +739,9 @@ test('TASK-099 T20: "Mark N done" takes the hidden stream cards with it', async 
 });
 
 // ── The switch's own gate ─────────────────────────────────────────────────────
-// Review finding 8: `T9` asserts the `aria-disabled` ATTRIBUTE and never the REFUSAL, so deleting
-// the click handler's explicit guard survived all 851 tests — the tap went through on an inert
-// switch and persisted `'on'`. CLAUDE.md's rule is to ATTACK the gate, not to check that the right
+// `T9` asserts the `aria-disabled` ATTRIBUTE and never the REFUSAL, so deleting
+// the click handler's explicit guard would pass it — the tap goes through on an inert
+// switch and persists `'on'`. ATTACK the gate rather than check that the right
 // view rendered; an advisory attribute is not a gate, the `return` under it is.
 
 test('TASK-099 T21: a tap on an INERT switch is refused, not merely discouraged', async () => {
@@ -787,12 +772,12 @@ test('TASK-099 T21: a tap on an INERT switch is refused, not merely discouraged'
 });
 
 test('TASK-099 T22: while ON, the way out is always open — even with nothing left to group', async () => {
-  // Review finding 9, DECIDED (Asli, 2026-08-27): "always allow turning off". `syncGroupingToggle`
-  // computed `live` from `paintableTileCount()` alone, regardless of the switch's own state, so
-  // "nothing to switch INTO" and "no way to switch OUT OF" were one state. A reader whose topics all
-  // went done, archived or out-of-hand — or whose X posts stopped arriving at the plan's post cap
-  // ([BUG-024], a 502 that reaches exactly this) — was left holding a dead switch in a view they did
-  // not want. The cost of the fix was CHECKED, not assumed: `aria-disabled` gates only the click, the
+  // "Always allow turning off". If `syncGroupingToggle`
+  // computes `live` from `paintableTileCount()` alone, regardless of the switch's own state, then
+  // "nothing to switch INTO" and "no way to switch OUT OF" are one state. A reader whose topics all
+  // went done, archived or out-of-hand — or whose X posts stopped arriving
+  // (an X 502 reaches exactly this) — is left holding a dead switch in a view they did
+  // not want. The exit is cheap: `aria-disabled` gates only the click, the
   // classify runs eagerly regardless of view, and the key is device-local with no `schedulePush`, so
   // a toggle makes zero network calls and zero API spend.
   const { app } = boot({
@@ -820,24 +805,23 @@ test('TASK-099 T22: while ON, the way out is always open — even with nothing l
 });
 
 // ── Hide-not-remove, for the ONLY branch that can reach it ────────────────────
-// Review finding 4: `liftGroupedFromStream`'s hide could revert to `remove()` with all 851 green.
-// That line IS decision 1 (2026-08-26) — the property the whole toggle rests on. `T7`'s idempotence
+// `liftGroupedFromStream`'s hide must not revert to `remove()`.
+// That line is the property the whole toggle rests on. `T7`'s idempotence
 // fixture starts OFF with assignments ALREADY in state, so its cards are never `grouping-pending`
 // and never reach this branch; the only way in is a post that was unassigned when it rendered and
-// was classified DURING the session. Nothing covered that, so the branch was free to change meaning.
+// was classified DURING the session.
 //
-// WHAT T23 DOES NOT PIN, measured by an independent battery 2026-08-27 and recorded so this test is
-// not over-credited: it kills the hide->remove revert because `remove()` destroys the NODE, not
+// WHAT T23 DOES NOT PIN, recorded so this test is
+// not over-credited: it catches the hide->remove revert because `remove()` destroys the NODE, not
 // because the class was wrong. A defect in this branch that only writes (or fails to write)
 // `.grouped-out` is INVISIBLE here — `setGroupedCardsHidden()` recomputes that class from scratch on
 // the very next line of `updateGroupsForFeed`'s tail, erasing it. Adding `.grouped-out` to the
-// DEFERRAL branch — yanking a card the reader is mid-read, [BUG-092]'s exact subject — survives the
-// whole suite for that reason. So "T23 covers decision 1" is too strong: it covers the node.
+// DEFERRAL branch — yanking a card the reader is mid-read — passes the
+// whole suite for that reason. So T23 covers the node, not the class.
 
 test('TASK-099 T23: a post classified MID-SESSION is hidden, not removed — so OFF gets it back', async () => {
-  // GREEN BEFORE the change, like T21: the code already hides. This closes a coverage gap rather
-  // than a defect, so it is declared here and proved by the mutation that reverts the hide — a green
-  // T23 on its own is not evidence of anything.
+  // This closes a coverage gap rather
+  // than a defect: it fails when the hide is reverted to a remove.
   const { app, bodies } = boot({
     grouped: true,
     reply: [{ label: 'AI news', summary: ['x1 says a thing'], item_ids: ['x1'] }],
@@ -869,48 +853,43 @@ test('TASK-099 T23: a post classified MID-SESSION is hidden, not removed — so 
 });
 
 // ── What the toggle repaints that is NOT invariant ────────────────────────────
-// Review finding 12 is CONFIRMED and narrower than it first reads: the badge cannot fail on a toggle
+// The badge cannot fail on a toggle
 // defect, because the stream and the grid PARTITION the unread set — an assigned, in-hand, unread
 // post is a visible card while OFF and a tile entry while ON, contributing exactly one either way,
-// and an out-of-hand assignment contributes nothing in both. Criterion 6's badge clause is therefore
-// satisfied by arithmetic, and `T6`/`T14`'s badge lines cannot bite on a view flip. They are kept
-// (they DO kill a counting defect — the TASK-099 battery's M3 drops updateCount's `.grouped-out`
-// exclusion and T6 catches it) but they are not evidence for criterion 6, and are annotated as such.
+// and an out-of-hand assignment contributes nothing in both. The badge is therefore
+// correct across a flip by arithmetic, and `T6`/`T14`'s badge lines cannot bite on a view flip. They are kept
+// (they DO catch a counting defect — dropping updateCount's `.grouped-out`
+// exclusion fails T6) but they are not evidence about the toggle.
 //
-// Measuring that claim found something the finding did not name. The SECTION HEADINGS are not
+// The SECTION HEADINGS are not
 // invariant the way the badge is: "Posts" must vanish when the flip hides the last stream card and
-// come back when it returns, and nothing asserted that. T16 was written for those headings but
+// come back when it returns. T16 covers those headings but
 // renders in grouped mode WITHOUT ever tapping the switch, so it pins the exclusion inside
 // `updateSectionHeads` and nothing about the flip.
 //
-// Two things this test does NOT claim, both measured rather than reasoned (2026-08-27), because a
-// first and a second prediction about it were both wrong:
-//   - It does not pin `updateCount()`'s presence in `applyGroupView`. Dropping that call SURVIVES
+// Two things this test does NOT claim:
+//   - It does not pin `updateCount()`'s presence in `applyGroupView`. Dropping that call passes
 //     even with this test, and so does removing `renderGroupGrid`'s own heading repaint. The repaint
 //     is DOUBLY IMPLEMENTED — renderGroupGrid calls updateSectionHeads on all three of its exits and
 //     applyGroupView then calls updateCount, which calls it again — so each site alone suffices and
-//     no single-site mutation can be killed. Two guards masking each other pin neither.
-//   - It is nonetheless NOT vacuous: neutering the mechanism both sites share kills it
-//     (`mutations/TASK-099-item4.mjs` M3). What it pins is the OUTCOME the reader sees, which is the
+//     no single-site defect can be caught. Two guards masking each other pin neither.
+//   - It is nonetheless NOT vacuous: neutering the mechanism both sites share fails it.
+//     What it pins is the OUTCOME the reader sees, which is the
 //     right thing for it to assert; what it cannot pin is which of the two paths delivered it.
 
 test('TASK-099 T24 (re-pointed, [TASK-098]): the one head stays correct across a view flip', async () => {
-  // Re-pointed on Asli's call (2026-08-29). The original watched TWO headings trade places across the
-  // toggle; [TASK-098] leaves one, and what it pins now is narrower — said plainly rather than dressed
-  // up, because the honest limit is the interesting part:
+  // There is one heading, and what this pins is narrow:
   //
   //   THIS TEST CANNOT DETECT A DROPPED REPAINT, and no fixture can. Making the switch LIVE requires
-  //   `paintableTileCount() > 0` ([TASK-099] T9's inertness rule), which means a topic that actually
+  //   `paintableTileCount() > 0` (T9's inertness rule), which means a topic that actually
   //   paints — so the grouped view has a topic card and the ungrouped view has the posts, and "Posts"
   //   is SHOWN either way. The answer is invariant, so `updateSectionHeads` failing to run during a
-  //   flip is unobservable through the head. My first rewrite tried to dodge that with an assignment
-  //   carrying no group record; the switch was inert for exactly the same reason and the test failed
-  //   on its own guard, which is how the invariance was found rather than assumed.
+  //   flip is unobservable through the head. An assignment
+  //   carrying no group record does not dodge that: the switch is inert for exactly the same reason.
   //
   //   What still bites: a head WRONG in either view. T16 above pins the empty-section direction;
   //   group-topic-card T6 pins the topic-cards-only direction. This one pins that a flip in either
-  //   direction leaves neither of those broken — which is where the original two-heading version
-  //   caught real defects, and the only part of it that survives one stream.
+  //   direction leaves neither of those broken.
   const { app } = boot({
     grouped: false,
     store: { focus_groups: groupState({ assignments: { x1: G_AI, x2: G_AI }, groups: { [G_AI]: AI_NEWS } }) },
@@ -936,17 +915,17 @@ test('TASK-099 T24 (re-pointed, [TASK-098]): the one head stays correct across a
 });
 
 // ── The writer nobody followed: Undo ──────────────────────────────────────────
-// Review round 2 (2026-08-27), and a direct continuation of round 1's root cause. Round 1 found the
-// audit had enumerated the selectors that READ `#feed` and missed the WRITERS. The fix then
-// enumerated the writers — and stopped at the Done action without following the UNDO that action
-// offers. `markDoneInGroup` is the one writer whose Undo does not restore the second home; every
-// sibling does (`markDone` calls insertIntoFeed, `markGroupDone` calls refreshFeed, `markAllDone`
-// never destroys its cards). It takes `item` as a parameter and never uses it.
+// The same root cause as the writers above, one step on: enumerating
+// the writers
+// and stopping at the Done action without following the UNDO that action
+// offers. `markDoneInGroup` is the one writer whose Undo must be made to restore the second home; every
+// sibling does it already (`markDone` calls insertIntoFeed, `markGroupDone` calls refreshFeed, `markAllDone`
+// never destroys its cards).
 
 /** Press the Undo on the live toast. `btn.onclick` is what showToast assigns. */
 const pressUndo = (app) => app.el('toast').querySelector('.toast-action').onclick();
 
-/** Press Done on one post of G_AI's rail, the way [TASK-074]'s per-post control does. */
+/** Press Done on one post of G_AI's rail, the way the per-post control does. */
 const doneOnRail = (app, id) => actOnRail(app, G_AI, id, '.btn-done');
 
 test('TASK-099 T25: Undo after a rail Done returns the post to BOTH homes', async () => {
@@ -979,20 +958,20 @@ test('TASK-099 T25: Undo after a rail Done returns the post to BOTH homes', asyn
 });
 
 
-// ── Round-2 coverage gaps, all found by an independent mutation battery ───────
-// None of the four below was a live defect: the code was already correct and NOTHING IN THE SUITE
-// COULD TELL. Each is declared GREEN BEFORE, and each is proved to bite by `mutations/TASK-099-item6.mjs`.
+// ── Coverage gaps ───────
+// None of the four below guards a live defect: each pins behaviour that is correct and that
+// nothing else in the suite could tell apart from broken.
 
 test('TASK-099 T27 (C12): flipping the view never arms the sync — with a control that proves it could', async () => {
   // T12 asserts this too, and CANNOT FAIL: `schedulePush` writes SK.dirty only `if (_stateLoaded)`,
   // and T12 never calls `syncOnLoad`, so `focus_dirty === null` holds there no matter what
-  // `setGrouped` does. Measured: adding `schedulePush()` to setGrouped survives the whole suite.
-  // That is the [BUG-047] G5 shape — a guard present and ineffective — living in the TEST.
+  // `setGrouped` does: adding `schedulePush()` to setGrouped would pass it.
+  // That is a guard present and ineffective — living in the TEST.
   // The group state is seeded into the SERVER ROW, not only into localStorage. `syncOnLoad` applies
   // the row over local state, so a fixture seeded only locally is ERASED by the very call this test
-  // needs — the switch then goes inert for want of a tile and the tap is swallowed. That is
-  // CLAUDE.md's "any local state you WRITE before a reload is provisional", which is written for the
-  // RESTORE case and bites a SEEDED FIXTURE identically. Caught here by the aria-disabled guard.
+  // needs — the switch then goes inert for want of a tile and the tap is swallowed. Any local
+  // state written before a reload is provisional, and that
+  // bites a SEEDED FIXTURE as much as a restore. Caught here by the aria-disabled guard.
   const SEEDED = groupState({ assignments: { x1: G_AI }, groups: { [G_AI]: AI_NEWS } });
   const app = createApp({
     // `focus_channels` OVERRIDDEN, not inherited: SIGNED_IN carries a YouTube channel only, and the
@@ -1040,9 +1019,9 @@ test('TASK-099 T27 (C12): flipping the view never arms the sync — with a contr
 });
 
 test('TASK-099 T28 (C9): a tap repaints the switch, in both directions', async () => {
-  // `applyGroupView` ends with `syncGroupingToggle()`, and deleting that call survived all 856 tests:
-  // the key flipped, the feed reorganised, and the switch stayed visually off. The task said the
-  // switch's appearance "cannot be tested at all" — true of the BLOOM, but `is-on` and `aria-checked`
+  // `applyGroupView` ends with `syncGroupingToggle()`; without that call
+  // the key flips, the feed reorganises, and the switch stays visually off.
+  // The BLOOM cannot be tested here, but `is-on` and `aria-checked`
   // are a class and an attribute on an element the harness memoises. Only the animation is untestable.
   const { app } = boot({
     grouped: false,
@@ -1128,21 +1107,19 @@ test('TASK-099 T30 (C10): no bloom when the classify placed nothing NEW', async 
     + 'posts it was sent gained nothing, and a signal that fires anyway teaches the reader to ignore it');
 });
 
-// ── [TASK-101] The signals: progress on the toggle, the sentence at the ready moment ─────────────
+// ── The signals: progress on the toggle, the sentence at the ready moment ─────────────
 //
-// A SEPARATE accounting from TASK-099's above, kept separate on purpose — that list records which
-// tests were RED before THAT fix, and appending to it would quietly make a true sentence false.
+// A SEPARATE accounting from the one at the top of this file.
 //
-// All nine below are RED before TASK-101's code, and each fails for its own reason rather than
-// because the elements are absent: `HIDDEN_IDS` now seeds `group-busy` and `group-ready-note`
+// All nine below fail without the signals' code, and each fails for its own reason rather than
+// because the elements are absent: `HIDDEN_IDS` seeds `group-busy` and `group-ready-note`
 // (test-helpers/app-harness.mjs), so an unwritten element reads as HIDDEN and every "is shown"
-// assertion bites. That seeding was itself verified by a control — asserting "the bubble was shown"
-// against a tree with neither element nor code PASSED before it and FAILS after (2026-08-27).
+// assertion bites.
 //
-// NOT TESTABLE HERE, and deliberately (task Verification, steps 5-6): criteria 3 (survives a
-// scroll), 4 (the reduced-motion pulse), 9 (translucency) and 8's non-modality. A desktop browser is
-// the wrong instrument for the pulse and the bubble's fit; those go to Asli on a handset. Criterion
-// 4's regression half is pinned by the style.css tripwire in test/docs.test.mjs instead.
+// NOT TESTABLE HERE, and deliberately: surviving a
+// scroll, the reduced-motion pulse, translucency and non-modality. A desktop browser is
+// the wrong instrument for the pulse and the bubble's fit; those need a handset. The reduced-motion
+// regression half is pinned by the style.css tripwire in test/docs.test.mjs instead.
 
 // Must match app.js. Deliberately duplicated rather than plumbed through the harness: N9 asserts
 // BOTH sides of the boundary, so a drift between the two values fails loudly on one of them rather
@@ -1199,8 +1176,7 @@ test('TASK-101 N1 (C2): the busy indicator is shown WHILE the classify is in fli
 });
 
 test('TASK-101 N2 (C2): the indicator is hidden on the DEGRADE path, not left spinning forever', async () => {
-  // The `finally` at app.js:834 (it was :793 before this change added code above it — the number
-  // was carried into this brand-new file without re-deriving it, and a review caught that).
+  // The `finally` in app.js's classify path.
   // Predicted killer of "hide only in the success branch": this test
   // alone — N1 releases a successful call and would stay green.
   // GATED, and that is not incidental. Written with an immediate rejection this test PASSED at the
@@ -1272,21 +1248,18 @@ test('TASK-101 N4 (C5): no note on a quiet open — nothing was classified', asy
 });
 
 test('TASK-101 N5 (C5): no note when every post the classify placed was DEFERRED', async () => {
-  // ⚠️ THIS TEST PINS NOTHING, and that is a measured finding rather than a suspicion: it killed
-  // ZERO of the 10 mutations in mutations/TASK-101.mjs. The reason is structural, and it is the
-  // [BUG-047] G5 shape one level up — in the CRITERION rather than in the code.
+  // ⚠️ THIS TEST PINS NOTHING. The reason is structural.
   //
   // Deferral requires the GROUPED view: `_liftDeferred` is populated only by
   // `liftGroupedFromStream`, which `updateGroupsForFeed` calls only `if (isGrouped())`. The note
   // requires the UNGROUPED view (N6's gate). The two conditions are mutually exclusive, so
   // "a deferred placement must not raise the note" cannot fail — the gate already implies it, and
-  // this fixture trips BOTH guards so it sizes out neither. CLAUDE.md: when two guards can stop the
+  // this fixture trips BOTH guards so it sizes out neither. When two guards can stop the
   // same input, a test exercising both pins neither.
   //
-  // KEPT rather than deleted, and declared rather than counted as coverage — the same call
-  // [TASK-099] made for its criterion-6 badge clause. It documents the exclusion for the next reader
-  // who wonders why criterion 5's third clause has no pin. The clause itself should come off the
-  // note's half of criterion 5; that is a task-file amendment and is Asli's to approve.
+  // KEPT rather than deleted, and not counted as coverage.
+  // It documents the exclusion for the next reader
+  // who wonders why the "deferred placement" clause has no pin.
   // Same fixture shape as T10c, and for the same reason: the grid gained nothing openable, so
   // promising a topic would be a promise it does not keep.
   const { app, bodies } = boot({
@@ -1345,8 +1318,7 @@ test('TASK-101 N7 (C7): a tap consumes the note, and it does not come back on th
 
 test('TASK-101 N8 (C7): a second classify RESTARTS the dismissal rather than letting the first timer cut it short', async () => {
   // Without a clearTimeout the first classify's timer is still pending, so the note vanishes at its
-  // deadline even though a newer one just re-armed it. `advance` makes cancellation observable —
-  // this test is only possible because of the delay-aware driver re-derived in 57f19a6.
+  // deadline even though a newer one just re-armed it. `advance` makes cancellation observable.
   // Predicted killer of "re-arm without clearing the old timer": this test alone.
   const { app, bodies } = boot({
     grouped: false,
@@ -1400,19 +1372,16 @@ test('TASK-101 N9 (C8): the note dismisses itself, without the reader touching a
   assert.equal(noteShown(app), false, 'and gone on it — a sentence that never leaves becomes furniture');
 });
 
-// ── [TASK-101] round 2: what four independent reviews found ──────────────────────────────────────
+// ── The signals: latching and placement ──────────────────────────────────────
 // N10 pins a LIVE DEFECT (the note appearing on a paint that classified nothing). N11 and N12 close
-// two "guard moved, not deleted" mutations that SURVIVED all 887 tests in an independent battery.
+// two "guard moved, not deleted" defects.
 
 test('TASK-101 N10 (C5): an arm that could not be shown must NOT latch and fire on a later quiet paint', async () => {
-  // THE DEFECT, found by an independent correctness review 2026-08-27. `_shineArmed` is set when a
+  // `_shineArmed` is set when a
   // classify places something, but consumed only inside `if (_shineArmed && live)`. Resolve a
-  // classify while the switch is INERT and the arm survives — then any later render calls
-  // `syncGroupingToggle` (app.js:3582, on EVERY render) and raises the sentence on a paint that
-  // classified nothing. That is criterion 5's "not on a quiet open" clause, violated.
-  // The author's comment claimed the note "inherits every guard criterion 10 already pins,
-  // including not on a quiet open". It did not; this test is why that sentence is now false.
-  // PREDICT: killed by nothing before the fix — it IS the fix. Killer after: this test alone.
+  // classify while the switch is INERT and the arm remains — then any later render calls
+  // `syncGroupingToggle` (on EVERY render) and raises the sentence on a paint that
+  // classified nothing: the note on a quiet open.
   const { app, bodies, release } = bootGated({
     reply: [{ label: 'AI news', summary: ['x1 says a thing'], item_ids: ['x1'] }],
   });
@@ -1445,12 +1414,12 @@ test('TASK-101 N10 (C5): an arm that could not be shown must NOT latch and fire 
 });
 
 test('TASK-101 N11 (C2): a quiet open leaves the indicator hidden — it is raised BELOW the early return', async () => {
-  // Independent mutation IM1 moves `showGroupBusy()` one line ABOVE
-  // `if (newItems.length === 0) { ...; return; }`. That return is before the `try`, so the `finally`
+  // If `showGroupBusy()` moves one line ABOVE
+  // `if (newItems.length === 0) { ...; return; }`, that return is before the `try`, so the `finally`
   // never runs and the ring spins forever — on the MOST COMMON load, the one where nothing is new,
-  // and in a sticky appbar it never scrolls away. IM1 survived all 887 tests.
+  // and in a sticky appbar it never scrolls away.
   // Two phases on purpose: phase 1 proves the indicator can be shown and hidden at all, so phase 2's
-  // assertion is a transition rather than the resting state N2 originally passed vacuously against.
+  // assertion is a transition rather than a resting state.
   // PREDICT: killed by this test alone.
   const { app, bodies, release } = bootGated({
     reply: [{ label: 'AI news', summary: ['x1 says a thing'], item_ids: ['x1'] }],
@@ -1474,9 +1443,9 @@ test('TASK-101 N11 (C2): a quiet open leaves the indicator hidden — it is rais
 });
 
 test('TASK-101 N12 (C5): the sentence is withheld while the switch is inert, even though a classify placed a post', async () => {
-  // Independent mutation IM7 calls `showReadyNote()` at the ARMING site, before `live` is known —
-  // it survived all 887 tests. Offering "you can group your posts by topic now" beside a switch
-  // carrying aria-disabled="true" is an offer for a view that cannot be opened.
+  // If `showReadyNote()` is called at the ARMING site, before `live` is known,
+  // it offers "you can group your posts by topic now" beside a switch
+  // carrying aria-disabled="true" — an offer for a view that cannot be opened.
   // Sized so ONLY the `live` term can decide: grouping is OFF (so the !isGrouped() gate passes) and
   // the classify DID place a post (so the arm is set) — the switch's inertness is the only thing left.
   // PREDICT: killed by this test alone.

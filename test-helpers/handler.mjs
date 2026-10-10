@@ -1,17 +1,16 @@
-// Handler test harness (BUG-019). The first one in this repo — `api/` had zero handler tests
-// before it, which is why owner-resolution rules were never provable.
+// Handler test harness: what makes owner-resolution rules provable.
 //
 // The design decision that matters: `fakeDb()` is a STATEFUL STORE, not a call recorder. Tests
 // assert on what is actually stored afterwards ("the victim's row is byte-identical"), never on
-// "the query ran" — per CLAUDE.md, assert observable output, not that a function was called.
+// "the query ran" — assert observable output, not that a function was called.
 //
 // It reads the SQL rather than pattern-matching fixed strings, so it models the real semantics:
-//   - `where id = ?`            matches a row of ANY kind  → reproduces the BUG-019 vulnerability
+//   - `where id = ?`            matches a row of ANY kind  → reproduces the cross-namespace vulnerability
 //   - `where id = ? and kind = ?` matches exactly          → what the fix must produce
 // Nothing here needs editing to go from RED to GREEN; the same fake serves both.
 //
 // SAFETY NET: any query it does not recognise THROWS. A silently-ignored query would let a test
-// pass green against SQL that never ran — the exact false-confidence failure CHR-013 is about.
+// pass green against SQL that never ran — a false-confidence failure.
 //
 // It lives OUTSIDE `test/` on purpose. `npm test` runs `node --test test/`, and Node treats every
 // .mjs under a `test/` directory as a test file — so a harness parked there reports itself as a
@@ -29,12 +28,12 @@ import { REV_EXPR, REV_EXPR_QUALIFIED } from '../api/_state.js';
 // The canonical rev expression as `normalize()` below renders it: whitespace-collapsed and
 // lowercased. Every rev the handler asks for must match ONE of these two spellings exactly.
 //
-// This is review round 4's R18/R19. Until now the fake matched `to_char\(users\.updated_at, '[^']*'\)`
-// — ANY format literal — and then rendered the token with its own `toCharUS` regardless. So the read
-// could ask for one format and the write for another, or either could drop the `at time zone 'UTC'`
-// that makes the token GUC-stable, and the fake would hand back matching strings and stay green. The
-// instrument could not detect the defect it was installed to detect. It now refuses anything it does
-// not recognise, which is the same fail-loudly property the rest of this file already had.
+// A fake matching `to_char\(users\.updated_at, '[^']*'\)`
+// — ANY format literal — and then rendering the token with its own `toCharUS` regardless would let the read
+// ask for one format and the write for another, or either drop the `at time zone 'UTC'`
+// that makes the token GUC-stable, while handing back matching strings and staying green. The
+// instrument could not detect the defect it was installed to detect. So it refuses anything it does
+// not recognise, which is the same fail-loudly property the rest of this file has.
 const REV_SQL = REV_EXPR.replace(/\s+/g, ' ').toLowerCase();
 const REV_SQL_QUALIFIED = REV_EXPR_QUALIFIED.replace(/\s+/g, ' ').toLowerCase();
 
@@ -44,11 +43,11 @@ function reLit(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 // Render a timestamp the way Postgres' `to_char(ts, 'YYYY-MM-DD"T"HH24:MI:SS.US')` does:
 // microsecond precision, no timezone suffix. DELIBERATELY not `toISOString()`.
 //
-// This is BUG-047 punch-list item 7, and it is the difference between a test that can fail on the
+// This is the difference between a test that can fail on the
 // risk it names and one that cannot. The rev token and the `updatedAt` field are two different
 // renderings of the SAME column, so a fake that emits one string for both makes them
-// interchangeable — a reviewer showed attempt 3's fake returned them byte-identical, which meant a
-// client echoing `updatedAt` where it should echo `rev` passed a test written to catch exactly that.
+// interchangeable — a fake returning them byte-identical means a
+// client echoing `updatedAt` where it should echo `rev` passes a test written to catch exactly that.
 // `2026-01-01T00:00:01.000000` (here) vs `2026-01-01T00:00:01.000Z` (JSON's Date) cannot be confused.
 //
 // It is also why the real query must use `to_char` rather than `::text`: `timestamptz::text` renders
@@ -85,12 +84,10 @@ function wherePredicate(text, values, { fromEnd = false } = {}) {
 function parseInsert(text, values) {
   const m = text.match(/insert into (\w+) \(([^)]*)\) values \(/);
   if (!m) return null;
-  // Scan to the MATCHING close paren. This used to be `values \(([^)]*)\)`, which stops at the first
-  // `)` — the one inside `now()` — so the token list was truncated to `?, ?, ?::jsonb, now(`, the
-  // trailing token matched nothing, and EVERY insert stored `updated_at: null`. A test comparing a
-  // write's timestamp was therefore comparing null to null and passing against nothing. Found by
-  // BUG-047 attempt 3, fixed here when TASK-084's "one PUT stores state AND ingests events" test
-  // asserted on the returned updatedAt and went red for the right reason.
+  // Scan to the MATCHING close paren. `values \(([^)]*)\)` would stop at the first
+  // `)` — the one inside `now()` — so the token list would be truncated to `?, ?, ?::jsonb, now(`, the
+  // trailing token would match nothing, and EVERY insert would store `updated_at: null`. A test comparing a
+  // write's timestamp would then be comparing null to null and passing against nothing.
   const open = m.index + m[0].length;
   let depth = 1, i = open;
   while (i < text.length && depth > 0) {
@@ -120,11 +117,11 @@ function parseInsert(text, values) {
   };
 }
 
-// What the ON CONFLICT clause DOES — the half the fake used to ignore entirely.
+// What the ON CONFLICT clause DOES.
 //
-// Until BUG-047 attempt 4 this returned nothing: `parseInsert` read the conflict TARGET and dropped
-// the action, so `do update … where <guard>` was applied as an unconditional overwrite. A conditional
-// write is the entire mechanism of this fix, so its criterion-1 test would have gone green against an
+// If `parseInsert` read only the conflict TARGET and dropped
+// the action, `do update … where <guard>` would be applied as an unconditional overwrite. A conditional
+// write is the entire mechanism of stale-write refusal, so its test would go green against an
 // implementation guarding nothing — the "green, correct, and measuring the wrong quantity" shape,
 // one layer below the code under test.
 //
@@ -163,7 +160,7 @@ function conflictAction(text, values) {
 // Three answers, and the third is the point: an expression that asks for a rev in ANY other spelling
 // THROWS rather than being served. A fake that quietly answers a divergent expression with its own
 // rendering is an instrument that cannot detect divergence — which is precisely the defect this
-// mechanism exists to make impossible (review round 4, R18/R19).
+// mechanism exists to make impossible.
 function revRequested(text) {
   if (text.includes(`${REV_SQL} as rev`)) return true;
   if (/to_char\([^)]*updated_at[^)]*\)\s+as rev/.test(text)) {
@@ -187,11 +184,11 @@ function writeResult(text, row) {
 
 // A fake `users` store plus an events log, behind the same tagged-template interface as
 // @neondatabase/serverless. `users` seeds rows as { kind, id, state }.
-// TWO HALVES of [BUG-123]'s migration, separately stageable, because a real un-migrated table is
-// missing BOTH and answers for the COLUMN first — measured against Postgres (dev branch, 2026-09-16):
+// TWO HALVES of the events `client_id` migration, separately stageable, because a real un-migrated table is
+// missing BOTH and answers for the COLUMN first — measured against Postgres:
 //   `eventsClientIdColumn: false` → any statement naming client_id raises 42703 undefined_column.
 //        This is the ordinary deploy order (a merge deploys the code; init-db is run by hand), and
-//        modelling only the index half is what let a fallback that missed 42703 look tested.
+//        modelling only the index half would let a fallback that misses 42703 look tested.
 //   `eventsIndex: false`          → the column exists, its unique index does not: 42P10.
 // Either way `ingestEvents`' best-effort catch would swallow the error while the response said 200.
 export function fakeDb({ users = [], xUsage = [], throwOn = null, eventsIndex = true, eventsClientIdColumn = true } = {}) {
@@ -202,13 +199,13 @@ export function fakeDb({ users = [], xUsage = [], throwOn = null, eventsIndex = 
     updated_at: u.updated_at ?? nextNow(),
   }));
   const events = [];
-  // THE ROWS, not the calls ([BUG-123]). `events` above stays a call log because
+  // THE ROWS, not the calls. `events` above stays a call log because
   // test/state-handler.test.mjs reads its shape; this is the stateful table beside it, and it is what
   // "stored once" can be asserted against. `client_id` carries the unique index when `eventsIndex`.
   const eventRows = [];
   let eventSeq = 0;
   const queries = [];
-  // TASK-100's two meters. `usage` is the per-owner fairness counter; `postsSeen` is the app-wide
+  // The two X usage meters. `usage` is the per-owner fairness counter; `postsSeen` is the app-wide
   // SPEND meter and is a Set keyed `day|post_id`, which is what makes it exact rather than a sum —
   // it models X's own within-a-day dedup, so a test can show the two meters diverging.
   const usage = xUsage.map((u) => ({ ...u, posts: u.posts ?? 0 }));
@@ -218,13 +215,13 @@ export function fakeDb({ users = [], xUsage = [], throwOn = null, eventsIndex = 
     const text = normalize(strings);
     queries.push({ text, values });
 
-    // A query the test has asked to fail, so criterion 12's fail-open path can be exercised. The
+    // A query the test has asked to fail, so the fail-open path can be exercised. The
     // real failure is a Neon blip mid-request; this is the only way to stage one.
     if (throwOn && text.startsWith(throwOn)) {
       return Promise.reject(new Error(`fakeDb: staged failure for "${throwOn}"`));
     }
 
-    // ── TASK-100 meters ───────────────────────────────────────────────────────
+    // ── X usage meters ───────────────────────────────────────────────────────
     if (text.startsWith('select posts from x_usage')) {
       const pred = wherePredicate(text, values);
       const hit = usage.find((r) => Object.keys(pred).every((k) => String(r[k]) === String(pred[k])));
@@ -232,11 +229,10 @@ export function fakeDb({ users = [], xUsage = [], throwOn = null, eventsIndex = 
     }
 
     // The increment upsert. It READS the on-conflict action rather than always adding — the same
-    // property `conflictAction` gives the users table, and for the same reason. An earlier version
-    // of this branch added unconditionally, which meant criterion 4 ("two channels sum into one
-    // row") passed identically against `posts = x_usage.posts + n` and against `posts = n`: the
-    // instrument could not detect the defect it was installed to detect. Found by writing the
-    // mutation that recreates the overwrite and watching it survive.
+    // property `conflictAction` gives the users table, and for the same reason. A branch
+    // that added unconditionally would let "two channels sum into one
+    // row" pass identically against `posts = x_usage.posts + n` and against `posts = n`: the
+    // instrument could not detect the defect it was installed to detect.
     if (text.startsWith('insert into x_usage')) {
       const [owner_kind, owner_id, day, n] = values;
       const increments = /do update set posts = x_usage\.posts \+ \?/.test(text);
@@ -253,7 +249,7 @@ export function fakeDb({ users = [], xUsage = [], throwOn = null, eventsIndex = 
     }
 
     // The spend meter. The Set models the (day, post_id) primary key, which is what makes a re-read
-    // by a SECOND user add nothing — the divergence criterion 3 asserts. Without `on conflict do
+    // by a SECOND user add nothing — the divergence the meter tests assert. Without `on conflict do
     // nothing` a real Postgres raises a unique violation on that duplicate, so the fake rejects
     // too: the clause is load-bearing and a fake that silently absorbed the duplicate would hide
     // that the app-wide meter had stopped recording.
@@ -328,13 +324,13 @@ export function fakeDb({ users = [], xUsage = [], throwOn = null, eventsIndex = 
       return Promise.resolve([writeResult(text, fresh)]);
     }
 
-    // The BUG-052 shape: update-but-never-create, for a PUT carrying no user data.
+    // Update-but-never-create, for a PUT carrying no user data.
     //
     // It takes the SAME conditional guard as the upsert above, and that is not symmetry for its own
     // sake. This branch replaces the WHOLE state blob, so it destroys exactly as much as the upsert
-    // does — and the BUG-057 control (2026-08-23) showed it is the branch through which an empty
-    // browser's blob actually lands on a populated row. Guarding only the upsert would have left the
-    // measured wipe path wide open while criterion 1 read as met.
+    // does — and it is the branch through which an empty
+    // browser's blob actually lands on a populated row. Guarding only the upsert would leave the
+    // measured wipe path wide open.
     const UPDATE_RE = new RegExp(
       '^update users set state = \\?::jsonb, updated_at = now\\(\\) where kind = \\? and id = \\?' +
       `( and ${reLit(REV_SQL_QUALIFIED)} = \\?)? returning `);
@@ -363,8 +359,8 @@ export function fakeDb({ users = [], xUsage = [], throwOn = null, eventsIndex = 
       return Promise.resolve([]);
     }
 
-    // Analytics ingestion rides along on PUT (TASK-070). BOTH records are kept: the call log above
-    // (state-handler.test.mjs reads it) and the ROWS, which is what [BUG-123] turns on — "the same
+    // Analytics ingestion rides along on PUT. BOTH records are kept: the call log above
+    // (state-handler.test.mjs reads it) and the ROWS, which is what event de-duplication turns on — "the same
     // event reached the table once" cannot be asked of a recorder.
     if (text.startsWith('insert into events')) {
       events.push({ accountId: values[0], deviceId: values[1], batch: values[2] });
@@ -379,7 +375,7 @@ export function fakeDb({ users = [], xUsage = [], throwOn = null, eventsIndex = 
           { code: '42703' }));
       }
       // Postgres 42P10: the conflict target must be backed by a unique index. Staged by
-      // `eventsIndex: false` — the deploy-order failure of Risk 1, which no other instrument can show.
+      // `eventsIndex: false` — the deploy-order failure, which no other instrument can show.
       if (skipsDuplicates && !eventsIndex) {
         return Promise.reject(Object.assign(
           new Error('there is no unique or exclusion constraint matching the ON CONFLICT specification'),
@@ -424,7 +420,7 @@ export function fakeDb({ users = [], xUsage = [], throwOn = null, eventsIndex = 
     }
     if (text.startsWith('update events set account_id')) {
       events.push({ attributed: { accountId: values[0], deviceId: values[1] } });
-      // Attribute-on-login, applied to the rows as well: criterion 7 asks what the table holds after
+      // Attribute-on-login, applied to the rows as well: the tests ask what the table holds after
       // a sign-in, which the log could only answer as "the statement ran".
       for (const r of eventRows) {
         if (r.device_id === values[1] && r.account_id == null) r.account_id = values[0];
@@ -440,7 +436,7 @@ export function fakeDb({ users = [], xUsage = [], throwOn = null, eventsIndex = 
 
   sql.rows = rows;
   sql.events = events;
-  /** The `events` TABLE as rows ([BUG-123]) — `sql.events` above is the call log it replaced for
+  /** The `events` TABLE as rows — `sql.events` above is the call log it replaced for
    *  anything asking what is stored. */
   sql.eventRows = eventRows;
   /** How many rows the table holds for `name` — the count "stored exactly once" is asserted on. */
@@ -464,9 +460,9 @@ export function fakeReq({ method = 'GET', query = {}, headers = {}, body = null 
 
 // Behaves like a Node response in the one way a header test depends on: once `json()` has sent the body,
 // `setHeader` throws `ERR_HTTP_HEADERS_SENT`, and `sentHeaders` records the headers the body actually left
-// with. Until [BUG-025] review round 1 it accepted a header in any order, so a `no-store` set AFTER the
-// body looked identical to one set before it — while on Vercel that response would leave without the
-// header (claims L4, battery survivor S10). Assert on `sentHeaders` whenever WHEN a header was set matters.
+// with. If it accepted a header in any order, a `no-store` set AFTER the
+// body would look identical to one set before it — while on Vercel that response would leave without the
+// header. Assert on `sentHeaders` whenever WHEN a header was set matters.
 export function fakeRes() {
   const res = {
     statusCode: null,
@@ -487,23 +483,23 @@ export function fakeRes() {
   return res;
 }
 
-// Deep structural equality via canonical JSON — the "byte-identical afterwards" assertion in
-// BUG-019's acceptance criteria. Returns the serialized form so a failure shows what changed.
+// Deep structural equality via canonical JSON — the "byte-identical afterwards" assertion.
+// Returns the serialized form so a failure shows what changed.
 export function snapshot(value) {
   return JSON.stringify(value);
 }
 
-// ── X / feed handler fakes (TASK-100) ─────────────────────────────────────────
+// ── X / feed handler fakes ─────────────────────────────────────────
 //
-// `api/feed.js` had no handler test before this: `test/feed.test.mjs` covers the pure parsers, so
-// nothing could ask what the endpoint DOES with a request. `createFeedHandler({ xFetch })` takes the
+// `test/feed.test.mjs` covers the pure parsers only; these let a test ask
+// what the endpoint DOES with a request. `createFeedHandler({ xFetch })` takes the
 // client as a parameter; this is what a test passes in.
 //
-// WHY THIS ONE RECORDS CALLS, when the rest of this file deliberately does not. CLAUDE.md says
+// WHY THIS ONE RECORDS CALLS, when the rest of this file deliberately does not. The rule is to
 // assert observable output, never "the function was called" — and `fakeDb` obeys that by being a
 // store. Here the outbound request IS the observable: X bills on retrieval, so "did a billable call
-// go out" is the quantity TASK-100 exists to control, not a proxy for it. Criterion 6 ("returns 429
-// and issues no X API call at all") is unassertable any other way.
+// go out" is the quantity the quota exists to control, not a proxy for it. "Returns 429
+// and issues no X API call at all" is unassertable any other way.
 //
 // `pages` is consumed one entry per call, in order:
 //   an object   → returned as the parsed JSON body

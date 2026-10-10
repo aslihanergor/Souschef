@@ -1,24 +1,24 @@
-// The boot must not act on a state row the sign-in answer contradicts ([BUG-063], [BUG-102]).
+// The boot must not act on a state row the sign-in answer contradicts.
 //
 // `GET /api/state` answers from whichever namespace the SERVER resolved — the account when the
 // session cookie checks out, the device otherwise — and says which in `kind`. `/api/auth/me` is a
-// separate request that can disagree with it: it times out ([BUG-053]), or the session lookup blips
+// separate request that can disagree with it: it times out, or the session lookup blips
 // on one query and not the other (`api/_session.js` returns null on a DB error). `init` runs the two
 // concurrently, and `syncOnLoad` used to act on whatever the state read returned:
 //
 //   - signed-out answer + account row → a browser showing the sign-in wall was handed the account's
-//     channels, and the next brand-new account signed in on it uploaded them as its own ([BUG-063]);
+//     channels, and the next brand-new account signed in on it uploaded them as its own;
 //   - signed-in answer + device row → a signed-in user's channels were replaced by the device's stale
-//     copy, or with no device row her list was uploaded into the anonymous device row ([BUG-102]).
+//     copy, or with no device row her list was uploaded into the anonymous device row.
 //
 // `_readOwnRow` already refused this for "Use saved copy". The boot is the other reader.
 //
-// THE REFUSAL IS DIRECTION-AWARE (review round 1; Asli, 2026-09-11: "yes to 1"):
+// THE REFUSAL IS DIRECTION-AWARE:
 //   - SIGNED IN, the DEVICE answered → nothing in that answer is hers: refuse everything (c4-c7, c5c).
 //   - WALLED, the ACCOUNT answered → the cookie is valid. Refuse only PULLING the account into this
 //     browser (c1, c3). Uploading this browser's own copy to that account — the no-row claim and the
-//     dirty push — is what the next healthy boot does anyway; refusing it only deferred it, and the
-//     deferral lost data main keeps (c2, c2b, c2c, c2d).
+//     dirty push — is what the next healthy boot does anyway; refusing it would only defer it, and the
+//     deferral loses data (c2, c2b, c2c, c2d).
 //
 // These run the REAL app.js through the harness against the REAL `createStateHandler` over one shared
 // fake store, so "what the account row holds afterwards" is observed, not inferred from requests.
@@ -29,13 +29,12 @@
 // test is built to reach one of them, though a test that observes the end state can see more than one:
 // c6b checks that local is kept, so an apply leaking through reds it as well as a leak of standing.
 //
-// CONTROLS, green on main (254a22d): c2, c2b, c2c and c2d — since review round 1 reversed the walled
-// refusal, they pin uploads main already makes — plus c8–c10c, c14, c15a and c15b. c10c is what stops a
+// CONTROLS, which pass with or without the refusal: c2, c2b, c2c and c2d — they pin uploads a walled
+// boot must keep making — plus c8–c10c, c14, c15a and c15b. c10c is what stops a
 // fix that refuses every signed-out answer; c8 and c14 pin that both requests start together and that
-// the boot waits for the sign-in answer; c15a/c15b pin that waiting adds no way to lose main's uploads.
-// c13 is NOT a control, though this header once called it one: on main its walled browser holds all
+// the boot waits for the sign-in answer; c15a/c15b pin that waiting adds no way to lose those uploads.
+// c13 is NOT a control: without the refusal its walled browser holds all
 // six synced keys. It pins that one sign-in answer decides both the check and the screen.
-// (Corrected in review round 2, which also added c1c, c4b, c7b and c15a-b for guards no test could fail.)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../test-helpers/app-harness.mjs';
@@ -108,8 +107,8 @@ function rig({ sql = fakeDb(), store = {}, me, stateSession, order = 'natural', 
   // The held request is released only once the OTHER one has answered. That wait is BOUNDED, and the
   // bound is an assertion, not a convenience: a boot that issues the two requests one after the other
   // never sends the second while the first is held, so an unbounded wait deadlocks, node CANCELS the
-  // test instead of failing it, and the mutation runner reports ERROR — "this proved nothing". Found by
-  // the battery's M03 (init awaiting checkAuth before starting syncOnLoad). Bounded, the same defect is
+  // test instead of failing it — "this proved nothing". That is the shape of
+  // init awaiting checkAuth before starting syncOnLoad. Bounded, the same defect is
   // a named failure, and init's claim that the boot waits for the slower request, not the sum, is pinned.
   const answeredWhileHeld = async (done, held, release) => {
     let arrived = false;
@@ -133,7 +132,7 @@ const statePuts = (puts) => puts.filter((p) => 'state' in p);
 const ids = (raw) => (raw == null ? raw : JSON.parse(raw).map((c) => c.id));
 const rowIds = (row) => (row ? (row.state.channels || []).map((c) => c.id) : null);
 
-// ── Criteria 1–3: a walled browser is not handed the account's data ([BUG-063]) ─────────────────
+// ── Criteria 1–3: a walled browser is not handed the account's data ─────────────────
 
 for (const [label, me] of [['aborts', 'abort'], ['answers a definite 401', 401]]) {
   test(`[BUG-063] c1${me === 'abort' ? 'a' : 'b'}: a walled boot is not handed the account row when the sign-in check ${label}`, async () => {
@@ -148,11 +147,11 @@ for (const [label, me] of [['aborts', 'abort'], ['answers a definite 401', 401]]
 }
 
 test('[BUG-063] c1c: a walled browser that already holds data is not handed the account row either', async () => {
-  // Review round 2 (claims reviewer, H1). c1a and c1b start from a FRESH store, and c2-c2d take the
-  // no-row claim or the dirty branch, so a pull guard that fired only for an EMPTY store survived every
-  // test — while the CHANGELOG and the task's UI section promise that a walled browser holding data
-  // "still receives nothing". On main this is the leak with a signed-out visitor's channels in place:
-  // the walled browser took Alice's row, and the next brand-new account adopted it.
+  // c1a and c1b start from a FRESH store, and c2-c2d take the
+  // no-row claim or the dirty branch, so a pull guard that fired only for an EMPTY store would pass
+  // all of them — while a walled browser holding data must
+  // "still receive nothing". Unguarded, this is the leak with a signed-out visitor's channels in place:
+  // the walled browser takes Alice's row, and the next brand-new account adopts it.
   // Not dirty, and the account has a row, so neither upload can fire and only the pull is under test.
   const sql = fakeDb({ users: [{ kind: 'account', id: ALICE_ID, state: ALICE_ROW }] });
   const visitor = { focus_channels: JSON.stringify(chans('UC_legacy')), focus_done: JSON.stringify(['legacy-done']) };
@@ -173,11 +172,10 @@ test('[BUG-063] c1c: a walled browser that already holds data is not handed the 
 });
 
 test('[BUG-063] c2: a walled boot still uploads this browser\'s own copy to the account behind the cookie', async () => {
-  // REVERSED after review round 1 (Asli, 2026-09-11: "yes to 1"). This test first pinned the OPPOSITE
-  // — "a walled boot claims nothing" — and two independent reviewers measured what that cost. The
+  // The OPPOSITE rule — "a walled boot claims nothing" — costs data. The
   // claim sends THIS BROWSER's copy to the account the valid cookie names, which is exactly what the
-  // next healthy boot does moments later, so refusing it protected nothing; it only DEFERRED the
-  // adoption, and the deferral lost a signed-out browser's channels when another device created the
+  // next healthy boot does moments later, so refusing it protects nothing; it only DEFERS the
+  // adoption, and the deferral loses a signed-out browser's channels when another device creates the
   // row first (c2c). Only PULLING the account into a walled browser is the leak (c1, c3).
   // The no-row branch, not the apply: the account has no row and local holds channels. Analytics must
   // still leave — the wall's own metric rides them.
@@ -206,10 +204,10 @@ function aliceStoreWith(extra, sql, more = {}) {
 }
 
 test('[BUG-063] c2b: a walled boot still uploads un-pushed work to the account behind the cookie', async () => {
-  // The dirty keep-local push — the fifth write after the state read, which round 1 found no test or
-  // mutation reaching for a contradicted answer. Walled, it sends this browser's un-pushed work to its
-  // own account under its own base, exactly as main does; deferring it lost the work when the session
-  // ended before the next healthy boot (c2d).
+  // The dirty keep-local push — the fifth write after the state read, reached here for a
+  // contradicted answer. Walled, it sends this browser's un-pushed work to its
+  // own account under its own base; deferring it would lose the work when the session
+  // ends before the next healthy boot (c2d).
   const sql = fakeDb({ users: [{ kind: 'account', id: ALICE_ID, state: ALICE_ROW }] });
   const r = rig({ sql, store: aliceStoreWith(chans('UC_unpushed'), sql, { focus_dirty: '1' }), me: 'abort', stateSession: ALICE });
   await r.boot();
@@ -230,10 +228,10 @@ test('[BUG-063] c3: a new account signed in after the walled boot does not inher
 });
 
 test('[BUG-063] c2c: a walled first sign-in keeps a signed-out browser\'s channels when another device creates the row first', async () => {
-  // Review round 1's HIGH, measured there and re-measured before this fix: a browser holding channels
+  // A browser holding channels
   // from before sign-in was mandatory, walled on the magic-link boot, then the same person adds a
   // channel on their phone — which creates the account row — and comes back. Refusing the walled
-  // claim left the row to the phone, and the next boot pulled it over the old channels.
+  // claim would leave the row to the phone, and the next boot would pull it over the old channels.
   const sql = fakeDb();
   const legacy = rig({ sql, store: { focus_channels: JSON.stringify(chans('UC_legacy')) }, me: 'abort', stateSession: ALICE, search: '?auth=ok' });
   await legacy.boot();
@@ -249,9 +247,9 @@ test('[BUG-063] c2c: a walled first sign-in keeps a signed-out browser\'s channe
 });
 
 test('[BUG-063] c2d: un-pushed work from a walled boot survives the session ending before the next boot', async () => {
-  // Round 1's second loss, the consequence of c2b: walled with un-pushed work, then a boot whose
+  // The consequence of deferring c2b's push: walled with un-pushed work, then a boot whose
   // session has ended saves that work into the DEVICE row and clears dirty, and the next sign-in pulls
-  // the account row over it. It needs two abnormal boots; main keeps the work.
+  // the account row over it. It needs two abnormal boots.
   const sql = fakeDb({ users: [{ kind: 'account', id: ALICE_ID, state: ALICE_ROW }] });
   const walled = rig({ sql, store: aliceStoreWith(chans('UC_unpushed'), sql, { focus_dirty: '1' }), me: 'abort', stateSession: ALICE });
   await walled.boot();
@@ -262,7 +260,7 @@ test('[BUG-063] c2d: un-pushed work from a walled boot survives the session endi
   assert.deepEqual(rowIds(sql.get('account', ALICE_ID)), ['UC_alice', 'UC_unpushed'], 'the work must have reached the account');
 });
 
-// ── Criteria 4–7: a signed-in user whose state read resolved to the device ([BUG-102]) ──────────
+// ── Criteria 4–7: a signed-in user whose state read resolved to the device ──────────
 
 /** Alice is signed in and her store is her own current copy, based on her account row. The boot's
  *  state read hits a session blip and resolves to this browser's DEVICE namespace. */
@@ -298,10 +296,10 @@ test('[BUG-102] c4: a signed-in boot does not apply a device row, nor re-base on
 });
 
 test('[BUG-102] c4b: a signed-in browser holding nothing gains neither the device row nor standing', async () => {
-  // Review round 2 (claims reviewer, X07). Every blipRig seeds Alice's local copy, so a refusal that
-  // fired only when local HOLDS data survived every test. On an empty browser the pull is still stopped
-  // further down, so what leaks is STANDING: a later tap claims state from a document that never read
-  // its own row. On main the device row is simply applied. A fresh browser, on its first sign-in.
+  // Every blipRig seeds Alice's local copy, so a refusal that
+  // fired only when local HOLDS data would pass every other test. On an empty browser the pull is still
+  // stopped further down, so what leaks is STANDING: a later tap claims state from a document that never
+  // read its own row. Unguarded, the device row is simply applied. A fresh browser, on its first sign-in.
   // "Not written FROM THE ROW", not "null": the boot writes `focus_include_shorts: 'true'` on an empty
   // browser whatever the server holds (measured with a device row saying 'false', and with none), so
   // every value below differs from what an empty browser writes for itself.
@@ -339,8 +337,8 @@ test('[BUG-102] c5b: a dirty store equal to the contradicting row keeps dirty an
   // this browser may write to; a statement about the WRONG row, so it may not clear dirty or re-base.
   // Every synced key matches across the two sides — `sameSyncedState` compares the union of keys, so a
   // key that differed would read as "different" and pin nothing. `focus_groups` is ABSENT locally and
-  // null on the row, and still counts as matching: review round 2 measured c5b failing on main, which it
-  // can only do by reaching the reconcile. (This comment used to say every key was present on both sides.)
+  // null on the row, and still counts as matching: c5b fails without the refusal, which it
+  // can only do by reaching the reconcile.
   const same = { channels: chans('UC_alice_local'), done: ['alice-local-done'], archive: [], theme: 'dark', shorts: 'false', groups: null };
   const r = blipRig({ deviceState: same, store: { focus_dirty: '1' }, omit: ['focus_groups'] });
   await r.boot();
@@ -400,11 +398,11 @@ test('[BUG-102] c7: after a contradicted answer, whether a row exists stays unkn
 });
 
 test('[BUG-102] c7b: with no device row either, the notice still does not claim there is no saved copy', async () => {
-  // Review round 2 (claims reviewer, H2). c7 seeds a device row, so the only wrong copy it can produce
-  // is the ROW copy, and criterion 7's "not the no-row copy" could not fail. Here the device namespace
-  // has no row: main then records "no row", says "There's no saved copy to restore from" and hides the
-  // repair — while the account HAS one. `focus_archive: ''` damages the store, so the notice shows on
-  // either code and main's no-row claim is stopped; what differs is what the notice says.
+  // c7 seeds a device row, so the only wrong copy it can produce
+  // is the ROW copy, and "not the no-row copy" cannot fail there. Here the device namespace
+  // has no row: unguarded, the boot records "no row", says "There's no saved copy to restore from" and
+  // hides the repair — while the account HAS one. `focus_archive: ''` damages the store, so the notice
+  // shows either way and the no-row claim is stopped; what differs is what the notice says.
   const r = blipRig({ store: { focus_archive: '' } });
   await r.boot();
   assert.equal(r.app.el('damaged-notice-setup').classList.contains('hidden'), false, 'guard: the store is damaged and the notice shows');
@@ -434,7 +432,7 @@ for (const order of ['state-first', 'me-first']) {
 
 test('[BUG-063] c9: an answer that does not say which namespace answered is still applied (Asli: "only a wrong label")', async () => {
   // A deliberate decision, pinned so tightening it cannot land silently: the real server labels every
-  // answer (test/sync-conflict.test.mjs), so an unlabelled one is refused only if Asli decides so.
+  // answer (test/sync-conflict.test.mjs), so refusing an unlabelled one has to be a deliberate change.
   const sql = fakeDb({ users: [{ kind: 'account', id: ALICE_ID, state: ALICE_ROW }] });
   const r = rig({ sql, me: ALICE, stateSession: ALICE, stripKind: true });
   await r.boot();
@@ -461,9 +459,8 @@ test('[BUG-063] c10b: a signed-out browser\'s channels are still adopted by a ne
 });
 
 test('[BUG-063] c10c: a signed-out browser is still handed its own device row', async () => {
-  // The control round 1 found missing. c8-c10b are all signed-in or do their real work on a signed-in
-  // boot, so a fix that refused EVERY signed-out answer survived them; only older tests calling
-  // syncOnLoad() without checkAuth() caught it, and only by accident of that missing call.
+  // A control. c8-c10b are all signed-in or do their real work on a signed-in
+  // boot, so a fix that refused EVERY signed-out answer would pass them.
   const sql = fakeDb({ users: [{ kind: 'device', id: DEVICE_ID, state: { channels: chans('UC_device'), done: ['device-done'] } }] });
   const r = rig({ sql, me: 401, stateSession: null });
   await r.boot();
@@ -471,27 +468,27 @@ test('[BUG-063] c10c: a signed-out browser is still handed its own device row', 
   assert.deepEqual(ids(r.app.get('focus_channels')), ['UC_device'], 'the device namespace is this browser\'s own, and must still apply');
 });
 
-// ── Criteria 13–14: pinned after the independent battery found them unguarded ────────────────────
+// ── c13–c14: one sign-in answer, and the boot waits for it ───────────────────────────────────────
 
 test('[BUG-063] c13: one boot asks who is signed in exactly once, so the check and the screen cannot disagree', async () => {
-  // Independent battery B06: `init` handing syncOnLoad a SECOND checkAuth() rather than the same
-  // promise survived every test, and its probe reproduced the original leak end to end — the check
+  // `init` handing syncOnLoad a SECOND checkAuth() rather than the same
+  // promise reproduces the original leak end to end — the check
   // deciding on one answer and the screen on another. Here the two answers would disagree: the first
   // request times out, any second one says Alice.
   const r = rig({ sql: fakeDb({ users: [{ kind: 'account', id: ALICE_ID, state: ALICE_ROW }] }), me: ['abort', ALICE], stateSession: ALICE, search: '?auth=ok' });
   await r.boot();
   assert.equal(r.app.urls().filter((u) => u.includes('/api/auth/me')).length, 1, 'the boot must ask exactly once');
   assert.deepEqual([...r.app.visibleViews()], ['view-landing'], 'the one answer walled the browser');
-  // Every synced key and the base, not only channels (review round 2, claims reviewer L9: the criterion
-  // names "no synced key", and a leak of the other five passed when this read `focus_channels` alone).
+  // Every synced key and the base, not only channels: a leak of the other five would pass a
+  // check that read `focus_channels` alone.
   for (const k of SYNCED) {
     assert.equal(r.app.get(k), null, `and the check agreed with it: nothing was handed over, but ${k} holds ${r.app.get(k)}`);
   }
 });
 
 test('[BUG-063] c14: the boot waits for the sign-in answer even when the state read fails at once', async () => {
-  // Independent battery B07: `init` no longer awaiting the sign-in answer was killed only by unrelated
-  // assertions, depending on microtask counts. syncOnLoad returns early on a failed read WITHOUT
+  // Pins `init` awaiting the sign-in answer directly, rather than through unrelated
+  // assertions that depend on microtask counts. syncOnLoad returns early on a failed read WITHOUT
   // reaching its own await, so only init's wait stops the screen being decided before sign-in resolves.
   const r = rig({ store: { focus_channels: JSON.stringify(chans('UC_alice')), focus_was_authed: '1' }, me: ALICE, stateSession: ALICE, order: 'state-first', stateFails: true });
   await r.boot();
@@ -499,15 +496,14 @@ test('[BUG-063] c14: the boot waits for the sign-in answer even when the state r
   assert.ok(r.app.el('btn-feed-manage').listeners.length > 0, 'and the app is wired');
 });
 
-// ── Risk 4: a sign-in check that throws after answering must not cost main's uploads ─────────────
+// ── A sign-in check that throws after answering must not cost the boot's uploads ─────────────────
 //
 // syncOnLoad's wait for the sign-in answer is WRAPPED: checkAuth settles `_authEmail` first, then reads
-// and writes `focus_was_authed`, and either can throw (a full store, a browser refusing site data). Both
-// the independent battery (D09 unwrapped, D10 a throw treated as a failed read) and the claims reviewer
-// (M16) survived every test with the wrap gone — and the task's own probe could not tell, because it
-// read only whether init rejected and which view showed, and init rejects here on main as well. What
+// and writes `focus_was_authed`, and either can throw (a full store, a browser refusing site data).
+// Whether init rejects and which view shows cannot tell whether the wrap is there, because init
+// rejects here either way. What
 // the wrap preserves is the UPLOAD. These assert that, and deliberately not the rejection: a later fix
-// that lets init survive a storage throw must not have to edit them. Controls: green on main.
+// that lets init survive a storage throw must not have to edit them.
 
 test('[BUG-063] c15a: a signed-in boot whose sign-in check throws after answering still pushes un-pushed work', async () => {
   // A first sign-in on this browser (no `focus_was_authed`) with a full store: checkAuth's write of the
@@ -527,7 +523,7 @@ test('[BUG-063] c15a: a signed-in boot whose sign-in check throws after answerin
 test('[BUG-063] c15b: a walled boot whose sign-in check throws after answering still uploads this browser\'s channels', async () => {
   // Walled (the check aborts), and the browser refuses the READ of `focus_was_authed`, so checkAuth
   // throws after settling a signed-out answer. The account has no row and local holds channels: c2's
-  // adoption, which main performs on this boot.
+  // adoption, which must still happen on this boot.
   const sql = fakeDb();
   const r = rig({ sql, store: { focus_channels: JSON.stringify(chans('UC_legacy')) }, me: 'abort', stateSession: ALICE });
   let threw = 0;

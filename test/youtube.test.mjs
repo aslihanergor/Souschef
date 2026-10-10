@@ -61,7 +61,7 @@ test('ytFetch returns null when no API key is set (so the resolver falls back to
   }
 });
 
-// ── ytFetch / fetchRssXml resilience: retry-with-backoff (BUG-004) ────────────
+// ── ytFetch / fetchRssXml resilience: retry-with-backoff ────────────
 // The feed is Data-API-primary with an RSS fallback. A transient blip (429 rate-limit,
 // 5xx, network error / timeout) shouldn't drop a channel on the first miss — retry with
 // backoff. But a 403 is YouTube's REAL quota-exceeded answer: retrying just burns the

@@ -1,26 +1,26 @@
-// The first-run tour ([TASK-092]).
+// The first-run tour.
 //
-// Two layers, split the way the task's Cost section split them. The DECISIONS — whether a boot may
+// Two layers. The DECISIONS — whether a boot may
 // start the tour, which cards survive the skip rule, what each button does to the record — are pure
 // and live in lib/pure.js, so they are tested directly (P-series). Everything that decides whether the
 // app stays USABLE — the layer going up and coming down, the four blockers, the hooks where a channel
 // lands and a feed renders, suspension under the drawer and the picker, focus — runs the real app.js
-// through the harness (A-series). Criterion numbers are the task file's.
+// through the harness (A-series).
 //
 // What this file cannot see without help: where things are placed (`getBoundingClientRect` answers
 // zeros), the dim itself (a box-shadow), reduced motion (`matchMedia` always answers false), and Tab
 // traversal (the stubs have no `matches`/`getClientRects` — A30b and A30c stub those, A30d and A30e the toast's query and
-// focus). How those LOOK is criterion 17
-// and the live half of 14; A29–A29e read placement from stubbed rects.
+// focus). How those LOOK is verified in a browser;
+// A29–A29e read placement from stubbed rects.
 //
-// CORRECTED after review round 1 (MED-3). This header used to say that which element a ring is on was
-// visible through `#tour-ring`'s `data-target`. It was not: `data-target` is the CARD's key, so a ring on
-// the wrong element — the gear instead of the topics switch, the Add button instead of Open my feed — kept
+// Which element a ring is on is NOT
+// visible through `#tour-ring`'s `data-target`: `data-target` is the CARD's key, so a ring on
+// the wrong element — the gear instead of the topics switch, the Add button instead of Open my feed — would keep
 // every test green. `box()` below gives chosen elements a real rect, and A7c/A26 assert the ring's own
 // position, which only the right element can produce.
 //
-// Pure functions are reached through the namespace rather than named imports on purpose: at the RED
-// step a missing export must fail each test BY NAME, not the whole file at load.
+// Pure functions are reached through the namespace rather than named imports on purpose:
+// a missing export must fail each test BY NAME, not the whole file at load.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as pure from '../lib/pure.js';
@@ -35,8 +35,8 @@ test('[TASK-092] P1 a signed-in, loaded, healthy, empty account with no record m
   assert.equal(pure.shouldStartTour(START), true);
 });
 
-// Criterion 2 and Risk 2 — one test per term, so each term of the compound predicate is pinned alone
-// (Known Pitfalls §2). Each fixture differs from START in exactly one field.
+// One test per term, so each term of the compound predicate is pinned alone.
+// Each fixture differs from START in exactly one field.
 for (const [id, label, change] of [
   ['P2a', 'signed out', { signedIn: false }],
   ['P2b', 'the boot read failed or was refused', { stateLoaded: false }],
@@ -44,8 +44,8 @@ for (const [id, label, change] of [
   ['P2d', 'a channel exists', { channels: 1 }],
   ['P2e', 'an archived item exists', { archived: 1 }],
   ['P2f', 'a record is present', { record: JSON.stringify({ at: 'done' }) }],
-  // Battery S7: a quota-aborted write leaves "" behind. Present-but-empty is still a record — reading it
-  // as absent would restart the tour over it, the [BUG-052] shape one key over.
+  // A quota-aborted write leaves "" behind. Present-but-empty is still a record — reading it
+  // as absent would restart the tour over it.
   ['P2g', 'the record is an empty string', { record: '' }],
 ]) {
   test(`[TASK-092] ${id} does not start when ${label} (criterion 2)`, () => {
@@ -139,13 +139,13 @@ test('[TASK-092] P12 the tip ends in a wait for the feed, by OK or by tapping Op
   assert.deepEqual(pure.tourStep(tip, 'go', YT).record, { at: 'wait-feed', replay: false });
   const done = { at: 'done' };
   assert.equal(pure.tourStep(done, 'go', YT).record, done);
-  // Independent battery L26b: Back on the tip is disabled in the view, so the app cannot send it — but the
+  // Back on the tip is disabled in the view, so the app cannot send it — but the
   // decision itself must still refuse to cross back over the channel the reader just added.
   assert.equal(pure.tourStep(tip, 'back', YT).record, tip, 'Back at the tip goes nowhere');
 });
 
 test('[TASK-092] P13 a feed render with a post starts the feed part only from the wait, never again (criterion 8)', () => {
-  // Amendment 11 changed the requirement this asserts: the start now also needs the render to have a post, so the
+  // The start also needs the render to have a post, so the
   // context says so. The "never again" half is unchanged, and is asserted WITH a post so only the wait can stop it.
   const POSTS = { ...YT, feedHasPost: true };
   assert.deepEqual(pure.tourStep({ at: 'wait-feed', replay: true }, 'feed', POSTS).record, { at: 'feed', card: 'done', replay: true });
@@ -201,7 +201,7 @@ test('[TASK-092] P15 each card reads as the UI & states table says, count recalc
   });
   assert.equal(pure.tourView(at('import'), { ...YT, source: 'twitter' }).card, 'wait',
     'a card that no longer survives resolves to the next one that does');
-  // Independent battery L11: with NO later survivor — card 4 on a replay with content — it resolves to the LAST
+  // With NO later survivor — card 4 on a replay with content — it resolves to the LAST
   // card that survives, not back to card 1.
   assert.deepEqual([pure.tourView(at('wait'), { ...YT, hasContent: true }).card, pure.tourView(at('wait'), { ...YT, hasContent: true }).count],
     ['import', '3 of 3']);
@@ -246,7 +246,7 @@ function putAnswer(raw) {
 
 /** An app and the PUT bodies it sent. `stateGet`: 'no-row' (a brand-new account), 'fails' (500),
  *  'row' (an account with a channel), 'empty-row' (an account row with no content), or
- *  'device' (a signed-in boot answered from the device — refused, [BUG-102]). `feed`: 'posts',
+ *  'device' (a signed-in boot answered from the device — refused). `feed`: 'posts',
  *  'empty', 'fails', and for X channels 'x-quota' (no cache → the X-unavailable note). */
 function rig({ store = {}, signedIn = true, stateGet = 'no-row', search = '', feed = 'posts' } = {}) {
   const puts = [];
@@ -332,7 +332,7 @@ const named = (app, puts, name) => eventsOf(app, puts).filter((e) => e.name === 
 const statePuts = (puts) => puts.filter((p) => 'state' in p);
 const click = (app, id) => app.click(app.el(id));
 
-/** Everything a "the tour ended and nothing is left dimmed" claim covers (criteria 4, 15). */
+/** Everything a "the tour ended and nothing is left dimmed" claim covers. */
 function assertNoDim(app, why) {
   for (const id of TOUR_LAYER) assert.ok(!shown(app, id), `#${id} must be hidden — ${why}`);
   assert.ok(!app.ctx.document.body.classList.contains('tour-open'), `the scroll lock must be released — ${why}`);
@@ -448,7 +448,7 @@ for (const [part, opts, expected] of ON_EACH_PART) {
 }
 
 // Stopped by TWO guards at once — the keydown handler's "is a card up" and tourStep's "is anything
-// showing" — so this pins the behaviour and neither guard alone (author battery, T4 and D4). Each is
+// showing" — so this pins the behaviour and neither guard alone. Each is
 // pinned on its own by P10 and A15b.
 test('[TASK-092] A5b Escape while the tour is waiting changes nothing (criterion 4)', async () => {
   const { app, puts } = rig({ store: { focus_tour: JSON.stringify({ at: 'wait-channel', replay: false }) } });
@@ -500,10 +500,8 @@ test('[TASK-092] A7b a channel added from inside card 2 ends the setup cards ear
   await app.ctx.handleAddChannel();
   assert.ok(app.el('add-form').classList.contains('hidden'), 'guard: Add swapped the form for the confirm panel');
   assert.equal(app.el('tour-ring').dataset.target, 'add', 'still on the add step');
-  // WHICH element the highlight is on — the form or the confirm panel — is A7c's to pin. The first
-  // version of this test fired a document click here and called that "the re-draw after the form is
-  // hidden"; a resolve slower than that click's timers made the comment false, and `data-target` is the
-  // card's key, which cannot tell the two apart (review round 1, MED-2/MED-3).
+  // WHICH element the highlight is on — the form or the confirm panel — is A7c's to pin: `data-target` is the
+  // card's key, which cannot tell the two apart.
   click(app, 'btn-confirm-add');
   assert.equal(card(app), 'tip');
 });
@@ -512,8 +510,8 @@ test('[TASK-092] A8 the first channel brought in by Import while waiting raises 
   const { app } = rig({ search: '?import=youtube', store: { focus_tour: JSON.stringify({ at: 'wait-channel', replay: false }) } });
   await boot(app);
   assert.ok(app.el('import-modal').classList.contains('open'), 'guard: the picker is open');
-  // Not a suspension check: the record is only waiting, so there is nothing to draw either way
-  // (author battery H10). A8b is the one that pins a card being held back by the picker.
+  // Not a suspension check: the record is only waiting, so there is nothing to draw either way.
+  // A8b is the one that pins a card being held back by the picker.
   assert.ok(!shown(app, 'tour'), 'guard: waiting, so no card');
   const row = app.el('import-list').children[0];
   assert.equal(app.click(row), 1, 'guard: the imported row is selectable');
@@ -590,8 +588,7 @@ test('[TASK-092] A12 a total load failure does not start the feed part; the next
   assert.equal(card(app), 'done');
 });
 
-// A13 and A14 asserted the opposite until amendment 11 (Asli's handset walk, 2026-09-15: "A"): an empty first feed used
-// to start the feed part with Done and Archive centred over "You're all caught up". Rewritten for the new requirement.
+// An empty first feed must not start the feed part with Done and Archive centred over "You're all caught up".
 test('[TASK-092] A13 a caught-up first feed keeps waiting, silently; the first load with a post starts Done on it (criterion 8, amendment 11)', async () => {
   const store = { focus_channels: JSON.stringify([YT_CHANNEL]), focus_last_view: 'feed', focus_tour: JSON.stringify({ at: 'wait-feed', replay: false }) };
   const { app, puts, setFeed } = rig({ store, feed: 'empty' });
@@ -737,7 +734,7 @@ test('[TASK-092] A20 focus moves to the card and comes back where it was when th
   await addChannelByForm(app);
   assert.equal(card(app), 'tip', 'guard');
   // Compared by id, not by reference: a failed reference comparison between vm-realm stubs reports as
-  // a test-code failure rather than an assertion, which a battery then has to second-guess.
+  // a test-code failure rather than an assertion, which a mutation run then has to second-guess.
   const doc = app.ctx.document;
   assert.equal(doc.activeElement.id, 'tour-main', 'focus is on the card\'s main button');
   click(app, 'tour-close');
@@ -755,7 +752,7 @@ test('[TASK-092] A20b each new card takes focus (criterion 14)', async () => {
 });
 
 test('[TASK-092] A20c a re-draw while a card is up does not forget where focus came from (criterion 14)', async () => {
-  // Battery F3. The card is re-placed on every resize, scroll and tap — and each of those runs while
+  // The card is re-placed on every resize, scroll and tap — and each of those runs while
   // focus sits on the card's own button. Recapturing "where focus was" on a re-draw stores that button,
   // so closing would hand focus to an element inside the layer being hidden.
   const { app } = rig({ store: { focus_tour: JSON.stringify({ at: 'wait-channel', replay: false }) } });
@@ -771,7 +768,7 @@ test('[TASK-092] A20c a re-draw while a card is up does not forget where focus c
 });
 
 test('[TASK-092] A15b Escape with the drawer open closes the drawer, not the tour behind it (criteria 4, 10)', async () => {
-  // Battery D4. Sized so ONLY the keydown handler's "is a card up" guard can stop it: the record is on
+  // Sized so ONLY the keydown handler's "is a card up" guard can stop it: the record is on
   // a setup card, which tourStep would happily close.
   const { app } = rig();
   await boot(app);
@@ -790,7 +787,7 @@ const FEED_AT = (card) => ({
 });
 
 test('[TASK-092] A22 leaving the feed by the drawer\'s Manage channels takes the feed card down (criterion 10)', async () => {
-  // Battery H13. The only tour-free route off a screen while its dim is up: the gear card's highlight
+  // The only tour-free route off a screen while its dim is up: the gear card's highlight
   // takes the tap, the drawer suspends the card, and "Manage channels" closes the drawer — which
   // resumes the card on the feed — then shows setup. Only showView's redraw takes it back down.
   const { app } = rig({ store: FEED_AT('gear') });
@@ -804,7 +801,7 @@ test('[TASK-092] A22 leaving the feed by the drawer\'s Manage channels takes the
 });
 
 test('[TASK-092] A23 reopening the feed mid-part draws no card while it loads (criterion 8)', async () => {
-  // Battery H7. A feed render earlier in this document must not count for the NEXT load.
+  // A feed render earlier in this document must not count for the NEXT load.
   const { app, holdFeed } = rig({ store: FEED_AT('gear') });
   await boot(app);
   click(app, 'btn-feed-manage');
@@ -821,7 +818,7 @@ test('[TASK-092] A23 reopening the feed mid-part draws no card while it loads (c
 });
 
 test('[TASK-092] A24 a reload mid-feed-part draws no card until this boot\'s feed has rendered (criterion 8)', async () => {
-  // Battery H8. Every other test lets the load finish before looking.
+  // Every other test lets the load finish before looking.
   const { app, holdFeed } = rig({ store: FEED_AT('archive') });
   const release = holdFeed();
   const booting = app.ctx.init();
@@ -836,13 +833,13 @@ test('[TASK-092] A24 a reload mid-feed-part draws no card until this boot\'s fee
 });
 
 test('[TASK-092] A13b a caught-up render after one with posts does not point Done at a stale card (criterion 9)', async () => {
-  // Battery P1. The caught-up screen hides #feed but leaves the previous render's cards in it.
+  // The caught-up screen hides #feed but leaves the previous render's cards in it.
   const store = { focus_channels: JSON.stringify([YT_CHANNEL]), focus_last_view: 'feed', focus_tour: JSON.stringify({ at: 'done' }) };
   const { app, setFeed } = rig({ store });
   await boot(app);
   assert.ok(app.queryAll('#feed .card').length > 0, 'guard: this document rendered posts');
-  // A replay already on its Done card. Until amendment 11 this seeded the wait, which an empty render no longer
-  // starts; the stale-card hazard this test pins only exists once the feed part is running.
+  // A replay already on its Done card. Seeding the wait would not do: an empty render does not
+  // start it, and the stale-card hazard this test pins only exists once the feed part is running.
   app.set('focus_tour', JSON.stringify({ at: 'feed', card: 'done', replay: true }));
   setFeed('empty');
   app.ctx.renderFeedResults(await app.ctx.loadFeed());
@@ -856,7 +853,7 @@ test('[TASK-092] A21 a refused storage read at boot leaves no dim and a usable a
   const { app } = rig();
   app.failGetItem((k) => k === 'focus_tour');
   // An ASSERTION that the boot resolves, not a bare await: without tourBoot's guard the refused read rejects
-  // init, and a bare await turns that into a crash rather than a failed claim (independent battery, crit. 15).
+  // init, and a bare await turns that into a crash rather than a failed claim.
   await assert.doesNotReject(app.ctx.init(), 'a refused tour read must not reject the boot');
   await drain(app);
   assert.deepEqual(app.visibleViews(), ['view-setup'], 'the app still boots');
@@ -875,11 +872,11 @@ test('[TASK-092] A21b a throw mid-tour tears the whole layer down (criterion 15)
   assertNoDim(app, 'the record could not be written');
   app.fireDocument('keydown', { key: 'Escape', preventDefault() {} });
   // `app.click` runs only the button's own listeners, so this is the no-capture-listener case. The browser's
-  // order — the document's capture listener first, scheduling a re-draw — is A21c's (review round 1, HIGH-1).
+  // order — the document's capture listener first, scheduling a re-draw — is A21c's.
   assertNoDim(app, 'and Escape afterwards does not bring it back');
 });
 
-// ── Review round 1 (independent claims review of 01ac516) ───────────────────────────────────────
+// ── A refused save, with the tap's own re-draw ──────────────────────────────────────────────────
 
 for (const [label, id, before] of [
   ['Close', 'tour-close', 0],
@@ -890,7 +887,7 @@ for (const [label, id, before] of [
     // In a browser the document's capture-phase click listener runs BEFORE the button's handler and
     // schedules a re-draw. When the handler's save then throws, the teardown ran — but the record on
     // disk still says a card is up, so that scheduled re-draw put the card back, on every tap.
-    // `app.click` fires only the element's own listeners, which is how A21b stayed green over this.
+    // `app.click` fires only the element's own listeners, which is why A21b cannot see this.
     const { app } = rig();
     await boot(app);
     for (let i = 0; i < before; i++) click(app, 'tour-main');
@@ -905,7 +902,7 @@ for (const [label, id, before] of [
     app.runTimers();
     assertNoDim(app, 'and nothing later in this document redraws it');
     // One more, so the count is odd: a guard that only takes down a card already UP would draw on one re-draw and
-    // take it down on the next, and every even count above would still read no dim (review round 2, MED-A).
+    // take it down on the next, and every even count above would still read no dim.
     app.ctx.showView('view-setup');
     assertNoDim(app, 'after an odd number of re-draws too');
     app.failSetItem(null);
@@ -980,7 +977,7 @@ test('[TASK-092] A26b each feed card rings its own control, on the first post th
   app.runTimers();
   assert.equal(ringOn(app), 600, 'a post held hidden is not in the stream, so the next one is used');
   cards[0].classList.remove('grouping-pending');
-  cards[0].classList.add('grouped-out');         // lifted into a topic — independent battery T35b
+  cards[0].classList.add('grouped-out');         // lifted into a topic
   app.fireWindow('resize');
   app.runTimers();
   assert.equal(ringOn(app), 600, 'nor is a post lifted into a topic');
@@ -1068,8 +1065,6 @@ test('[TASK-092] A25 a tour control missing from the page does not stop the rest
   assert.equal(click(app, 'import-add'), 1, 'the picker is wired');
 });
 
-// ── Independent battery, round 1 (blind battery of 01ac516) ─────────────────────────────────────
-
 test('[TASK-092] A28 a re-draw while typing into card 2 does not pull focus out of the add box (Risk 3; independent T29)', async () => {
   // Every tap, scroll, resize and keyboard change re-draws the card. Only a NEW card may take focus;
   // re-drawing the same one while the reader types would make the add box it points at unusable.
@@ -1145,7 +1140,7 @@ test('[TASK-092] A29d a new card scrolls its control into view, and a re-draw of
 });
 
 test('[TASK-092] A30 Tab stays inside a centred card: it cycles, wraps both ways and skips a disabled Back (criterion 14; independent T42–T44)', async () => {
-  const store = { focus_channels: JSON.stringify([YT_CHANNEL]), focus_last_view: 'feed', focus_tour: JSON.stringify({ at: 'feed', card: 'done', replay: false }) };   // the feed part already on Done: since amendment 11 an empty FIRST feed keeps waiting instead
+  const store = { focus_channels: JSON.stringify([YT_CHANNEL]), focus_last_view: 'feed', focus_tour: JSON.stringify({ at: 'feed', card: 'done', replay: false }) };   // the feed part already on Done: an empty FIRST feed keeps waiting instead
   const { app } = rig({ store, feed: 'empty' });
   await boot(app);
   assert.equal(card(app), 'done', 'guard: the feed part on Done over an empty feed, centred, Back disabled');
@@ -1274,11 +1269,8 @@ test('[TASK-092] A37 sign-out clears the tour record (Risk 8; independent E8, X6
   assert.equal(app.get('focus_tour'), null, 'the next person on this browser gets their own tour');
 });
 
-// ── Review round 2 (blind claims review and independent battery of 095f4f5) ─────────────────────
-// Each test below closes a survivor one of the two reviewers measured: the named mutation passed the whole
-// suite. Where a test needs a DOM method the harness lacks (`matches`, `getClientRects`, a query honouring
-// `:not(.hidden)`), it is stubbed here in the open, on the elements involved — the approach the independent
-// battery's probes showed works, the way `box()` stubs a rect.
+// Where a test below needs a DOM method the harness lacks (`matches`, `getClientRects`, a query honouring
+// `:not(.hidden)`), it is stubbed here in the open, on the elements involved, the way `box()` stubs a rect.
 
 test('[TASK-092] A21d after a switch-off, one re-draw draws nothing, takes no focus and scrolls nothing (Risk 1; review round 2 MED-A, independent B07)', async () => {
   const { app } = rig();
@@ -1315,8 +1307,7 @@ test('[TASK-092] A29e placement: on a scrolled page with the keyboard open, a ca
   assert.equal(parseFloat(app.el('tour-card').style.top), 410);
 });
 
-// [BUG-124] Measured on Asli's iPhone (iOS 26.6.1 Safari, probes/bug-124-walk1-2026-09-26.log on the probe
-// branch): opening the keyboard on card 2 scrolls the document 146px even under `body.tour-open`, and while it
+// Measured on an iPhone (iOS 26.6.1 Safari): opening the keyboard on card 2 scrolls the document 146px even under `body.tour-open`, and while it
 // is scrolled a `position: fixed` element is drawn 146px ABOVE where `getBoundingClientRect` says the same
 // coordinates are. The ring was re-placed at once from the add box's rect (177 → top 171) and its own rect then
 // read 25. `#tour` is `position: fixed; inset: 0`, so its rect is where the fixed frame's origin sits in the
@@ -1346,9 +1337,9 @@ test('[BUG-124] B1 placement: with the fixed frame shifted by the keyboard, the 
   assert.equal(px('tour-card', 'top'), 383, 'the card sits under the box, not over the tabs');
 });
 
-// B1's 40px box and 120px card fit below in BOTH frames, so it cannot see the above/below decision (independent
-// review 1, LOW-2: a mutation judging fit in the rect frame survived it). These are the phone's own numbers at 13966ms
-// in the probe log: add box 104px tall at rect 177, card 127px, innerHeight 568, visualViewport 145.65625 + 404.
+// B1's 40px box and 120px card fit below in BOTH frames, so it cannot see the above/below decision:
+// a mutation judging fit in the rect frame would survive it. These are the phone's own measured numbers:
+// add box 104px tall at rect 177, card 127px, innerHeight 568, visualViewport 145.65625 + 404.
 test('[BUG-124] B3 placement: on the logged phone state the card goes above the add box, inside what the reader sees', async () => {
   const { app } = rig();
   app.ctx.innerWidth = 402;
@@ -1430,7 +1421,7 @@ test('[TASK-092] A30c a control inside the highlight that is not rendered is ski
 /** A centred Done card over an empty feed (Back disabled) with a toast raised. The toast's action query honours
  *  `:not(.hidden)` and its focus() is refused while hidden — what a browser does and the harness stub does not. */
 async function centredWithToast(actionLabel) {
-  const store = { focus_channels: JSON.stringify([YT_CHANNEL]), focus_last_view: 'feed', focus_tour: JSON.stringify({ at: 'feed', card: 'done', replay: false }) };   // as A30: since amendment 11 an empty first feed keeps waiting
+  const store = { focus_channels: JSON.stringify([YT_CHANNEL]), focus_last_view: 'feed', focus_tour: JSON.stringify({ at: 'feed', card: 'done', replay: false }) };   // as A30: an empty first feed keeps waiting
   const { app } = rig({ store, feed: 'empty' });
   await boot(app);
   assert.equal(card(app), 'done', 'guard: centred card');
@@ -1555,11 +1546,11 @@ test('[TASK-092] A34b a replay started from the feed\'s gear hands focus back to
   assert.equal(app.ctx.document.activeElement.id, 'profile-btn', 'the gear on the screen now showing, which opens the same drawer');
 });
 
-// ── The blind review of amendment 11, and amendment 12 (only a post visible in the stream counts) ─────────
+// ── Only a post visible in the stream counts ─────────────────────────────────────────────────────
 
 test('[TASK-092] A13c a reload while waiting boots onto posts and starts the feed part on one, at boot (criterion 8; review of amendment 11, MED-2)', async () => {
-  // The handset walk's own next step: the quiet channel left the tour waiting, the reader comes back after it posts.
-  // Rewriting A13 and A14 for amendment 11 removed the only tests that booted a WAITING record onto posts.
+  // The quiet channel left the tour waiting, the reader comes back after it posts:
+  // this is the test that boots a WAITING record onto posts.
   const store = { focus_channels: JSON.stringify([YT_CHANNEL]), focus_last_view: 'feed', focus_tour: JSON.stringify({ at: 'wait-feed', replay: false }) };
   const { app } = rig({ store });
   await boot(app);

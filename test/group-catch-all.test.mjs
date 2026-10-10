@@ -1,40 +1,35 @@
-// [BUG-114] A CATCH-ALL NAMED BY THE MODEL MUST STILL BE THE BUCKET.
+// A CATCH-ALL NAMED BY THE MODEL MUST STILL BE THE BUCKET.
 //
-// [TASK-096] keeps a post the classifier cannot place UNASSIGNED — readable in the stream and re-sent
-// on every classify. That rule used to hang on one exact string: the prompt asks for a group labelled
-// "Everything else", and both sides recognise the bucket by that name only. On the live dev row the
-// model once called it "Miscellaneous", the client stored it as a real topic, every post in the batch
-// was assigned (and so never re-classified), and `unfiled` went to 0.
+// A post the classifier cannot place stays UNASSIGNED — readable in the stream and re-sent
+// on every classify. That rule must not hang on one exact string: the prompt asks for a group labelled
+// "Everything else", and if both sides recognise the bucket by that name only, then when the
+// model calls it "Miscellaneous", the client stores it as a real topic, every post in the batch
+// is assigned (and so never re-classified), and `unfiled` goes to 0.
 //
 // The labels below are the model's OWN catch-all names, HARD-CODED as literals rather than derived
-// from the matcher — an assertion routed through the code it checks cannot fail (CLAUDE.md, Mutation
-// batteries, [BUG-023]). Sources: the live dev row (2026-09-08), M3's runs and the two captures in
+// from the matcher — an assertion routed through the code it checks cannot fail.
+// Sources: observed model output and the two captures in
 // test/fixtures/group-truncated-tool-reply.json. The three observed names the rule does NOT catch are
 // pinned in C3 as the stated limit, so a future widening has to be a decision, not a drift.
 //
-// WHICH TESTS CAN RED BEFORE THE FIX, declared because a merely-red suite hides the one that passed
+// WHICH TESTS FAIL WITHOUT THE MATCHER, declared because a merely-red suite hides the one that passed
 // for the wrong reason:
-//   RED before the fix   — C1, C1b, C2, C4, C5.
-//   GREEN before the fix — C3, BY DESIGN: it pins that topical names are left alone, which is true
-//                          today because nothing is matched at all. It exists to red a matcher that
-//                          over-reaches.
+//   RED without it   — C1, C1b, C2, C4, C5, C6.
+//   GREEN without it — C3, BY DESIGN: it pins that topical names are left alone, which is true
+//                      when nothing is matched at all. It exists to red a matcher that
+//                      over-reaches.
 //
-// Added after blind review 1 (reviews/BUG-114-review-1.md on `review/bug-114`):
-//   RED before the amendment   — C6 (MED-2: "Everything else" with words after it; Asli's call).
-//   GREEN before the amendment — C2b and C5b, which pin behaviour the fix already had but no test could
-//                                fail on: the reviewer's R1 (rename only the first catch-all) and R2
-//                                (skip one-post catch-alls) both survived the suite. Proven by those
-//                                two mutations, not by a red run.
+// C2b and C5b pin behaviour that renaming only the first catch-all, or skipping one-post
+// catch-alls, would break.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { groupItems, topicKey } from '../api/_group.js';
 import { createGroupHandler } from '../api/group.js';
 
-// [BUG-130] made the endpoint signed-in only, so this file presents a confirmed session: these tests are
+// The endpoint is signed-in only, so this file presents a confirmed session: these tests are
 // about what a signed-in caller's request does, and the gate itself is covered in signed-in-gate.test.mjs.
-// Only how the handler is built changed (the import above and this block); no assertion did (Asli,
-// 2026-10-07: "yes to all three, go ahead"). The DEFAULT export, which these files used to run, is now
-// covered by test/group-default-export.test.mjs (review round 1, H1).
+// The DEFAULT export is
+// covered by test/group-default-export.test.mjs.
 const handler = createGroupHandler({
   db: () => ({}),
   sessionAccount: async () => ({ accountId: 'acct-test', email: 'test@example.com' }),
@@ -50,7 +45,7 @@ const BUCKET_KEY = 'g_everything_else';
 const toolUse = groups => ({ content: [{ type: 'tool_use', name: 'emit_groups', input: { groups } }] });
 const fakeResponse = body => ({ ok: true, status: 200, json: async () => body });
 const posts = n => Array.from({ length: n }, (_, i) => ({ id: `x${i}`, source: 'twitter', text: `post ${i} says a thing` }));
-// Positions, not ids ([BUG-077] lever A): the model sees `String(n)`.
+// Positions, not ids: the model sees `String(n)`.
 const at = (...ns) => ns.map(String);
 const run = (items, groups) => groupItems({ items, apiKey: 'k' }, async () => fakeResponse(toolUse(groups)));
 const bucketsOf = res => res.groups.filter(g => topicKey(g.label) === BUCKET_KEY);
@@ -60,11 +55,11 @@ const allIds = res => res.groups.flatMap(g => g.item_ids);
 
 const REAL_CAUGHT = [
   'Miscellaneous',                                      // the live dev row
-  'Miscellaneous single reactions',                     // M3
-  'Miscellaneous opinions without substantive content', // M3
-  'Miscellaneous Reactions & Fragments',                // M3 capture-1
-  'Other reactions and low-substance posts',            // M3
-  'General Reactions & Context',                        // M3 capture-0
+  'Miscellaneous single reactions',                     // observed
+  'Miscellaneous opinions without substantive content', // observed
+  'Miscellaneous Reactions & Fragments',                // observed, capture-1
+  'Other reactions and low-substance posts',            // observed
+  'General Reactions & Context',                        // observed, capture-0
 ];
 
 for (const label of REAL_CAUGHT) {
@@ -143,11 +138,11 @@ test('BUG-114 C3: topical names, and the three stated misses, keep their own lab
     'Mixed martial arts',                   // "mixed" deliberately left off the list
     'Random walk theory',                   // "random" deliberately left off the list
     'AI & other news',                      // a list word, but not the FIRST word
-    'Bare affirmations and bare agreement', // stated limit (M3)
+    'Bare affirmations and bare agreement', // stated limit
     'Observations & Commentary',            // stated limit (capture-0)
     'Technology & Innovation Notes',        // stated limit (capture-1)
     // THREE words each, so `words.length > 2` passes and only the term under test can reject them. At two
-    // words the length check rejected both first, and mutations M9/M10 survived — the fixture pinned nothing.
+    // words the length check rejects both first, and the fixture pins nothing.
     'Everything Apple announced',           // "everything" alone is not the bucket (C6)
     'Everything elsewhere today',           // nor is "everything" + a word that merely starts "else"
   ];
@@ -277,9 +272,9 @@ test('BUG-114 C5: an already-stuck Miscellaneous tile is left byte-identical, an
 });
 
 test('BUG-114 C5b: on a stuck account, ONE new post the model files under "Miscellaneous" does not join the tile', async () => {
-  // The stuck account's everyday case (review 1, MED-1): a refresh brings a handful of posts and the model
+  // The stuck account's everyday case: a refresh brings a handful of posts and the model
   // files one under the existing catch-all. Alone in its group it is a singleton, and `collapseSingletons`
-  // SPARES a singleton whose label matches a populated existing topic ([BUG-066]) — so if the rename ever
+  // SPARES a singleton whose label matches a populated existing topic — so if the rename ever
   // skipped one-post groups, this post would be assigned into the stuck tile: the original bug.
   const STUCK = { label: 'Miscellaneous', summary: [{ text: 'an old fragment', item_ids: ['m1'] }] };
   const cached = {
@@ -315,11 +310,11 @@ test('BUG-114 C5b: on a stuck account, ONE new post the model files under "Misce
   );
 });
 
-// ── C6: "Everything else" with words after it (review 1, MED-2; Asli's call) ──────
+// ── C6: "Everything else" with words after it ──────
 //
 // The model's observed habit is to ELABORATE the name it was given ("Miscellaneous single reactions").
-// Only the exact key was recognised, so "Everything else — short reactions" became an ordinary topic and
-// froze its batch exactly as "Miscellaneous" did.
+// If only the exact key is recognised, "Everything else — short reactions" becomes an ordinary topic and
+// freezes its batch exactly as "Miscellaneous" does.
 
 test('BUG-114 C6: a label that STARTS with "Everything else" is the bucket', async () => {
   for (const label of ['Everything else — short reactions', 'Everything else: fragments', 'everything else (misc)']) {

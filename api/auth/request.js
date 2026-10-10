@@ -1,4 +1,4 @@
-// POST /api/auth/request  { email }  → mint a single-use magic-link token, email it (TASK-025).
+// POST /api/auth/request  { email }  → mint a single-use magic-link token, email it.
 // Uniform 200 response: never reveals whether an account exists (there's no account lookup
 // here — accounts are found-or-created at callback) nor whether we were rate-limited.
 import { db } from '../_db.js';

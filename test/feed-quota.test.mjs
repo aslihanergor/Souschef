@@ -1,4 +1,4 @@
-// Per-user X quotas — the handler half (TASK-100), criteria 1-7 and 12-14.
+// Per-user X quotas — the handler half.
 //
 // The assertion that matters is C6: over quota, NO X call goes out. X bills on retrieval, so a 429
 // that still fetched has spent the money and merely hidden the posts. Everything else here is
@@ -45,11 +45,9 @@ test('C1a a signed-in fetch is attributed to the ACCOUNT id', async () => {
   assert.equal(sql.postsFor('device', DEVICE_ID, DAY), 0, 'a session must outrank the client-supplied id');
 });
 
-// CHANGED DELIBERATELY ([BUG-025]) — the "confirm the requirement changed" branch of the never-change-a-
-// test rule, not the "make it pass" one (Asli, 2026-09-13, approving exactly these three: "3 yes"). C1b,
-// C1c and C15 pinned TASK-100's fail-open reading: a request with no session was SERVED, counted against a
-// device id if it sent one. That was the hole BUG-025 closes — an anonymous X fetch was billed and met no
-// quota — so each now asserts the refusal, and that nothing went out to X.
+// C1b, C1c and C15: a request with no session must be REFUSED, even when it sends a
+// device id. Serving it — counted against the device id — would bill an anonymous X fetch that meets no
+// quota, so each asserts the refusal, and that nothing went out to X.
 test('C1b a signed-out fetch with a device header is REFUSED — no X call, no device row', async () => {
   const sql = fakeDb({});
   const { handler, xf } = feedOn(sql, { pages: [xPage({ ids: ['1'], at: RECENT })] });
@@ -130,9 +128,9 @@ test('C6 over quota returns 429 AND issues no X call at all', async () => {
 });
 
 test('C7 the quota gate is X-only — it does not short-circuit another source', async () => {
-  // The server-side half of criterion 7. A YouTube request under the same over-quota session still
-  // reaches its OWN validation rather than the quota's 429. The full criterion — YouTube and
-  // Substack items still rendering in the same load — is a client assertion and lands with that half.
+  // The server-side half. A YouTube request under the same over-quota session still
+  // reaches its OWN validation rather than the quota's 429. YouTube and
+  // Substack items still rendering in the same load is a client assertion.
   const sql = fakeDb({ xUsage: [{ owner_kind: 'account', owner_id: ACCOUNT.accountId, day: DAY, posts: 400 }] });
   const { handler } = feedOn(sql, { account: ACCOUNT, env: { X_DAILY_POST_QUOTA: '400' } });
   const res = fakeRes();
@@ -142,9 +140,8 @@ test('C7 the quota gate is X-only — it does not short-circuit another source',
 });
 
 test('C15 a DEVICE-identified requester is refused whatever its count — only a session is served', async () => {
-  // Changed with C1b and C1c above ([BUG-025]). It pinned the `owner?.kind === 'account'` term: a device
-  // over quota was served and still counted. A device id is client-supplied and rotatable, so it was
-  // never an identity to enforce on — and since BUG-025 it is not one to serve on either.
+  // With C1b and C1c above. A device id is client-supplied and rotatable, so it is
+  // not an identity to enforce a quota on — nor one to serve on.
   const sql = fakeDb({ xUsage: [{ owner_kind: 'device', owner_id: DEVICE_ID, day: DAY, posts: 400 }] });
   const { handler, xf } = feedOn(sql, {
     pages: [xPage({ ids: ['1'], at: RECENT })], env: { X_DAILY_POST_QUOTA: '400' },
@@ -191,9 +188,9 @@ test('C14 a failed fetch records nothing — X returned no posts to bill', async
 });
 
 test('[BUG-122] every window cutoff in api/feed.js reads the injected clock, never the real one', () => {
-  // The handler had two clocks: its quota day came from the injected `now()` and its 14-day window from
-  // `Date.now()`, so a test pinning the clock pinned only half of it — and C2 above, whose "fresh" post is
-  // dated from that pin, aged out of the real window on 2026-09-15 and redded every branch. A scan rather
+  // If the handler reads two clocks — its quota day from the injected `now()` and its 14-day window from
+  // `Date.now()` — a test pinning the clock pins only half of it, and C2 above, whose "fresh" post is
+  // dated from that pin, ages out of the real window and reds every branch. A scan rather
   // than a behaviour test per path, because the YouTube and Substack paths have no fixture that could
   // notice, and this is the one shape that must not come back.
   const src = readFileSync(new URL('../api/feed.js', import.meta.url), 'utf8');

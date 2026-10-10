@@ -1,14 +1,11 @@
-// THE INSTRUMENT ITSELF ([BUG-092], deliverable 1).
+// THE INSTRUMENT ITSELF.
 //
 // `liftGroupedFromStream` reads `document.querySelectorAll('#feed .card')` and detaches with
-// `card.remove()`. Until this file, the harness answered that selector with a hardcoded `[]` and
-// `remove()` was `remove() {}` — so the function that yanks a card from under the reader was
-// unobservable, and `liftGroupedFromStream` says so in its own comment.
+// `card.remove()`. A harness that answers that selector with a hardcoded `[]` and
+// whose `remove()` is `remove() {}` makes the function that yanks a card from under the reader
+// unobservable.
 //
-// [CHR-057] recorded this in BUG-066 review round 1, measured FOUR faithful mutations of the
-// children tracking all passing GREEN, and was killed in 2026-08-07 triage as "the harness children
-// tracking is shipped and working". It was not: only the field's EXISTENCE was load-bearing. These
-// tests exist so the same sentence cannot be true again — every one of them reds when the harness
+// Every test here reds when the harness
 // capability it names is reverted, verified by mutation, not assumed.
 //
 // Assert on DERIVED answers, never on hardcoded ones. `.chip` returning `[]` is only meaningful once
@@ -23,7 +20,7 @@ const xPost = (id = 'x1') => ({
   channel: { id: 'c1', name: 'X acct', handle: 'xacct', source: 'twitter' },
 });
 
-// GROUPED VIEW SEEDED ([TASK-099]). Ungrouped is now the DEFAULT: every post renders into the
+// GROUPED VIEW SEEDED. Ungrouped is now the DEFAULT: every post renders into the
 // chronological stream and an assigned one is merely HIDDEN, so a fixture with no view key exercises
 // the plain feed — where tiles, the lift and the classify hold do not exist at all. The seed states a PRECONDITION and is load-bearing
 // rather than inert — stripping it from the six seeded files reds 37 tests. This file's own
@@ -92,7 +89,7 @@ test('harness: an absent class answers [] by derivation, through the same code p
 test('harness: a selector the model cannot express THROWS rather than answering []', () => {
   const app = boot();
   // Same property test-helpers/handler.mjs has for unrecognised SQL: a query this cannot model must
-  // fail loudly. A silent [] is what made BUG-092 invisible in the first place.
+  // fail loudly. A silent [] is what makes a wrongly removed card invisible.
   assert.throws(() => app.queryAll('div.card'), /unsupported selector part/,
     'a tag selector is not modelled and says so');
   assert.throws(() => app.queryAll('.card .inner'), /needs an #id root/,
@@ -126,12 +123,9 @@ test('harness: ELEMENT-scoped querySelectorAll works, and the "Posts" heading de
 });
 
 test('harness: the descendant walk is RECURSIVE — two levels deep is found', () => {
-  // Kills what used to be declared survivor M11. Its justification was written twice and wrong twice:
-  // first "nothing in the tree is two levels deep" (incidental, not structural), then "unreachable
-  // because stubEl lacks append()" — which review round 2 falsified by pointing at
-  // createChipsInput(host, {}), which builds #keyword-chips > .chips-input > .chips-text through
-  // plain appendChild and never calls append() at all. Two wrong justifications is the signal to stop
-  // justifying and pin it.
+  // The tree really is two levels deep:
+  // createChipsInput(host, {}) builds #keyword-chips > .chips-input > .chips-text through
+  // plain appendChild.
   const app = boot();
   const host = app.el('keyword-chips');
   const field = app.ctx.document.createElement('div');
@@ -148,8 +142,7 @@ test('harness: the descendant walk is RECURSIVE — two levels deep is found', (
 });
 
 test('harness: document.querySelector is REAL for #id roots and a phantom only for bare classes', () => {
-  // The split introduced in round 2 had no harness-side assertion — review round 2 called that out as
-  // the one place criterion 9's pattern ("stub it back, the harness's own test reds") was skipped.
+  // The harness-side assertion for the split: stub it back and this test reds.
   const app = boot();
   render(app, [xPost('x1')]);
   const doc = app.ctx.document;
@@ -208,17 +201,16 @@ test('harness: insertBefore places the node at the reference index', () => {
     'the method places at the reference index');
   // Said plainly: this calls insertBefore DIRECTLY. `insertIntoFeed` reaches it only with an
   // ISO-string `published` — with the numeric epoch these fixtures use, Date.parse is NaN and it
-  // appends instead. Claiming this test covers insertIntoFeed would be false (review round 1).
+  // appends instead. Claiming this test covers insertIntoFeed would be false.
 });
 
-// ── (R26) The seed the whole sign-out warning proof rests on ────────────────────────────────────
+// ── The seed the whole sign-out warning proof rests on ──────────────────────────────────────────
 //
 // A fresh stub starts with an EMPTY class set, so "the confirm was revealed" passes whether or not
 // the code ever revealed it. `acct-signout-confirm` ships as `class="acct-confirm hidden"` in
-// app/index.html and is seeded into HIDDEN_IDS to match — and review round 4 measured what happens
-// without that one line: the author's own M23, which deletes the ENTIRE sign-out warning branch,
-// goes GREEN. The proof that a destructive confirm is ever shown rested on an unprotected harness
-// line, which is the worst possible place to keep that hole.
+// app/index.html and is seeded into HIDDEN_IDS to match. Without that one line, deleting the
+// ENTIRE sign-out warning branch goes GREEN: the proof that a destructive confirm is ever shown
+// rests on this harness line.
 test('the two account confirms start HIDDEN, as app/index.html ships them', async () => {
   const app = createApp();
   for (const id of ['acct-delete-confirm', 'acct-signout-confirm']) {
@@ -234,14 +226,12 @@ test('revealing a confirm is therefore a DERIVED answer, not a hardcoded one', a
   assert.equal(app.el('acct-signout-confirm').classList.contains('hidden'), false);
 });
 
-// ─── The page-close listeners ([BUG-039] criterion 22) ────────────────────────────────────────
+// ─── The page-close listeners ────────────────────────────────────────
 //
-// `window.addEventListener` and `document.addEventListener` were both `() => {}` until 2026-09-12.
-// That is the same shape of hole as the `[]` above: `window.addEventListener('pagehide', flushPush)`
-// and the `visibilitychange` line beside it were unreachable, so no test could close the tab the way
-// a browser does, and deleting either line survived the whole suite. BUG-039 review round 2's claims
-// reviewer found it (MED-2) — while the question under review was precisely what a refused save owes
-// when the page goes away. These pin the INSTRUMENT; what the flush then does is pinned in
+// A `window.addEventListener` or `document.addEventListener` that is `() => {}`
+// is the same shape of hole as the `[]` above: `window.addEventListener('pagehide', flushPush)`
+// and the `visibilitychange` line beside it would be unreachable, so no test could close the tab the way
+// a browser does, and deleting either line would go unnoticed. These pin the INSTRUMENT; what the flush then does is pinned in
 // test/require-account-r2.test.mjs.
 
 test('harness: window listeners are RECORDED, so app.js wiring pagehide is visible at all', () => {
@@ -294,10 +284,9 @@ test('harness: removeEventListener DETACHES, rather than being a no-op', () => {
 });
 
 test('harness: removeEventListener DETACHES on WINDOW too, not only on document', () => {
-  // Added after review round 3, which measured the pair half-pinned: the document side died to the test
-  // above, the window side survived a no-op. Nothing in app.js removes a window listener today, so this
-  // pins a capability rather than a behaviour — which is what this file is for, and the reason the
-  // element-scoped `remove()` was allowed to be a no-op for months ([BUG-092]).
+  // The other half of the pair: the document side is pinned by the test
+  // above, the window side here. Nothing in app.js removes a window listener today, so this
+  // pins a capability rather than a behaviour — which is what this file is for.
   const app = createApp();
   let ran = 0;
   const fn = () => { ran++; };
@@ -316,8 +305,8 @@ test('harness: document.visibilityState is settable, and starts "visible"', () =
 });
 
 test('[TASK-092] harness: document.activeElement follows focus() and blur(), and starts at body', () => {
-  // Criterion 14 asks where focus RETURNS when the tour ends, which needs a record of what was focused
-  // before it began. `focus()` used to set a flag and nothing else, so that question had no answer.
+  // Where focus RETURNS when the tour ends needs a record of what was focused
+  // before it began. A `focus()` that only sets a flag cannot answer that.
   // Both elements the tour moves between are exercised: one reached by id, one built by createElement.
   const app = createApp();
   const doc = app.ctx.document;

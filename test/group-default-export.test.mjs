@@ -1,11 +1,11 @@
-// The DEFAULT EXPORT of api/group.js — the handler Vercel actually runs ([BUG-130], review round 1, H1).
+// The DEFAULT EXPORT of api/group.js — the handler Vercel actually runs.
 //
 // Every other group test builds its own handler through `createGroupHandler` and injects a session, so
-// until this file nothing ran the production wiring: `export default createGroupHandler()` and the
-// factory's two defaults, the real `db` and the real `sessionAccount`. The independent battery showed
-// three ways to break that wiring with the suite green — a default export that confirms everyone (I2), a
-// default session lookup that confirms everyone (I3), both of which are the original hole, and a default
-// store of none (I4), which refuses every real user.
+// only this file runs the production wiring: `export default createGroupHandler()` and the
+// factory's two defaults, the real `db` and the real `sessionAccount`. Without it there are
+// three ways to break that wiring with the suite green — a default export that confirms everyone, a
+// default session lookup that confirms everyone, both of which leave the endpoint open, and a default
+// store of none, which refuses every real user.
 //
 // Nothing is injected here. The store is chosen the way production chooses it, through the environment,
 // and the network under the real Neon driver is replaced so no request leaves the process:

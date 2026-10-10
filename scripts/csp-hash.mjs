@@ -1,5 +1,4 @@
-// Compute the CSP sha256 hash for the inline <head> theme script in app/index.html (TASK-065;
-// the app shell moved to /app in TASK-069).
+// Compute the CSP sha256 hash for the inline <head> theme script in app/index.html.
 // Run: node scripts/csp-hash.mjs  → prints `sha256-...` to paste into vercel.json's
 // Content-Security-Policy `script-src`. Rerun whenever that inline script's bytes change.
 //

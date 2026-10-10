@@ -1,4 +1,4 @@
-// Run the REAL landing.js inside Node so the dot story's frame loop can be tested (TASK-091).
+// Run the REAL landing.js inside Node so the dot story's frame loop can be tested.
 //
 // Why this exists: three defects went into the landing rebuild in a single sitting — a loop that
 // never stopped, a resize that repainted the DOM while leaving the canvas showing a different
@@ -33,13 +33,13 @@ import vm from 'node:vm';
 const LANDING = new URL('../landing.js', import.meta.url);
 const INDEX = new URL('../index.html', import.meta.url);
 
-// ── Everything the fake DOM knows, it reads off the real page (round-1 H4) ──────────────
+// ── Everything the fake DOM knows, it reads off the real page ──────────────
 //
-// The first version of this harness invented an element for any id it was asked for, and hardcoded
-// the stage geometry. That made the whole suite blind to the one thing it most needed to see: the
-// coupling between landing.js and the markup it drives. A reviewer renamed `id="stage"` — which
-// makes the script bail at its first line and the animation entirely dead — and all 484 tests
-// passed. Same for deleting a demo post, and for changing the 700vh scroll track to 100vh.
+// A harness that invents an element for any id it is asked for, and hardcodes
+// the stage geometry, makes the whole suite blind to the one thing it most needs to see: the
+// coupling between landing.js and the markup it drives. Renaming `id="stage"` — which
+// makes the script bail at its first line and the animation entirely dead — would pass every
+// test. Same for deleting a demo post, and for changing the scroll track's height.
 //
 // So the three facts the script depends on are DERIVED here, and an id the page does not have
 // resolves to null exactly as `document.getElementById` would.
@@ -60,7 +60,7 @@ function derive(re, what) {
 // The /100 is load-bearing and was briefly missing: with the raw 700 every test still passed,
 // because the harness's own span cancels out of its own progress calculation. A derived value that
 // nothing can disagree with is the same blindness this block exists to remove, one level up.
-// Exported because BUG-082's acceptance criteria are written in SCREEN HEIGHTS rather than in beat
+// Exported because the pacing tests are written in SCREEN HEIGHTS rather than in beat
 // constants — deliberately, so they survive the constants being tuned on a handset. A test needs the
 // real track to convert one to the other, and reading it from here keeps the single derivation
 // rather than starting a second copy that can drift from the CSS.

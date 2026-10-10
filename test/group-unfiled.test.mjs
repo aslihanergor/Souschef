@@ -1,10 +1,10 @@
-// LEFTOVERS ARE LEFT UNASSIGNED ([TASK-096]). The server still mints an "Everything else" group —
-// M1 measured that denying the model a named sink makes it invent unstable substitutes — but the
+// LEFTOVERS ARE LEFT UNASSIGNED. The server still mints an "Everything else" group —
+// denying the model a named sink makes it invent unstable substitutes — but the
 // CLIENT stores nothing for it: no assignment, no `state.groups` entry, no tile, and no mention in
 // the next classify's existing-topics block.
 //
 // These drive the REAL `mergeGroups` / `updateGroupsForFeed` / `renderFeedResults` through the
-// app-harness, per CLAUDE.md's [TASK-094] amendment: "is this card in the stream", "is it held
+// app-harness: "is this card in the stream", "is it held
 // hidden" and "did this post reach a billed API call" are routing decisions, not appearance.
 //
 // The observables, chosen deliberately:
@@ -14,13 +14,11 @@
 //   • `el('feed').children` + `dataset.id`— which cards the render put in the stream
 //   • `grouping-pending`                  — whether a card was held back
 //
-// The badge and the lift were BOTH excluded here as unobservable, because `updateCount` counts
-// `querySelectorAll('#feed .card')` and the harness answered that with a hardcoded `[]`. **That is
-// no longer true as of [BUG-092]**: the selector model answers from the tracked tree and `remove()`
+// The harness's selector model answers `querySelectorAll('#feed .card')` from the tracked tree and `remove()`
 // detaches, so the badge is real and `liftGroupedFromStream` / `revealPendingText` are directly
-// assertable (see test/harness-dom.test.mjs). These tests are left asserting through a SECOND
+// assertable (see test/harness-dom.test.mjs). These tests assert through a SECOND
 // render, which is a different and still-valid route to the same user-visible outcome — not because
-// the direct one is impossible. Do not re-derive the old limitation from this comment.
+// the direct one is impossible.
 //
 // Bucket identity comes from the server's own `EVERYTHING_ELSE` + `topicKey`, so a test cannot pass
 // by agreeing with a copy of the label that has drifted from the one the server sends.
@@ -29,7 +27,7 @@ import assert from 'node:assert/strict';
 import { createApp } from '../test-helpers/app-harness.mjs';
 import { topicKey, EVERYTHING_ELSE } from '../api/_group.js';
 
-// A post's publish time. RELATIVE to now, not an absolute constant ([BUG-098] review round 1):
+// A post's publish time. RELATIVE to now, not an absolute constant:
 // every post a live feed returns is inside `WINDOW_DAYS` by the server's clock, and the prune now
 // treats an in-hand post older than that window as evidence the DEVICE's clock is wrong. A frozen
 // 2025 timestamp made every fixture look like a broken clock — and would have drifted a suite that
@@ -57,7 +55,7 @@ const REPLY = [FILED, bucketed(['x2'])];
  * `reply` is either the groups array, or (callNumber) => groups — so a test can make the SECOND
  * classify answer differently from the first, which is how the re-file cases are driven.
  */
-// GROUPED VIEW SEEDED ([TASK-099]). Ungrouped is now the DEFAULT: every post renders into the
+// GROUPED VIEW SEEDED. Ungrouped is now the DEFAULT: every post renders into the
 // chronological stream and an assigned one is merely HIDDEN, so a fixture with no view key exercises
 // the plain feed — where tiles, the lift and the classify hold do not exist at all. This file's
 // subject is what happens INSIDE the grouped view, which is unchanged, so only the precondition had
@@ -79,16 +77,13 @@ function boot({ store = {}, reply = REPLY } = {}) {
 const stateOf = app => JSON.parse(app.get('focus_groups') || '{"assignments":{},"groups":{}}');
 const render = (app, items, failed = []) =>
   app.ctx.renderFeedResults({ items, failed, cappedNames: [], totalChannels: items.length + failed.length });
-// "In the stream" now means VISIBLE in the stream ([TASK-099] decision 1, Asli 2026-08-26: the lift
+// "In the stream" means VISIBLE in the stream (the lift
 // HIDES rather than removes). A lifted card is still a `#feed` child carrying `.grouped-out`
 // (display:none), so a raw `children` read reports a post the reader cannot see as present — the same
-// mistake the four production counting selectors had to be corrected for. The assertions below are
-// UNCHANGED; only what the instrument counts as "in the stream" moved, and it moved to match what a
-// browser shows.
-// [TASK-098]: `.card` is now REQUIRED rather than implied. Every child of `#feed` used to be a post
-// card, so mapping over `children` and mapping over post cards were the same set; a `.topic-card` is
-// now also a child, and it carries `data-gid` rather than `data-id` — so the un-narrowed version
-// reported `undefined` in the middle of the stream. The QUESTION is unchanged: which posts are here.
+// mistake a production counting selector could make.
+// `.card` is REQUIRED rather than implied. A `.topic-card` is
+// also a child of `#feed`, and it carries `data-gid` rather than `data-id` — so an un-narrowed
+// map over `children` reports `undefined` in the middle of the stream. The QUESTION is: which posts are here.
 const streamIds = app => app.el('feed').children
   .filter(c => c.classList.contains('card') && !c.classList.contains('grouped-out')).map(c => c.dataset.id);
 const cardFor = (app, id) => app.el('feed').children.find(c => c.dataset.id === id && !c.classList.contains('grouped-out'));
@@ -128,7 +123,7 @@ test('TASK-096 C5: no bucket tile is painted', async () => {
   await app.ctx.updateGroupsForFeed([xPost('x1'), xPost('x2')]);
   app.ctx.renderTopicCards();
 
-  // [TASK-098] re-pointed: topics are cards in the stream, not tiles in a grid.
+  // Topics are cards in the stream, not tiles in a grid.
   const labels = app.queryAll('#feed .topic-card').map(c => c.dataset.gid);
   assert.ok(labels.includes('g_ai_news'), 'the real topic still gets a tile');
   assert.equal(labels.includes(BUCKET_KEY), false, 'no "Everything else" tile');
@@ -143,8 +138,8 @@ test('TASK-096 C5: the NEXT classify is not offered the bucket as an existing to
   // Reachability first, and it is not boilerplate: today the bucketed post carries an assignment, so
   // `updateGroupsForFeed` finds nothing new and never makes a second call — which is why this test
   // reds here before it reds on the leak. The leak assertion below only becomes reachable once C2
-  // holds; the mutation battery has to confirm it bites on its own (skip the assignments, keep the
-  // group entry) rather than riding C2's kill.
+  // holds; it has to bite on its own (skip the assignments, keep the
+  // group entry) rather than riding C2's failure.
   assert.equal(bodies.length, 2,
     'a second classify ran at all — a frozen post gives the model nothing to reconsider');
   const existing = bodies[1].groups;
@@ -289,12 +284,12 @@ test('TASK-096 C8: a sticky post that leaves the feed is pruned from the record'
     'the record cannot outlive its posts — it is pruned with assignments');
 });
 
-// ── Criterion 8 on the path that is NOT a clean load ───────────────────────────
-// `syncGroupPrune`'s `unfiled` pass is gated on a complete load ([BUG-098] kept that gate for this one
-// record), but `updateGroupsForFeed` is not — so on a
+// ── C8 on the path that is NOT a clean load ───────────────────────────
+// `syncGroupPrune`'s `unfiled` pass is gated on a complete load,
+// but `updateGroupsForFeed` is not — so on a
 // feed with one permanently-dead channel (a deleted YouTube channel, or X 502ing at the plan's post
-// cap, which CLAUDE.md calls routine) every load classifies and nothing ever prunes. A record that
-// only carries forward is then monotonic and unbounded, on a SYNCED key: [BUG-076]'s row pressure on
+// cap, which is routine) every load classifies and nothing ever prunes. A record that
+// only carries forward is then monotonic and unbounded, on a SYNCED key: row-size pressure on
 // the one record whose entire justification is that it stays small.
 //
 // Every other C8 test uses `failed = []`, the one condition under which the prune fires at all —
@@ -344,7 +339,7 @@ test('TASK-096 sweep: it seeds only swept posts that are actually in the feed', 
 // tail is never shown to the model. Those posts come back in no group — indistinguishable, from the
 // stored state alone, from a post the model considered and could not place. Recording them as
 // unfiled would render them unheld on the next load and then yank them into a topic when a later
-// classify finally reaches them: [TASK-073]'s flash, reintroduced for exactly the posts that never
+// classify finally reaches them: a visible flash, for exactly the posts that never
 // had their turn.
 
 test('TASK-096: a post the server never processed is not recorded as unplaceable', async () => {
@@ -375,11 +370,11 @@ test('TASK-096: a post the server never processed is still held on the next rend
 // it, and `pruneGroupState` only drops a group once nothing is assigned to it — so without a sweep
 // the tile keeps painting, its posts stay lifted out of the stream and un-reclassified, and
 // `updateGroupsForFeed` keeps forwarding the bucket into the prompt as an existing topic, for up to
-// the full 14-day lookback. That is criterion 5 failing on a real device on day one.
+// the full 14-day lookback — the bucket leaking back into the prompt on a real device on day one.
 //
-// Not hypothetical: `test/group-seam.test.mjs` boots exactly this state and its
-// "the browser really sends the bucket bullets up" assertion PASSED with the merge-time skip in
-// place. The sweep is what closes it.
+// Not hypothetical: with only the merge-time skip in place, a browser booted in exactly this state
+// still sends the bucket bullets up.
+// The sweep is what closes it.
 const LEGACY_BUCKET_STATE = {
   assignments: { x1: 'g_ai_news', x2: 'g_everything_else', x3: 'g_everything_else' },
   groups: {
@@ -393,12 +388,11 @@ const LEGACY_BUCKET_STATE = {
 const legacyItems = () => [xPost('x1'), xPost('x2'), xPost('x3')];
 
 test('TASK-096 sweep: a bucket cached before this change is dropped from stored state', async () => {
-  // A FAILED load. Since [BUG-098] the ASSIGNMENT prune runs anyway — only the `unfiled` pass is
-  // still gated — so this fixture no longer isolates the sweep by switching the prune off. It isolates
+  // A FAILED load. The ASSIGNMENT prune runs anyway — only the `unfiled` pass is
+  // gated — so this fixture cannot isolate the sweep by switching the prune off. It isolates
   // it by leaving nothing for the prune to collect. On a complete load `pruneGroupState` collects
   // any group left with no members, so it would drop the bucket even if the sweep never touched
-  // `state.groups` — two guards over one input, pinning neither. Measured: deleting the sweep's
-  // `delete state.groups[...]` line survived this test until the fixture was narrowed.
+  // `state.groups` — two guards over one input, pinning neither.
   const { app } = boot({ store: { focus_groups: JSON.stringify(LEGACY_BUCKET_STATE) } });
   render(app, legacyItems(), ['a channel that failed to fetch']);
   await settle();
@@ -445,7 +439,7 @@ test('TASK-096 sweep: the cached bucket is never offered to the model again', as
 test('TASK-096 sweep: a real topic is untouched by it', async () => {
   // The classify DEGRADES here (`groups: null`), so nothing merges and the sweep is the only thing
   // that can have altered this state. With a successful reply the model's fresh bullets would
-  // legitimately replace the cached ones (BUG-067), and this assertion would be measuring that
+  // legitimately replace the cached ones, and this assertion would be measuring that
   // merge rather than the sweep — green, and about a different quantity.
   const { app } = boot({ store: { focus_groups: JSON.stringify(LEGACY_BUCKET_STATE) }, reply: null });
   render(app, legacyItems());
@@ -461,7 +455,7 @@ test('TASK-096 sweep: an EMPTY cached bucket group is dropped too', () => {
   // The bucket entry with nothing assigned to it. Pins the second term of the sweep's guard: without
   // it the group survives, `updateGroupsForFeed` builds its existing-topics block from
   // `Object.entries(state.groups)`, and the label is offered back to the model with size 0 — the
-  // same leak criterion 5 forbids, just with an empty bucket.
+  // same leak, just with an empty bucket.
   const { app } = boot({
     store: {
       focus_groups: JSON.stringify({
@@ -492,7 +486,7 @@ test('TASK-096 sweep: the swept posts are not held hidden on the upgrade load IT
   // `unfiled` from its own result, so a version of the sweep that seeds nothing looks identical a
   // few hundred milliseconds later. The seed exists for precisely this moment: the first paint after
   // the upgrade, where without it a fifth to a third of the backlog is hidden for the 4.4-10.3s the
-  // classify takes (M2), while the badge above it still counts every one of those cards.
+  // classify takes, while the badge above it still counts every one of those cards.
   const { app } = boot({ store: { focus_groups: JSON.stringify(LEGACY_BUCKET_STATE) } });
 
   render(app, legacyItems());
@@ -577,11 +571,11 @@ test('TASK-096 sweep: a cache with no bucket is not rewritten at all', () => {
     unfiled: [], updatedAt: PUBLISHED, v: 2,
   };
   //
-  // AMENDED by [BUG-098] (Asli, 2026-08-22: "okay both yes"). The FIRST render of a pre-BUG-098
+  // The FIRST render of a legacy
   // record legitimately rewrites it once — that is the backfill stamping ages onto legacy assignments
   // and starting the epoch, and without that write those assignments could never age out at all. The
-  // property worth pinning was never "never written"; it is "not written on every boot", which is
-  // what arms a sync forever. So the comparison moves to render 1 vs render 2, where a sweep that
+  // property worth pinning is not "never written"; it is "not written on every boot", which is
+  // what arms a sync forever. So the comparison is render 1 vs render 2, where a sweep that
   // writes unconditionally still reds.
   const { app } = boot({ store: { focus_groups: JSON.stringify(clean) } });
 
@@ -596,8 +590,8 @@ test('TASK-096 sweep: a cache with no bucket is not rewritten at all', () => {
 
 // Kept despite reaching the same expression by the same route as the aged-out sibling above, because
 // the fixture is the one a reader will ask about ("what happens when I read a leftover?") and the
-// answer is not obvious from the other test. Recorded as redundant coverage rather than presented as
-// an independent guard: both die to the same two mutations.
+// answer is not obvious from the other test. It is redundant coverage, not
+// a separate guard: both fail on the same two defects.
 test('TASK-096 C8: a sticky post that is marked done is pruned from the record', () => {
   const { app } = boot({
     store: {

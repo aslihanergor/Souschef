@@ -1,7 +1,7 @@
-// The client half of TASK-100 — criteria 7 (client), 9, 10, 11 and, since stage 2c, 15, 16 and 17.
+// The client half of the per-reader X quota and the app-wide cap.
 //
-// Today `loadTwitterChannel` throws on ANY non-OK response, so `loadFeed` files it under `failed`
-// and the user reads "Couldn't load: @x. Try reopening the feed." A quota 429 rendered that way
+// If `loadTwitterChannel` threw on ANY non-OK response, `loadFeed` would file it under `failed`
+// and the user would read "Couldn't load: @x. Try reopening the feed." A quota 429 rendered that way
 // would be worse than having no quota at all: the advice is wrong, and acting on it spends more of
 // the cap. These pin the three outcomes apart.
 //
@@ -12,13 +12,9 @@
 // L5 is not the vacuous direction: it shows the same render DOES reveal caught-up when nothing is
 // withheld.
 //
-// STAGE 2c WITHDREW THE QUOTA MESSAGE. Criterion 8 — "a quota 429 renders through renderFeedNote"
-// — is superseded by criteria 15/16/17: a refused reader is told NOTHING while their cache is warm,
+// THERE IS NO QUOTA MESSAGE. A refused reader is told NOTHING while their cache is warm,
 // and reads the neutral source-unavailable line only when it is cold and the screen would otherwise
-// be blank. Four assertions here pinned the withdrawn sentence by text (L1, L5, L9, L10) and are
-// changed. Asli's authorisation is quoted verbatim in `tasks/TASK-100.md` and is scoped to exactly
-// those four — this is the requirement-changed branch of CLAUDE.md's rule, not the
-// edit-a-test-to-go-green branch. Read the quote there rather than trusting this summary of it.
+// be blank.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../test-helpers/app-harness.mjs';
@@ -52,7 +48,7 @@ async function loadAndRender(app) {
 }
 
 test('L1 at quota with a warm cache the reader is told NOTHING AT ALL (criterion 15)', async () => {
-  // The whole of stage 2c in one assertion: a refused reader whose cached posts still render sees an
+  // The whole no-message rule in one assertion: a refused reader whose cached posts still render sees an
   // ordinary feed. Both elements are observed, not the absence of one string, so a message
   // reintroduced in different words is still caught here.
   const app = boot({ reply: QUOTA, cache: CACHED });
@@ -86,7 +82,7 @@ test('L4 cached X posts still render while the limit is on (criterion 7, client 
 
 test('L5 an X-only feed at quota with a cold cache does not go blank, nor claim caught-up (criteria 11, 17)', async () => {
   // At N=800 this is the state a real user reaches first (a cache clear on ~15 X accounts), which is
-  // why criterion 17 is load-bearing rather than defensive. Removing the note without this fallback
+  // why the cold-cache fallback is load-bearing rather than defensive. Removing the note without this fallback
   // yields a completely blank app: `#feed` hidden, no count, no caught-up, no note.
   const app = boot({ reply: QUOTA });
   const { items } = await loadAndRender(app);
@@ -122,7 +118,7 @@ test('L8 the New-badge baseline does not advance while posts were withheld', asy
 });
 
 test('L9 the blank-screen fallback outranks TASK-040 skip-note when both apply', async () => {
-  // Precedence dropped from three conditions to two in stage 2c, but the empty-cache fallback still
+  // The empty-cache fallback
   // has to win its one line: telling a reader that some OLDER posts were skipped, on a screen with no
   // posts on it at all, explains the wrong absence.
   const app = boot({ reply: QUOTA });
@@ -152,7 +148,7 @@ test('L10 a stale limit note clears on the next clean render', async () => {
 });
 
 test('L11 no user-visible surface names a quota, a limit or an allowance (criterion 16)', async () => {
-  // Text-level rather than string-level on purpose: criterion 16 has to catch a message reintroduced
+  // Text-level rather than string-level on purpose: this has to catch a message reintroduced
   // in a DIFFERENT function or in different words, which an assertion against one known sentence
   // cannot. Scoped to the rendered states, because a source-wide grep would match every `limited
   // ?.quota` branch and comment in app.js and so could never fail honestly.
@@ -179,10 +175,10 @@ test('L12 a refused reader and an app-wide cap read IDENTICALLY — the wording 
   // or a user comparing notes with a friend learns exactly what we chose not to tell them. Pinned by
   // comparing the two renders rather than by two copies of one literal, so the strings cannot drift apart.
   //
-  // THE CAP ARM NEEDS A WARM CACHE, and this test was WRONG until the battery said so. With a cold one
-  // the empty-branch fallback overwrites the note for the cap path as well, so both arms came out of the
-  // same final assignment and the comparison could not fail: mutation S3 gave the fallback its own
-  // wording and this test passed. A warm cache keeps items non-empty, so the cap arm never reaches the
+  // THE CAP ARM NEEDS A WARM CACHE. With a cold one
+  // the empty-branch fallback overwrites the note for the cap path as well, so both arms come out of the
+  // same final assignment and the comparison cannot fail, even if the fallback has its own
+  // wording. A warm cache keeps items non-empty, so the cap arm never reaches the
   // fallback and reads the genuine renderFeedNote line — which is the string the design claims they share.
   const quotaApp = boot({ reply: QUOTA });          // cold: the fallback speaks
   await loadAndRender(quotaApp);
@@ -195,9 +191,9 @@ test('L12 a refused reader and an app-wide cap read IDENTICALLY — the wording 
 });
 
 test('L13 an app-wide cap with a cold cache also refuses caught-up, and holds the baseline', async () => {
-  // Not a new requirement — the same guard has always covered both limits. It is pinned here because
-  // stage 2c's battery predicted that deleting the `cap` term would SURVIVE: L2 asserts the note, L5
-  // and L8 assert caught-up and the baseline but only for the quota half, so nothing asked whether an
+  // The same guard covers both limits. It is pinned here because
+  // deleting the `cap` term would otherwise go unnoticed: L2 asserts the note, L5
+  // and L8 assert caught-up and the baseline but only for the quota half, so nothing else asks whether an
   // app-wide cap could claim you had finished. A guard whose second term nothing tests is half a guard.
   const app = boot({ reply: CAP, lastLoad: 1000 });
   const { items } = await loadAndRender(app);

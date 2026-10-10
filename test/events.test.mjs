@@ -1,4 +1,4 @@
-// Pure event-helper tests (TASK-070 analytics ingestion). Zero-dep node:test.
+// Pure event-helper tests (analytics ingestion). Zero-dep node:test.
 // Covers the validation/normalization that guards the hot /api/state PUT path and the
 // owner (admin) gate. The DB write + client wiring are live-verified, not here.
 import { test } from 'node:test';
@@ -12,10 +12,9 @@ const NOW = 1_700_000_000_000; // fixed clock so timestamp assertions are determ
 
 test('normalizeEvent keeps an allowlisted event verbatim', () => {
   const e = normalizeEvent({ name: 'mark_done', section: 'feed', props: { count: 3 }, ts: NOW }, NOW);
-  // `id: null` is [BUG-123]'s added field, not a loosened assertion: an event carries an identity so a
+  // `id: null`: an event carries an identity so a
   // re-send can be told from a second real action, and an input with none says so explicitly. The four
-  // fields this test exists for still pass through untouched. Changed with Asli's decision, asked as A
-  // (edit this assertion) or B (omit the key when null) — Asli, 2026-09-16: "A".
+  // fields this test exists for still pass through untouched.
   assert.deepEqual(e, { name: 'mark_done', section: 'feed', props: { count: 3 }, ts: NOW, id: null });
 });
 

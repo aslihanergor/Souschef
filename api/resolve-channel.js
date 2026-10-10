@@ -5,7 +5,7 @@ import { isYouTubeHost } from './_hosts.js';
 import { db } from './_db.js';
 import { sessionAccount, signedInGate, refuse } from './_session.js';
 
-// Injection seam ([BUG-025]), mirroring `createFeedHandler`. Until this, the endpoint had no handler
+// Injection seam, mirroring `createFeedHandler`. Until this, the endpoint had no handler
 // test — `test/resolve-channel.test.mjs` covers the pure URL helpers only — so nothing could ask
 // what it does with a real request. Upstream requests need no seam of their own: `ytFetch`, `xFetch`
 // and `fetchSubstackXml` default `fetchImpl` to the global `fetch` per call, and the scrape path
@@ -22,7 +22,7 @@ export function createResolveHandler({
 export default createResolveHandler();
 
 async function handleResolve(req, res, ctx) {
-  // Signed-in only ([BUG-025]), before any upstream request: an X handle lookup bills $0.010 a user
+  // Signed-in only, before any upstream request: an X handle lookup bills $0.010 a user
   // read and a YouTube name search spends one of 100 searches a day. The app only resolves after
   // sign-in; a document that outlived its session shows this `error` in the add form, which renders
   // `data.error`. `signedInGate` (api/_session.js) owns the three answers.
@@ -45,7 +45,7 @@ async function handleResolve(req, res, ctx) {
     return res.status(200).json(account);
   }
 
-  // Substack: validate a publication's keyless RSS and read its title + avatar. (TASK-022)
+  // Substack: validate a publication's keyless RSS and read its title + avatar.
   if (source === 'substack') {
     if (!url) return res.status(400).json({ error: 'url required' });
     const pub = await resolveSubstack(url.trim());
@@ -156,7 +156,7 @@ async function searchViaApi(query) {
 export function parseYouTubeUrl(url) {
   try {
     const u = new URL(url);
-    if (!isYouTubeHost(u.hostname)) return null; // exact match, not endsWith (BUG-020)
+    if (!isYouTubeHost(u.hostname)) return null; // exact match, not endsWith
     const id = u.pathname.match(/^\/channel\/(UC[\w-]{22})/);
     if (id) return { id: id[1] };
     const handle = u.pathname.match(/^\/(@[\w.-]+)/);
@@ -195,7 +195,7 @@ export function buildCandidates(input) {
   if (input.startsWith('http')) {
     try {
       const u = new URL(input);
-      if (!isYouTubeHost(u.hostname)) return []; // exact match, not endsWith (BUG-020)
+      if (!isYouTubeHost(u.hostname)) return []; // exact match, not endsWith
       // Fetch a URL we REBUILD from the validated host + path — never the raw input, whose port,
       // query and fragment are attacker-controlled. https is forced (an http input would downgrade).
       return [`https://${u.hostname}${u.pathname}`];
@@ -273,7 +273,7 @@ async function tryFetchChannel(url) {
 // Parse the top channel results out of a YouTube search page. Each channelRenderer
 // block in ytInitialData carries the channelId, title (JSON-escaped text), and an
 // avatar thumbnail — enough to offer alternatives without an extra fetch per result
-// (keeps our request volume low; see BUG-004 throttling). Pure function so it can be
+// (keeps our request volume low). Pure function so it can be
 // unit-tested against a saved fixture once we stand up a runner.
 function parseSearchResults(html, limit = 5) {
   const results = [];

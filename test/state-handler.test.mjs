@@ -1,4 +1,4 @@
-// /api/state handler tests (BUG-019 — IDOR: anonymous cross-account read/write).
+// /api/state handler tests (IDOR: anonymous cross-account read/write).
 //
 // The vulnerability: with no session, `owner` came straight from a client-supplied id, and the
 // `users` table had no way to tell an account row from a device row. Anyone holding another
@@ -30,10 +30,9 @@ const deviceRow = (id = DEVICE_ID, state = { channels: [] }) => ({ kind: 'device
 
 // Read the row's current base, exactly as a real client does before it writes.
 //
-// Since [BUG-047] an existing row can only be overwritten by a client that declares the base it
+// An existing row can only be overwritten by a client that declares the base it
 // read: create is always allowed, overwrite never is. Tests below that write over a SEEDED row
-// therefore have to read first — that is the precondition changing, not the assertion. Each such
-// test keeps every assertion it had; only the missing read is added. The rule the change enforces
+// therefore have to read first. The rule itself
 // has its own coverage in test/sync-conflict.test.mjs (S3, S4, S7).
 async function baseOf(handler, headers) {
   const res = fakeRes();
@@ -80,10 +79,10 @@ test('no-session PUT with a valid account id leaves that row byte-identical', as
 
 // The pair above only ever reaches the INSERT. Every fixture in this file carries real channels, so
 // `hasUserData` is true and the `on conflict (kind, id)` upsert is the only statement exercised —
-// which left BUG-052's second, DESTRUCTIVE statement (`update … where kind = ? and id = ?`) with no
-// isolation coverage at all. Deleting `kind` from that WHERE was a 357/357-green mutation, and under
-// it an anonymous PUT wipes any account row whose id the caller can name: the BUG-019 shape again,
-// in a statement `grep "on conflict"` cannot find. Both directions, as above. (Round 5, H1.)
+// which leaves the second, DESTRUCTIVE statement (`update … where kind = ? and id = ?`) with no
+// isolation coverage at all. Deleting `kind` from that WHERE would keep the suite green, and under
+// it an anonymous PUT wipes any account row whose id the caller can name: the same IDOR again,
+// in a statement `grep "on conflict"` cannot find. Both directions, as above.
 
 test('no-session EMPTY-state PUT with a valid account id leaves that row byte-identical', async () => {
   const { handler, sql } = handlerWith({ users: [accountRow()] });
@@ -188,7 +187,7 @@ test('a PUT with a session and a foreign uid writes to the session account row',
   assert.equal(sql.get('device', OTHER_DEVICE), undefined, 'state leaked into the foreign device row');
 });
 
-// ── The device id leaves the URL (CHR-007a) ─────────────────────────────────
+// ── The device id leaves the URL ─────────────────────────────────
 
 test('GET resolves the device id from the X-Device-Id header, with no query param', async () => {
   const { handler } = handlerWith({ users: [deviceRow(DEVICE_ID, { channels: [{ id: 'UCmine' }] })] });
@@ -200,12 +199,11 @@ test('GET resolves the device id from the X-Device-Id header, with no query para
 });
 
 test('PUT resolves the device id from the header when the body carries no uid', async () => {
-  // FIXTURE CHANGED (TASK-084/BUG-052, 2026-07-31), not the assertion. This used to send
-  // `{channels: [], done: []}` — an empty state, which no longer creates a row, so the assertion
-  // below would have failed for a reason that has nothing to do with what this test is named for.
+  // The fixture carries real channels on purpose: an empty state
+  // (`{channels: [], done: []}`) does not create a row, so the assertion
+  // below would fail for a reason that has nothing to do with what this test is named for.
   // The claim here is OWNER RESOLUTION: that the header id, not the body uid, decides the row. A
-  // fixture carrying real channels tests exactly that claim and nothing less. Declared in the task
-  // scope before it went red, so it is a recorded requirement change rather than a test bent green.
+  // fixture carrying real channels tests exactly that claim and nothing less.
   const { handler, sql } = handlerWith();
   const res = fakeRes();
   await handler(fakeReq({
@@ -244,7 +242,7 @@ test('the header wins when a stale client sends both', async () => {
   assert.deepEqual(res.body.state, { channels: [{ id: 'UCheader' }] });
 });
 
-// ── An empty state must not manufacture a row (BUG-052) ─────────────────────
+// ── An empty state must not manufacture a row ─────────────────────
 //
 // track() flushes analytics on the shared /api/state PUT ~3s into every boot, and pushNow sends
 // collectSyncedState() alongside them whether or not there is any state. So a signed-in boot on an
@@ -294,8 +292,8 @@ test('analytics still ingest on a PUT that creates no row', async () => {
   // worth saving, only a usage ping. If suppressing the row write also dropped the events, every
   // metric would go blind for exactly the population that never curates anything.
   //
-  // Uses a plain 'view' rather than a name introduced by another task, so this test depends on the
-  // BUG-052 fix alone and nothing else.
+  // Uses a plain 'view' event name, so this test depends on the
+  // no-row-for-an-empty-PUT rule alone and nothing else.
   const { handler, sql } = handlerWith();
   const res = fakeRes();
   await handler(fakeReq({
@@ -313,9 +311,9 @@ test('analytics still ingest on a PUT that creates no row', async () => {
   assert.equal(sql.events[0].deviceId, DEVICE_ID);
 });
 
-// ── The caller declares intent: an ABSENT state is events-only (TASK-084 R1-H2) ──
+// ── The caller declares intent: an ABSENT state is events-only ──
 //
-// BUG-052 above closed the CREATING direction. This is the destroying one, and it is the half with
+// The tests above cover the CREATING direction. This is the destroying one, and it is the half with
 // real user data behind it: pushNow sends collectSyncedState() on every push, so a boot whose GET
 // failed (500, or the 2.5s abort) reaches the 3s analytics flush holding an empty browser and PUTs
 // it — the row exists, so the update branch above runs and the account's channels are gone.
@@ -353,7 +351,7 @@ test('a PUT that omits state leaves an existing account row byte-identical', asy
 
 test('an events-only PUT still ingests and attributes analytics, and creates no row', async () => {
   // If suppressing the row write also dropped the events, every metric would go blind for exactly
-  // the population this task creates: signed-in browsers that have not curated anything yet.
+  // the population this affects: signed-in browsers that have not curated anything yet.
   const { handler, sql } = handlerWith({ account: { accountId: ACCOUNT_ID, email: 'a@example.com' } });
   const res = fakeRes();
   await handler(fakeReq({
@@ -399,7 +397,7 @@ test('a malformed body is still a 400 and ingests nothing', async () => {
   // the one that actually regressed: Vercel's Node runtime hands the handler a raw Buffer for any
   // content-type it does not recognise, and a Buffer is `typeof 'object'` and not an array — so a
   // shape check built from those two tests waves it through, `body.state` is undefined, and it
-  // answers 200. Measured: 400 before this change, 200 after, until the guard became a POSITIVE
+  // answers 200, unless the guard is a POSITIVE
   // plain-object check. That is exactly the failure the guard exists to prevent — a client whose
   // requests are broken stops syncing while every response says OK, and loses its events too
   // (pushNow drains them on `ok`).
@@ -485,7 +483,7 @@ test('analytics ingestion still rides along on a PUT', async () => {
 });
 
 test('one PUT both stores the state and ingests the events', async () => {
-  // The combination nothing covered (TASK-084 round 1, the third test-blindness HIGH). Every
+  // The combination nothing else covers. Every
   // neighbouring test proves one side or the failure of one side: the empty-state PUT proves events
   // survive a suppressed row write, and the on-fire test proves a broken events write cannot take
   // the state down. Neither proves the ordinary case — real channels AND analytics, both landing —
@@ -510,11 +508,11 @@ test('one PUT both stores the state and ingests the events', async () => {
 });
 
 test('a failing analytics write cannot fail the state write', async () => {
-  // FIXTURE CHANGED (TASK-084/BUG-052, 2026-07-31), not the assertion — same reason as the header
+  // The fixture carries real channels on purpose — same reason as the header
   // test above. This asserts that a broken events write does not take the STATE write down with it,
-  // which requires a state write to happen at all; an empty state now writes nothing, so the old
-  // fixture made the final assertion unreachable. Real channels restore the conditions the claim
-  // needs. Declared in the task scope before it went red.
+  // which requires a state write to happen at all; an empty state writes nothing, which would
+  // make the final assertion unreachable. Real channels provide the conditions the claim
+  // needs.
   const store = fakeDb();
   const sql = (strings, ...values) => {
     if (strings.join('').includes('into events')) throw new Error('events table on fire');
@@ -537,16 +535,16 @@ test('a failing analytics write cannot fail the state write', async () => {
   assert.ok(store.get('device', DEVICE_ID), 'the state itself was not stored');
 });
 
-// ── The admin gate (CHR-072 criterion 1) ────────────────────────────────────
+// ── The admin gate ────────────────────────────────────
 // The X meter panel exposes per-account reading volume — a behavioural profile of a named person —
 // so the 403 that keeps it owner-only is worth an assertion rather than a code read.
 //
 // It also pins the ORDER: the gate at api/state.js:44 runs before adminStats, so a non-owner never
 // reaches a query. That is asserted DIRECTLY (`sql.queries.length === 0`) rather than inferred from
 // the status code. The inference — fakeDb throws on unrecognised queries, so getting past the gate
-// would return 500 rather than 403 — is true today and was all the first version of this test had,
-// which made the name a claim the assertions did not carry. It would go quietly false the day the
-// fake store learns these aggregates, which the task file explicitly contemplates. Asserting a
+// would return 500 rather than 403 — is true today, but it is not what the name claims,
+// and it would go quietly false the day the
+// fake store learns these aggregates. Asserting a
 // query did NOT run is the "did a billable call go out" exception, not general call-recording.
 test('GET ?admin=1 as a non-owner is 403, before any query reaches the database', async () => {
   const prev = process.env.ADMIN_EMAIL;

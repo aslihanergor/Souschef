@@ -1,41 +1,35 @@
-// A signed-in page's save must never be written into the anonymous device namespace ([BUG-039]).
+// A signed-in page's save must never be written into the anonymous device namespace.
 //
 // `api/_session.js` answers null for an expired session AND for a database error, and `resolveOwner` then
-// addresses the DEVICE namespace, so on `main` a signed-in page's save that met either one was written
-// into a device row and answered 200 — and the page re-based onto that row. Measured on 511774e: one
+// addresses the DEVICE namespace, so without this guard a signed-in page's save that met either one was written
+// into a device row and answered 200 — and the page re-based onto that row. One
 // such save wedged sync behind "Not syncing" across reloads, and Use saved copy discarded both changes.
 //
 // WHAT THIS FILE STAGES, and what it does not. Every fixture here makes the lookup RESOLVE to no
-// session: it succeeds and finds nothing. A lookup that ERRORS is a different answer, and review round 2
-// measured that conflating the two costs a change `main` keeps — so the tests that stage a throw live in
+// session: it succeeds and finds nothing. A lookup that ERRORS is a different answer, and
+// conflating the two costs a change the unguarded code keeps — so the tests that stage a throw live in
 // test/require-account-r2.test.mjs and reach the real `api/_session.js`. Read "no session" below literally; nothing here
-// makes the database fail. These lines called that answer a "blip" until 2026-09-12, which is the
-// misnomer the rename removes (Asli: "yes scope is fine, rename them" — names and comments only).
+// makes the database fail.
 //
 // The fix: a state-carrying push from a signed-in page sends `X-Require-Account: 1`, and the server
-// answers 412 instead of downgrading it. Sign-out's own save is EXEMPT (Asli, 2026-09-11: "1, log the
-// boot half, and yes to the note"): with the guard on it, a user whose session has ended can never sign
+// answers 412 instead of downgrading it. Sign-out's own save is EXEMPT:
+// with the guard on it, a user whose session has ended can never sign
 // out, and after a reload the walled browser keeps their data.
 //
 // The server tests run the real `createStateHandler` over the fake store; everything else runs the REAL
 // app.js through the harness against that same handler, so "what the rows hold afterwards" is observed.
 //
-// CONTROLS, green on unchanged code (511774e): c2, c3, c6a–c6f, c7, c12a and c12b. c7 is answered by a
+// CONTROLS, green without the guard: c2, c3, c6a–c6f, c7, c12a and c12b. c7 is answered by a
 // CANNED 412 rather than the handler, so it pins the client's reaction whatever the server does; the
 // c6 cases pin where the header must NOT appear, which unchanged code satisfies trivially — each one
-// asserts the push it inspects was actually sent, so a silence cannot pass for an absence. Criterion 4
+// asserts the push it inspects was actually sent, so a silence cannot pass for an absence. The unguarded path
 // (no header, no session → the device namespace, as today) is pinned by "device state round-trips on the
 // anonymous path" in test/state-handler.test.mjs.
 //
-// REVIEW ROUND 1 (on 544577a; Asli, 2026-09-11: "C′, yes to the pins and the record corrections").
-// Six tests fail on 544577a for the reason each names: c1e (a session answer without an account id), c7
-// (REQUIREMENT CHANGED — a refusal no longer keeps `focus_dirty`), c15a (a refusal re-sent when the page goes
-// away), and c16a–c16c (the next boot after a refusal is an ordinary one: the data-safety reviewer's M1).
-// The rest are PINS for guards 544577a already had and no test could fail for — c1c/c1d (a refused save
-// carrying no user data), c12c (sign-out's retry), c15b–c15e (only a refusal is re-sent), c8c/c8d — or
-// fixtures strengthened so a named mutation can fail (c1a/c1b declare a base; c6d/c6e carry one). c8b was
-// REWRITTEN (the page now goes away before the reload), and c11b's guard no longer reads `focus_dirty`.
-// Each pin is shown able to fail by mutations/BUG-039-r1.mjs.
+// c1e pins a session answer without an account id, c7 that a refusal does not keep `focus_dirty`,
+// c15a that a refusal is re-sent when the page goes away, and c16a–c16c that the next boot after a
+// refusal is an ordinary one. c1c/c1d pin a refused save
+// carrying no user data, c12c sign-out's retry, c15b–c15e that only a refusal is re-sent.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../test-helpers/app-harness.mjs';
@@ -160,7 +154,7 @@ for (const [label, users] of [
     const res = fakeRes();
     await handler(fakeReq({
       method: 'PUT',
-      // A base IS declared (review round 1, claims X02): without one, "hands back no base" could not fail
+      // A base IS declared: without one, "hands back no base" could not fail
       // for a refusal that echoed the request's own base back.
       headers: { 'x-device-id': DEVICE_ID, 'x-require-account': '1', 'x-state-rev': STALE_BASE },
       body: { uid: DEVICE_ID, state: { channels: chans('UC_alice'), done: ['alice-done'] }, events: [EVENT()] },
@@ -175,10 +169,10 @@ for (const [label, users] of [
 
 for (const [label, withRow] of [['with no device row', false], ['when a device row\'s base matches the one declared', true]]) {
   test(`[BUG-039] c1${withRow ? 'd' : 'c'}: a refused state PUT carrying NO user data writes nothing either, ${label}`, async () => {
-    // Review round 1 (independent battery S12, claims M1). Every refused fixture above carries channels, so a
-    // refusal scoped to the user-data branch survived the whole suite — and a "clear everything" save that
-    // found no session was then discarded (200, updatedAt null), lost its unsaved mark, and came back on reload.
-    // With a device row whose base matches, main EMPTIES that row: the data-less branch updates in place.
+    // Every refused fixture above carries channels, so a
+    // refusal scoped to the user-data branch would pass them all — and a "clear everything" save that
+    // found no session would then be discarded (200, updatedAt null), lose its unsaved mark, and come back on reload.
+    // With a device row whose base matches, the unguarded code EMPTIES that row: the data-less branch updates in place.
     const users = withRow ? [{ kind: 'device', id: DEVICE_ID, state: { channels: chans('UC_old_anon'), done: [] } }] : [];
     const sql = fakeDb({ users });
     const base = withRow ? toCharUS(sql.get('device', DEVICE_ID).updated_at) : STALE_BASE;
@@ -196,8 +190,8 @@ for (const [label, withRow] of [['with no device row', false], ['when a device r
 }
 
 test('[BUG-039] c1e: a session answer without an account id is refused like no session at all', async () => {
-  // Review round 1 (claims L5). The refusal read `!account` while resolveOwner sends a request to the device
-  // namespace unless `account.accountId` is set, so a truthy answer without an id was written to a device row
+  // If the refusal reads `!account` while resolveOwner sends a request to the device
+  // namespace unless `account.accountId` is set, a truthy answer without an id is written to a device row
   // despite the header. Unreachable through today's sessionAccount (its join always returns an id); pinned so
   // the two conditions cannot drift apart.
   const sql = fakeDb();
@@ -349,8 +343,8 @@ for (const [label, me, session, kind] of [
   ['a walled browser answered by its account', 'abort', ALICE, 'account'],
 ]) {
   test(`[BUG-039] c6${kind === 'device' ? 'd' : 'e'}: ${label} claims without X-Require-Account`, async () => {
-    // With a base (review round 1, claims Y10): a store without one let a "signed in" term widened to
-    // `_authEmail || base` survive — the header would then ride a signed-out page's claim and refuse it.
+    // With a base: a store without one lets a "signed in" term widened to
+    // `_authEmail || base` pass — the header would then ride a signed-out page's claim and refuse it.
     const r = rig({ store: { focus_channels: JSON.stringify(chans('UC_local')), focus_rev: STALE_BASE }, me, session });
     await r.boot();
     assert.deepEqual([...r.app.visibleViews()], ['view-landing'], 'guard: the browser is walled');
@@ -376,14 +370,13 @@ test('[BUG-039] c6f: sign-out\'s own save carries no X-Require-Account', async (
   for (const p of puts) assert.equal(p.headers['x-require-account'], undefined, `sign-out's save declared an account: ${JSON.stringify(p.headers)}`);
 });
 
-// ── Criterion 7: what a 412 leaves behind ───────────────────────────────────────────────────────
+// ── What a 412 leaves behind ───────────────────────────────────────────────────────
 
 test('[BUG-039] c7: a refused save is not marked unsaved across a reload, keeps its base and events, says nothing, and the next save still goes', async () => {
-  // REQUIREMENT CHANGED in review round 1 (Asli, 2026-09-11: "C′, yes to the pins and the record
-  // corrections"). This first asserted `focus_dirty` stays '1'. The data-safety reviewer measured what that
-  // cost: the flag survives the reload, and when the next boot is not this account's healthy one — another
+  // `focus_dirty` must NOT stay '1' after a refusal. If it did,
+  // the flag would survive the reload, and when the next boot is not this account's healthy one — another
   // account signing in through a link, a stale second tab, a row that appeared meanwhile — syncOnLoad's dirty
-  // branch pushes the stale copy instead of loading the row and stops behind "Not syncing". A refusal is now
+  // branch pushes the stale copy instead of loading the row and stops behind "Not syncing". A refusal is
   // owed within the page instead (c15a–c15e), never across a reload by itself (c16a–c16c).
   const sql = seeded();
   const r = rig({ sql, store: aliceStore(sql) });
@@ -402,21 +395,20 @@ test('[BUG-039] c7: a refused save is not marked unsaved across a reload, keeps 
   assert.equal(r.app.get('focus_rev'), base, 'a refused save must not move the base');
   assert.equal(r.app.get('focus_events'), events, 'a refused save must not drop the events it carried');
   assert.deepEqual([...r.app.toasts], [], `a refused save must say nothing (TASK-089 owns telling the user): ${JSON.stringify(r.app.toasts)}`);
-  // NOT TREATED AS SUCCESS — the half c15a owns, and it CANNOT be pinned from here. Stated rather than
-  // attempted, because it was attempted (review round 2) and the attempt could not fail.
+  // NOT TREATED AS SUCCESS — the half c15a owns, and it CANNOT be pinned from here.
   //
-  // The assertion added here fired the unload flush and checked that something went out, on the theory
-  // that only the owed debt could have triggered it. Round 3 measured otherwise: `flushPush`'s trigger is
+  // An assertion here that fired the unload flush and checked that something went out, on the theory
+  // that only the owed debt could have triggered it, could not fail: `flushPush`'s trigger is
   // `_pushTimer || _evtTimer || _readEvents().length || _refusalOwed`, and this test's own guard three
   // lines above REQUIRES buffered events — so the flush fires whatever the debt holds, and the payload
-  // carries state because `_stateOutstanding` is still true after a refusal. Measured on both trees: the
-  // mutation that drops `_refusalOwed = true` left this test green. The two assertions are mutually
+  // carries state because `_stateOutstanding` is still true after a refusal. Dropping
+  // `_refusalOwed = true` would leave it green. The two assertions are mutually
   // exclusive in one fixture — the events check needs events pending, the debt check needs nothing
-  // pending — which is CLAUDE.md's "size the fixture so only the guard under test can fire".
+  // pending — so the fixture cannot be sized for both.
   //
   // What DOES pin it: c15a ("even with nothing else pending") for the debt, and this test's own
   // "must not drop the events it carried" for the other spelling of treated-as-success, the one that
-  // returns ok and drains the buffer. That assertion predates review round 2 and already caught it.
+  // returns ok and drains the buffer.
   r.refuseStatePuts(false);
   const next = r.app.requests.length;
   r.app.ctx.addDone('d2');
@@ -427,7 +419,7 @@ test('[BUG-039] c7: a refused save is not marked unsaved across a reload, keeps 
   assert.deepEqual(rowIds(sql.get('account', ALICE_ID)), ['UC_alice', 'UC_new'], 'and lands the refused change with it');
 });
 
-// ── Criterion 15: a refusal is owed within the page, and only a refusal (review round 1, C′) ─────────
+// ── A refusal is owed within the page, and only a refusal ─────────
 
 test('[BUG-039] c15a: a refused change is re-sent when the page goes away, even with nothing else pending', async () => {
   const sql = seeded();
@@ -449,8 +441,8 @@ test('[BUG-039] c15a: a refused change is re-sent when the page goes away, even 
 });
 
 // The three cases below are why the re-send is keyed on a REFUSAL rather than on "any state still owed".
-// The broad version was measured in review round 1: a halted page re-raised "Not syncing" on every tab
-// switch, and a discarded theme-only save sent a no-op save on every one.
+// The broad version has a cost: a halted page re-raises "Not syncing" on every tab
+// switch, and a discarded theme-only save sends a no-op save on every one.
 
 test('[BUG-039] c15b: a page halted by a real 409 sends nothing and says nothing when it goes away', async () => {
   const sql = seeded();
@@ -517,8 +509,8 @@ test('[BUG-039] c15e: a refusal later settled by a discard sends nothing when th
 });
 
 test('[BUG-039] c15f: a refusal later settled by an accepted save sends nothing when the page goes away', async () => {
-  // Found while writing mutations/BUG-039-r1.mjs, before it ran: nothing pinned that the owed flag is
-  // settled by an ACCEPTED save, so a page that had recovered would re-send its whole state on every tab switch.
+  // The owed flag must be
+  // settled by an ACCEPTED save, or a page that had recovered would re-send its whole state on every tab switch.
   const sql = seeded();
   const r = rig({ sql, store: aliceStore(sql) });
   await r.boot();
@@ -553,9 +545,9 @@ test('[BUG-039] c8a: one save that finds no session creates no device row, and t
   assert.deepEqual(notSyncing(r.app), [], '"Not syncing" must not appear');
 });
 
-// c8b–c8d: the page goes away (pagehide → flushPush) and reloads. REQUIREMENT CHANGED in review round 1
-// (C′): c8b first reloaded WITHOUT the page going away and relied on the unsaved mark surviving, which is
-// what c7 now forbids. A reload in a browser fires pagehide; an app killed outright may not (Risk, C′).
+// c8b–c8d: the page goes away (pagehide → flushPush) and reloads. A reload WITHOUT the page going away
+// would rely on the unsaved mark surviving, which is
+// what c7 forbids. A reload in a browser fires pagehide; an app killed outright may not.
 async function noSessionCloseReload({ sql, store, change }) {
   const r = rig({ sql, store });
   await r.boot();
@@ -576,13 +568,13 @@ test('[BUG-039] c8b: one save that finds no session, then the page closes and re
   assert.equal(sql.get('device', DEVICE_ID), undefined, 'the save that found no session was written into a device row');
   assert.deepEqual(rowIds(sql.get('account', ALICE_ID)), ['UC_alice', 'UC_new'], 'the change must land in the account');
   assert.deepEqual(ids(back.app.get('focus_channels')), ['UC_alice', 'UC_new'], 'and stay on the device');
-  // BOTH pages (review round 1, claims L4): the criterion says "at any point".
+  // BOTH pages: the notice must not appear "at any point".
   assert.deepEqual([...notSyncing(r.app), ...notSyncing(back.app)], [], '"Not syncing" must not appear on either page');
 });
 
 test('[BUG-039] c8c: with a legacy device row, one save that finds no session, then the page closes and reloads — the change lands', async () => {
-  // Measured in review round 1: main keeps this change (its 409 keeps the unsaved mark), and a refusal that
-  // is simply not carried across the reload (option B) lost it. The re-send on close is what keeps it.
+  // Without the guard this change is kept (a 409 keeps the unsaved mark), and a refusal that
+  // is simply not carried across the reload would lose it. The re-send on close is what keeps it.
   const legacy = { channels: chans('UC_old_anon'), done: [] };
   const sql = fakeDb({ users: [{ kind: 'account', id: ALICE_ID, state: ALICE_ROW }, { kind: 'device', id: DEVICE_ID, state: legacy }] });
   const deviceBefore = JSON.stringify(sql.get('device', DEVICE_ID));
@@ -594,7 +586,7 @@ test('[BUG-039] c8c: with a legacy device row, one save that finds no session, t
 });
 
 test('[BUG-039] c8d: clearing every channel, one save that finds no session, then the page closes and reloads — the clear lands', async () => {
-  // Review round 1 (independent battery S12, claims M1): a save carrying NO user data. If it were not refused
+  // A save carrying NO user data. If it were not refused
   // it would be discarded (200, updatedAt null) and the channel would come back on the reload.
   const only = { channels: chans('UC_only'), done: [], archive: [], theme: 'dark', shorts: 'false' };
   const sql = fakeDb({ users: [{ kind: 'account', id: ALICE_ID, state: only }] });
@@ -602,11 +594,10 @@ test('[BUG-039] c8d: clearing every channel, one save that finds no session, the
   const { r, back } = await noSessionCloseReload({ sql, store, change: (ctx) => ctx.saveChannels([]) });
   assert.deepEqual(rowIds(sql.get('account', ALICE_ID)), [], 'the clear must land in the account');
   assert.deepEqual(ids(back.app.get('focus_channels')), [], 'and the channel must not come back');
-  // BOTH PAGES. Added in review round 2 for criterion 23 — every other c8 case asserts the notice never
-  // appears and this one, the clear, did not — but it was added watching `back` alone, which is the very
-  // gap round 1 had just closed in c8b and c8c (claims L4). Round 3 measured the cost: routing a 412 into
-  // the halt branch raises the notice on the ORIGINAL page and this test stayed green while fifteen others
-  // died. The notice appears where the refusal happened, so that is where it has to be read.
+  // BOTH PAGES, not `back` alone: routing a 412 into
+  // the halt branch raises the notice on the ORIGINAL page, and a check on `back` alone
+  // would stay green.
+  // The notice appears where the refusal happened, so that is where it has to be read.
   assert.deepEqual([...notSyncing(r.app), ...notSyncing(back.app)], [],
     '"Not syncing" must not appear on either page');
 });
@@ -656,13 +647,12 @@ test('[BUG-039] c11: with the session gone, the unload save creates no device ro
 });
 
 test('[BUG-039] c11b: an unload save fired while sign-out\'s own save is in flight still carries X-Require-Account', async () => {
-  // Added after the author battery's M04i SURVIVED: an exemption built as a module-level flag (anything
-  // while sign-out runs goes unguarded) passed every other test, because during sign-out's own state save
-  // [BUG-100]'s rule makes a flush analytics-only whenever a push holds the queue WITH a base. A flush
+  // An exemption built as a module-level flag (anything
+  // while sign-out runs goes unguarded) passes every other test, because during sign-out's own state save
+  // a flush is analytics-only whenever a push holds the queue WITH a base. A flush
   // carries state during sign-out whenever that is not so — a page with no base yet (this fixture), or a
-  // sign-out whose save is analytics-only because it had nothing to save. (Corrected in review round 1,
-  // claims L1: this said "a page with no base" was the only such shape; the claims reviewer measured the
-  // second.) Here: signed in on an account with no row, holding nothing at boot, then a channel added after
+  // sign-out whose save is analytics-only because it had nothing to save.
+  // Here: signed in on an account with no row, holding nothing at boot, then a channel added after
   // the session ended — refused, so still owed and still base-less.
   const r = rig();
   await r.boot();
@@ -683,10 +673,10 @@ test('[BUG-039] c11b: an unload save fired while sign-out\'s own save is in flig
   assert.ok(r.app.navigations.includes('/app'), `and sign-out must still complete: ${JSON.stringify(r.app.toasts)}`);
 });
 
-// ── Criterion 12: sign-out is unchanged (the exemption) ─────────────────────────────────────────
+// ── Sign-out is unchanged (the exemption) ─────────────────────────────────────────
 //
-// Against main's measured outcome (511774e, M3 and M3b): sign-out completes, its save lands in a
-// device row the id rotation then orphans ([CHR-030]'s, not this task's), and the account row is
+// Without the guard: sign-out completes, its save lands in a
+// device row the id rotation then orphans, and the account row is
 // untouched. The device row is asserted because it is the observable proof that sign-out's save was
 // NOT refused — a guarded sign-out writes nothing, refuses, and keeps the departing user's data.
 
@@ -717,9 +707,9 @@ for (const [label, late] of [['with a late change', true], ['with nothing pendin
 }
 
 test('[BUG-039] c12c: after the session ends, sign-out\'s RETRY is exempt too', async () => {
-  // Review round 1 (independent battery A10): only sign-out's first attempt was pinned. A change landing
+  // Not only sign-out's first attempt. A change landing
   // while that save is in flight — routine; the async /api/group resolve does it — makes it unconfirmed,
-  // so the loop retries, and a retry that carried the header was refused and stopped the sign-out.
+  // so the loop retries, and a retry that carried the header would be refused and stop the sign-out.
   const sql = seeded();
   const r = rig({ sql, store: aliceStore(sql) });
   await r.boot();
@@ -735,12 +725,12 @@ test('[BUG-039] c12c: after the session ends, sign-out\'s RETRY is exempt too', 
   assert.ok(r.app.navigations.includes('/app'), `sign-out did not complete: ${JSON.stringify(r.app.toasts)}`);
 });
 
-// ── Criterion 16: after a refusal, the next boot is an ordinary boot (review round 1, data-safety M1) ─
+// ── After a refusal, the next boot is an ordinary boot ─
 //
 // The page closes WITHOUT going away cleanly (no flushPush), so nothing re-sends: these pin that a refusal
-// alone leaves nothing behind for the next boot to act on. On the first build it left `focus_dirty` set, so
-// syncOnLoad's dirty branch pushed the previous copy instead of loading the row, and stopped behind "Not
-// syncing" — measured on 544577a for each case below, and not on main.
+// alone leaves nothing behind for the next boot to act on. If it left `focus_dirty` set,
+// syncOnLoad's dirty branch would push the previous copy instead of loading the row, and stop behind "Not
+// syncing".
 
 test('[BUG-039] c16a: a save that finds no session, then a different account signs in here — that account loads its own row', async () => {
   const sql = fakeDb({ users: [{ kind: 'account', id: ALICE_ID, state: ALICE_ROW }, { kind: 'account', id: BOB_ID, state: BOB_ROW }] });

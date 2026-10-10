@@ -1,4 +1,4 @@
-// The assignment prune's evidence rule ([BUG-098]).
+// The assignment prune's evidence rule.
 //
 // `syncGroupPrune` used to delete an assignment whenever its id was absent from the feed in hand.
 // **The evidence for that absence is device-local; the thing it deletes is synced.** `tweetCache` is
@@ -67,7 +67,7 @@ const metaFor = (ids, { at = daysAgo(1), ch = 'c1' } = {}) =>
 
 function boot({ store = {}, channels = [C1], reply = null } = {}) {
   const app = createApp({
-    store: { focus_group_view: 'on', // [TASK-099] — see the note on boot() in group-defer-lift
+    store: { focus_group_view: 'on', // grouping is off by default — see the note on boot() in group-defer-lift
              focus_device_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
              focus_channels: JSON.stringify(channels), ...store },
   });
@@ -114,11 +114,10 @@ test('BUG-098 C1: a cold cache returning only the newest post keeps every older 
 
 test('BUG-098 C1b: the PUT that follows a cold-cache render carries no deletion', async () => {
   // `syncOnLoad` FIRST, and it is not decoration. `pushNow` sends `state` only once `_stateLoaded` is
-  // true ([BUG-056]: a browser that never read the row has no standing to claim one), so without a
-  // boot read every PUT here carries `{uid, events}` and nothing else. The first version of this test
-  // branched on `puts.filter(p => p.state)` being empty — which it structurally always was — so it
-  // silently degraded to a weaker copy of C1 and criterion 1's PUT half was pinned by nothing.
-  // Driving the real chain also makes this the actual BUG-098 path: pull the row, render cold, push.
+  // true (a browser that never read the row has no standing to claim one), so without a
+  // boot read every PUT here carries `{uid, events}` and nothing else — `puts.filter(p => p.state)`
+  // would be structurally empty and the PUT half would be pinned by nothing.
+  // Driving the real chain also makes this the path the defect takes: pull the row, render cold, push.
   const SEED = threeAssigned({ postMeta: metaFor(['x1', 'x2', 'x3']) });
   const { app, puts } = boot({ store: { focus_groups: JSON.stringify(SEED) } });
   app.setFetch(async (url, init) => {
@@ -203,11 +202,11 @@ test('BUG-098 C3: removing a channel drops its assignments', async () => {
   assert.deepEqual(bulletTexts(after).sort(), ['about x1', 'about x3'], "and so is x2's bullet");
 });
 
-// GREEN on `main` by construction, and deliberately so: there, x2 leaves by ABSENCE and the user
-// reaches caught-up for the old reason. It cannot be made to discriminate — a post from a removed
-// channel can never be in a feed, since `loadFeed` only fetches channels you still follow — so this
-// pins the user-visible OUTCOME and rule 2's mechanism is pinned by C3 above. Mutation-verified
-// rather than RED-first. C8b and C9b are green for the same kind of reason: they pin what must not
+// This also passes under the old absence rule, by construction: there, x2 leaves by ABSENCE and
+// the user reaches caught-up for the old reason. It cannot be made to discriminate — a post from a
+// removed channel can never be in a feed, since `loadFeed` only fetches channels you still follow —
+// so this pins the user-visible OUTCOME and rule 2's mechanism is pinned by C3 above.
+// C8b and C9b are the same kind: they pin what must not
 // change at all.
 test('BUG-098 C3b: with the phantom gone, "You\'re all caught up" is reachable', async () => {
   const { app } = boot({
@@ -226,8 +225,8 @@ test('BUG-098 C3b: with the phantom gone, "You\'re all caught up" is reachable',
   await settle();
 
   // The user reads the last post they can actually see. A phantom assignment for the removed
-  // channel's x2 would keep `countGroupedUnread()` at 1 and make caught-up unreachable — [BUG-029]
-  // by design, and the whole reason rule 2 exists rather than waiting for the window.
+  // channel's x2 would keep `countGroupedUnread()` at 1 and make caught-up unreachable —
+  // the whole reason rule 2 exists rather than waiting for the window.
   app.ctx.addDone('x1');
   app.ctx.checkEmpty();
 
@@ -260,8 +259,8 @@ test('BUG-098 C4b: an ageless assignment whose post IS in the feed is NOT delete
     store: { focus_groups: JSON.stringify(threeAssigned({ postMetaEpoch: sec(daysAgo(20)) })) },
   });
 
-  // RE-PREMISED after review round 1, and the old premise was unreachable twice over. It fed an
-  // in-hand post published 20 days ago, which the clock check now reads — correctly — as a broken
+  // An in-hand post published 20 days ago is NOT a usable premise, twice over: the clock check
+  // reads it — correctly — as a broken
   // DEVICE clock rather than an old post; and `stampPostMeta` gives every in-hand post a fresh `at`
   // before any rule sees it, so a stamped post can never be both in hand and aged.
   //
@@ -319,7 +318,7 @@ test('BUG-098 C5c: once the epoch is older than the window, ageless assignments 
       focus_groups: JSON.stringify(threeAssigned({
         // x3 carries a real, in-window age. It is what keeps this test honest: without it every
         // assignment is expected to vanish, which is precisely what the OLD absence rule does to an
-        // empty feed — the test would pass on `main` via the bug it was written to close.
+        // empty feed — the test would pass via the bug it was written to close.
         postMeta: metaFor(['x3'], { at: daysAgo(2) }),
         postMetaEpoch: sec(daysAgo(20)),
       })),
@@ -344,23 +343,20 @@ test('BUG-098 C5d: an expired epoch never reaches an assignment the reader can s
   render(app, [xPost('x2', { published })]);   // fixture and an assertion that each call it can
   await settle();                              // straddle a second boundary and differ by one.
 
-  // What actually spares x2 is the VETO, not the stamp-before-prune order. This comment used to
-  // credit the ordering, and the battery disproved it: swapping the two calls (M22) leaves every
+  // What actually spares x2 is the VETO, not the stamp-before-prune order: swapping the two calls
+  // leaves every
   // test green, because rule 3 never reaches an in-hand post whatever its age says. The order is
-  // still the right one — stamp before you judge — but it is defensive, not load-bearing, and saying
-  // otherwise would be a false claim in a durable place ([BUG-091]'s lesson).
+  // still the right one — stamp before you judge — but it is defensive, not load-bearing.
   const after = stateOf(app);
   assert.equal(after.assignments.x2, 'g_t', 'the visible post survives its record\'s expired epoch');
   assert.deepEqual(after.postMeta.x2, [sec(published), 'c1'], 'because it was stamped first');
   assert.deepEqual(Object.keys(after.assignments), ['x2'], 'the two nobody has seen still age out');
 });
 
-// ── Review round 1: the display counts only what this device can reach ───────
+// ── The display counts only what this device can reach ───────────────────────
 
-// [TASK-098] RE-POINTED. A topic is a `.topic-card` in the stream now, not a `.group-card` tile in a
-// `#group-grid` above it. The assertions below are unchanged — only where they look. The READERS got
-// stronger in the move: the old tile was one `innerHTML` blob, so its count and bullets could only be
-// scraped by regex over an unparsed string; the new card is appended nodes, so these are real queries.
+// A topic is a `.topic-card` in the stream, built from appended nodes, so these are real queries
+// rather than regexes over an unparsed `innerHTML` string.
 const tileOf = (app, n = 0) => app.queryAll('#feed .topic-card')[n];
 const countOn = card => card?.querySelectorAll('.tc-count')[0]?.textContent;
 
@@ -402,20 +398,20 @@ test('BUG-098 R1b: a tile never claims more posts than the drill-in can show', a
   await settle();
   app.ctx.renderTopicCards();
 
-  // [BUG-029]'s exact shape, which this task's own "UI & states" section says must not regress:
-  // the tile offered "See all 3 posts" and "Mark 3 done" while `openGroupDetail`, which renders from
-  // `_lastFeedItems`, had one card to show.
+  // The count/content mismatch that must not regress:
+  // a tile offering "See all 3 posts" and "Mark 3 done" while `openGroupDetail`, which renders from
+  // `_lastFeedItems`, has one card to show.
   //
   // This pins the RE-paint, not the load paint: the explicit `renderGroupGrid()` above runs after
   // `settle()`, by which point `_lastFeedItems` is set whatever order `renderFeedResults` used. The
   // first paint — the one the user actually sees on load — is pinned by R2e instead, which reads the
-  // grid synchronously. Round 2 found that ordering surviving all 719 tests; saying which paint this
+  // grid synchronously. Saying which paint this
   // test covers is what stops the pair being read as one.
   assert.equal(countOn(tileOf(app)), '1 post', 'the tile counts what it can actually open');
   assert.equal(app.ctx.visibleGroupUnreadIds('g_t').length, 1, 'and the drill-in list agrees with it');
 });
 
-// ── Review round 1: a device with a wrong clock must not delete anything ─────
+// ── A device with a wrong clock must not delete anything ─────────────────────
 
 test('BUG-098 R1c: a fast device clock cannot age out in-window assignments', () => {
   const { app } = boot({
@@ -436,7 +432,7 @@ test('BUG-098 R1c: a fast device clock cannot age out in-window assignments', ()
     'nothing is aged out on the word of a clock the feed contradicts');
 });
 
-// ── Review round 1: the order the record is refreshed in ─────────────────────
+// ── The order the record is refreshed in ─────────────────────────────────────
 
 test('BUG-098 R1d: a stale recorded channel is refreshed before rule 2 reads it', () => {
   const { app } = boot({
@@ -463,7 +459,7 @@ test('BUG-098 R1d: a stale recorded channel is refreshed before rule 2 reads it'
   assert.equal((after.groups.g_t.summary || []).length, 1, 'and its bullet is intact');
 });
 
-// ── Review round 1: a failed load must not empty the sticky record ───────────
+// ── A failed load must not empty the sticky record ───────────────────────────
 
 test('BUG-098 R1e: an X failure does not wipe the unfiled record', async () => {
   const { app } = boot({
@@ -479,7 +475,7 @@ test('BUG-098 R1e: an X failure does not wipe the unfiled record', async () => {
   // gated on a complete load. Removing that gate for assignments left this pass running on failed
   // loads, where absence means "X 502'd at its post cap" — routine. Ungated, one failure wiped the
   // record and the next load held a fifth to a third of the backlog hidden behind `grouping-pending`
-  // for seconds, which is [TASK-096]'s measured defect.
+  // for seconds.
   render(app, [xPost('x1')], ['X acct']);
   await settle();
 
@@ -549,7 +545,7 @@ test('BUG-098 C6b: collecting an orphaned postMeta entry is PERSISTED, not just 
         assignments: { x1: 'g_t' },
         groups: { g_t: { label: 'A topic', summary: [{ text: 'about x1', item_ids: ['x1'] }] } },
         unfiled: [], updatedAt: daysAgo(1), v: 2,
-        // x9's assignment left by another route — the [TASK-096] bucket sweep is the live example —
+        // x9's assignment left by another route — the bucket sweep is the live example —
         // leaving its age behind with nothing pointing at it.
         // `at` matches what `stampPostMeta` will compute for the post rendered below, so the stamp is
         // a no-op and the orphan sweep is the ONLY writer. Two writers would let a clock-boundary
@@ -652,7 +648,7 @@ test('BUG-098 C8b: the unfiled record still leaves when its post is absent', asy
 
 test('BUG-098 C9a: the channel rule cannot fire on an empty channel list', () => {
   const { app } = boot({
-    channels: [],   // BUG-052 / BUG-059 / BUG-060 all produce exactly this, on prod, today
+    channels: [],   // several known sync failures produce exactly this in production
     store: {
       focus_groups: JSON.stringify(threeAssigned({ postMeta: metaFor(['x1', 'x2', 'x3'], { ch: 'c1' }) })),
     },
@@ -696,7 +692,7 @@ test('BUG-098 C10: a second identical render leaves the row byte-identical and p
 
   // ONE post object, rendered twice. Building it twice reads the clock twice, and a render that
   // straddles a second boundary re-stamps `at` — measured at roughly 1 run in 500, which is enough to
-  // make this test AND the mutation battery that depends on it give two answers on identical code.
+  // make this test give two answers on identical code.
   const post = xPost('x1');
   render(app, [post]);
   await settle();
@@ -731,7 +727,7 @@ test('BUG-098 backfill: a classify records each assigned post\'s published date 
   // Two posts sent, one placed. Asserted through `updateGroupsForFeed` directly rather than a render,
   // because a render prunes afterwards and its orphan sweep would tidy away a wrongly-written entry
   // before any assertion could see it — the guard and the sweep would then mask each other and
-  // neither would be pinned ([BUG-069]).
+  // neither would be pinned.
   await app.ctx.updateGroupsForFeed([xPost('x1', { published }), xPost('x_leftover', { published })]);
 
   const after = stateOf(app);
@@ -782,9 +778,9 @@ test('BUG-098 backfill: an unparseable published date is recorded as UNKNOWN, ne
   });
 
   // `published` is remote text. Landing junk as 0 would make the post older than any cutoff, so a
-  // publication returning a broken date would age out every one of its posts at once — Risk 8. The
+  // publication returning a broken date would age out every one of its posts at once. The
   // `age > 0` guard in the prune happens to catch that too, which is exactly why this is asserted
-  // HERE, on the stored value: two guards over one input pin neither ([BUG-069]).
+  // HERE, on the stored value: two guards over one input pin neither.
   render(app, [xPost('x2', { published: 'not a date at all' })]);
   await settle();
 
@@ -792,18 +788,14 @@ test('BUG-098 backfill: an unparseable published date is recorded as UNKNOWN, ne
     'unknown age, known channel — so it ages from the epoch like any other ageless record');
 });
 
-// ── Review round 2: the escape hatch, the guard's edges, and the first paint ──
+// ── The escape hatch, the guard's edges, and the first paint ──────────────────
 //
-// Round 1 split the RECORD from the DISPLAY: assignments survive a cold cache (the point of this
-// task) while the badge, the tiles and the drill-in count only what this render has in hand. Round 2
-// found that the split had been applied one function too far — into `markAllDone`, which is a WRITE
+// The RECORD is split from the DISPLAY: assignments survive a cold cache
+// while the badge, the tiles and the drill-in count only what this render has in hand. That
+// split must not reach one function too far — into `markAllDone`, which is a WRITE
 // answering "clear everything the account holds", not a display answering "what can I show".
-//
-// It also corrected the record. Round 1's commit message said caught-up had been "unreachable for up
-// to a fortnight"; measured against `13f1019`, Mark-all-done reached it in ONE tap. What was
-// unreachable was caught-up BY READING THE POSTS ON SCREEN. So the honest statement of what round 1
-// did is: it traded an over-count that had an escape hatch for an under-count that had none — and
-// R2a is that hatch restored.
+// Otherwise an over-count that has an escape hatch becomes an under-count that has none —
+// R2a pins that hatch.
 
 test('BUG-098 R2a: Mark-all-done clears the whole account, not only what this device fetched', async () => {
   const { app } = boot({
@@ -826,10 +818,10 @@ test('BUG-098 R2a: Mark-all-done clears the whole account, not only what this de
     'every unread assignment the ACCOUNT holds is marked, whatever this device fetched');
 });
 
-// R2c — [TASK-099]. R2a and R2b both boot `focus_group_view: 'on'`, so the protection above was
-// pinned ONLY in the grouped view. Ungrouped is now the DEFAULT, which means the one place BUG-098
-// round 2's guarantee was never asserted is the view almost every reader is actually in. Found by
-// independent review (finding 7): the `!isGrouped()` gate can be moved one function down, out of
+// R2c. R2a and R2b both boot `focus_group_view: 'on'`, so the protection above is
+// pinned ONLY in the grouped view. Ungrouped is the DEFAULT, which means the one place that
+// guarantee would go unasserted is the view almost every reader is actually in.
+// The `!isGrouped()` gate can be moved one function down, out of
 // `visibleGroupedUnreadIds` and into `groupedUnreadIds`, and every test above still passes — because
 // they all run with grouping ON, where the gate is transparent. In the default view that move turns
 // `markAllDone` into a write that silently skips every assignment this device did not fetch.
@@ -868,7 +860,7 @@ test('BUG-098 R2b: a device that fetched the posts agrees it is caught up', asyn
   app.ctx.markAllDone();
 
   // Both keys are synced, so this is what the next device pulls down — the device that DID fetch the
-  // posts, and on which round 1's bug was visible as "2 new" over a screen the other device had just
+  // posts, and on which the bug is visible as "2 new" over a screen the other device had just
   // declared finished.
   //
   // Asserted on the STATE set, before any render. Two weaker versions were tried and both were
@@ -882,7 +874,7 @@ test('BUG-098 R2b: a device that fetched the posts agrees it is caught up', asyn
   });
 
   // Spread into THIS realm before comparing: the array comes back carrying the vm's prototypes, so a
-  // bare `deepEqual` fails on a structurally identical `[]` (the harness gotcha CLAUDE.md names).
+  // bare `deepEqual` fails on a structurally identical `[]`.
   assert.deepEqual([...b.app.ctx.groupedUnreadIds()], [],
     'the account is clean everywhere, not just on the device that pressed the button');
 });
@@ -908,8 +900,8 @@ test('BUG-098 R2c: one future-dated post cannot vouch for a clock the rest of th
 });
 
 test('BUG-098 R2d: the clock guard engages exactly at the window edge', () => {
-  // The guard's THRESHOLD, pinned in both directions, because round 2 found it measured nowhere: the
-  // only test on it used a 20-day skew, so nothing said where it starts.
+  // The guard's THRESHOLD, pinned in both directions: the
+  // only other test on it uses a 20-day skew, so nothing else says where it starts.
   //
   // It engages when the newest post in hand is itself older than the window — impossible for a live
   // feed, since every source is windowed to WINDOW_DAYS server-side (`api/feed.js`), so it means this
@@ -923,10 +915,10 @@ test('BUG-098 R2d: the clock guard engages exactly at the window edge', () => {
 
   // And it is silent below that edge — the clock is believed, and rule 3 deletes on its word.
   //
-  // KNOWN LIMIT, accepted deliberately (Asli, 2026-08-22, choosing the binary guard over a graded
+  // KNOWN LIMIT, accepted deliberately (the binary guard was chosen over a graded
   // cutoff): a device fast by LESS than the window still ages out in-window assignments and pushes
   // the loss, because the skew has to exceed `WINDOW - age of the newest post` before the feed can
-  // contradict it. Measured in review round 2: 2 days fast, a post published 13 real days ago, its
+  // contradict it. For example: 2 days fast, a post published 13 real days ago, its
   // assignment and bullet deleted and carried in the PUT. This assertion is that limit written down
   // where a future change has to look at it — not an endorsement of it.
   const silent = boot({
@@ -943,9 +935,9 @@ test('BUG-098 R2e: the FIRST painted tile counts what this render has in hand', 
   });
 
   // Read the grid SYNCHRONOUSLY, with no `settle()` and no second `renderGroupGrid()` call. That is
-  // the whole point: `_lastFeedItems = items` sits above the first paint, and round 2 found that
-  // ordering pinned by nothing — moving the assignment below the paint left all 719 tests green
-  // while the first tile the user sees read "3 posts" over one reachable post ([BUG-029]'s shape, on
+  // the whole point: `_lastFeedItems = items` sits above the first paint, and only this pins that
+  // ordering — with the assignment moved below the paint,
+  // the first tile the user sees reads "3 posts" over one reachable post (on
   // the paint that happens at load). R1b cannot see it, because it calls `renderGroupGrid()` again
   // after `settle()`, by which point `_lastFeedItems` is set either way.
   render(app, [xPost('x1')]);

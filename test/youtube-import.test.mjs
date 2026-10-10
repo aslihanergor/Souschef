@@ -1,4 +1,4 @@
-// Transient handoff store for Connect-YouTube import (TASK-015). Security-sensitive bits — only
+// Transient handoff store for Connect-YouTube import. Security-sensitive bits — only
 // the token *hash* is stored, reads are single-use, expired rows are refused — so they get unit
 // tests with an injected fake `sql` (the DB itself is verified live).
 import { test } from 'node:test';

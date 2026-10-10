@@ -3,15 +3,15 @@
 //                    node scripts/init-db.mjs --prod   (production: DATABASE_URL, and nothing else)
 // Safe to re-run — every statement is CREATE … IF NOT EXISTS.
 //
-// TASK-024: the `users` state table.
-// TASK-025: accounts / login_tokens / sessions (magic-link auth).
+// The `users` state table.
+// Accounts / login_tokens / sessions (magic-link auth).
 
 import { neon } from '@neondatabase/serverless';
 import { scriptDatabaseTarget } from '../api/_db.js';
 
 process.loadEnvFile('.env');
 
-// CHR-016: `--prod` SELECTS production (DATABASE_URL) and refuses anything else; without it the
+// `--prod` SELECTS production (DATABASE_URL) and refuses anything else; without it the
 // target is the dev branch (DEV_DATABASE_URL, as api/_db.js resolves it) and production is refused.
 // It used to only PERMIT production, so a plain `--prod` on a laptop migrated the dev branch while
 // the banner read like success — the undocumented `DEV_DATABASE_URL=` prefix was the only way in.
@@ -25,7 +25,7 @@ console.log(`→ migrating ${target.host}${target.isProd ? '  ⚠️  PRODUCTION
 // Connect to the URL that was checked — db() resolves its own and would ignore --prod.
 const sql = neon(target.url);
 
-// State table (TASK-024): `id` = an anonymous device id, or an account id after login.
+// State table: `id` = an anonymous device id, or an account id after login.
 await sql`
   create table if not exists users (
     id         text primary key,
@@ -34,7 +34,7 @@ await sql`
   )
 `;
 
-// BUG-019: split device rows from account rows into separate namespaces.
+// Split device rows from account rows into separate namespaces.
 //
 // Both kinds of id shared one flat keyspace, so `where id = $1` matched either — which is how an
 // anonymous request supplying someone else's id read and overwrote their state. The isolation has
@@ -62,7 +62,7 @@ await sql`
     end if;
   end $$`;
 
-// Accounts (TASK-025): keyed on verified email. gen_random_uuid() is built into
+// Accounts: keyed on verified email. gen_random_uuid() is built into
 // Postgres 13+ (no pgcrypto extension needed on Neon).
 await sql`
   create table if not exists accounts (
@@ -72,14 +72,14 @@ await sql`
   )
 `;
 
-// BUG-013: Google's `sub` — the stable, never-reused id for a Google account. It, not the email,
+// Google's `sub` — the stable, never-reused id for a Google account. It, not the email,
 // identifies a Google sign-in: an email can be renamed upstream or recycled by a Workspace/edu
 // domain. Nullable (magic-link accounts have none, and existing rows backfill on their next Google
 // sign-in). The unique index is created separately because `add column … unique` is not idempotent.
 await sql`alter table accounts add column if not exists google_sub text`;
 await sql`create unique index if not exists accounts_google_sub_key on accounts (google_sub)`;
 
-// Login tokens (TASK-025): only the sha256 of the emailed token is stored; the raw
+// Login tokens: only the sha256 of the emailed token is stored; the raw
 // token lives only in the magic link. Single-use, ~15-min expiry. `ip` backs per-IP
 // rate limiting on the send endpoint.
 await sql`
@@ -95,7 +95,7 @@ await sql`
 // Idempotent for DBs created before the ip column existed.
 await sql`alter table login_tokens add column if not exists ip text`;
 
-// Sessions (TASK-025): opaque cookie value, stored as its sha256. ~30-day expiry.
+// Sessions: opaque cookie value, stored as its sha256. ~30-day expiry.
 await sql`
   create table if not exists sessions (
     token_hash text        primary key,
@@ -111,7 +111,7 @@ await sql`create index if not exists login_tokens_email_created_idx
 await sql`create index if not exists login_tokens_ip_created_idx
           on login_tokens (ip, created_at)`;
 
-// Connect-YouTube import handoff (TASK-015): a one-time, short-lived stash of the fetched
+// Connect-YouTube import handoff: a one-time, short-lived stash of the fetched
 // subscription list, keyed by the sha256 of a token handed to the client via redirect. Read once
 // (DELETE … RETURNING) then gone; rows also expire (~5 min) and are swept on the next stash.
 await sql`
@@ -123,7 +123,7 @@ await sql`
   )
 `;
 
-// Analytics events (TASK-070): an append-only behavioural log, owner-only. Separate from the
+// Analytics events: an append-only behavioural log, owner-only. Separate from the
 // state blob — events aren't state. `account_id` is null for anonymous activity and back-filled
 // on the person's next authenticated sync (attribute-on-login); `device_id` is the anon device
 // uuid. Section/action level only — `props` holds metadata (counts/source/method), never a
@@ -139,7 +139,7 @@ await sql`
     created_at timestamptz not null default now()
   )
 `;
-// [BUG-123] An event's client-minted id, and the unique index `ingestEvents` conflicts on. Nullable
+// An event's client-minted id, and the unique index `ingestEvents` conflicts on. Nullable
 // and nulls-distinct, so the rows stored before this shipped (and any event whose id did not
 // validate) are untouched and keep inserting. Added as its own statement rather than folded into the
 // create above, because the table already exists everywhere: `create table if not exists` would skip
@@ -148,12 +148,12 @@ await sql`
 // ORDER MATTERS: this must reach a database BEFORE the code that conflicts on it. The other way
 // round is a 42P10 on every ingest — see the fallback in api/state.js.
 await sql`alter table events add column if not exists client_id text`;
-// UNIQUE ON `client_id` ALONE, not on `(device_id, client_id)` — a decision, not an oversight. A blind
-// reviewer noted that global uniqueness lets any client occupy an id and so suppress a colliding event
+// UNIQUE ON `client_id` ALONE, not on `(device_id, client_id)` — a decision, not an oversight.
+// Global uniqueness lets any client occupy an id and so suppress a colliding event
 // belonging to someone else. Deliberate collision is not prevented; accidental collision is negligible
 // (uuid v4). Scoping it to the device would not close the hole either, because `device_id` is
 // client-supplied too — anyone able to do this can already spoof that header and flood events outright.
-// These are owner-only analytics for a trusted circle. (Asli, 2026-09-16: "keep it as is".)
+// These are owner-only analytics for a trusted circle.
 await sql`create unique index if not exists events_client_id_key on events (client_id)`;
 
 // Read paths for the owner dashboard: per-person timelines and per-event-type counts over time.
@@ -164,7 +164,7 @@ await sql`create index if not exists events_name_created_idx    on events (name,
 await sql`create index if not exists events_unattributed_idx
           on events (device_id) where account_id is null`;
 
-// X post-usage meters (TASK-100). TWO tables, because "what did the app spend" and "who should be
+// X post-usage meters. TWO tables, because "what did the app spend" and "who should be
 // limited" are different questions and one counter cannot answer both.
 //
 // X bills on retrieval but deduplicates within a day: "If the same post is returned from multiple
@@ -175,7 +175,7 @@ await sql`create index if not exists events_unattributed_idx
 //   x_usage      per (owner, UTC day) — the FAIRNESS meter. Approximate on overlap, by design.
 //   x_posts_seen distinct (UTC day, post id) — the SPEND meter, exact, matching X's own dedup.
 //
-// `owner_kind` is 'account' or 'device', mirroring the users-table namespacing BUG-019 introduced:
+// `owner_kind` is 'account' or 'device', mirroring the users-table namespacing:
 // a device id and an account id must never collide in one keyspace.
 await sql`
   create table if not exists x_usage (
@@ -194,8 +194,8 @@ await sql`
     primary key (day, post_id)
   )
 `;
-// Both tables are append-mostly and would otherwise grow forever — the shape CHR-026 flags on
-// login_tokens. Swept opportunistically on write (the youtube_imports pattern), so there is no cron
+// Both tables are append-mostly and would otherwise grow forever.
+// Swept opportunistically on write (the youtube_imports pattern), so there is no cron
 // to forget; 30 days is well past any window we read.
 await sql`create index if not exists x_usage_day_idx      on x_usage (day)`;
 await sql`create index if not exists x_posts_seen_day_idx on x_posts_seen (day)`;

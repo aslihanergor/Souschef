@@ -1,4 +1,4 @@
-// [BUG-123] One-off cleanup of the analytics rows the re-send defect stored more than once.
+// One-off cleanup of the analytics rows the re-send defect stored more than once.
 //
 //   node scripts/dedupe-events.mjs                  # DRY RUN against the dev database
 //   node scripts/dedupe-events.mjs --prod           # DRY RUN against production
@@ -14,7 +14,7 @@
 //
 // CONSERVATIVE BY CONSTRUCTION. A group whose rows have CONSECUTIVE ids is left alone. Those are
 // ambiguous: either one batch genuinely carried the same event twice, or two simultaneous saves
-// happened to land adjacent. Measured on production 2026-09-16: most groups were spread (deleted
+// happened to land adjacent. Measured on production: most groups were spread (deleted
 // here) and a minority contiguous (kept). Deleting a real event to tidy a metric is the wrong trade.
 //
 // Every deleted row is copied into `events_bug123_backup` first, in the same transaction, and the
@@ -25,7 +25,7 @@ import { scriptDatabaseTarget } from '../api/_db.js';
 process.loadEnvFile('.env');
 
 const APPLY = process.argv.includes('--apply');
-// CHR-016: `--prod` selects production and refuses anything else; without it production is refused.
+// `--prod` selects production and refuses anything else; without it production is refused.
 const target = scriptDatabaseTarget({ prod: process.argv.includes('--prod') });
 if (target.error) {
   console.error(`✗ ${target.error}`);

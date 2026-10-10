@@ -1,4 +1,4 @@
-// Pure dashboard aggregation for the owner-only analytics layer (TASK-087). No DB, no I/O —
+// Pure dashboard aggregation for the owner-only analytics layer. No DB, no I/O —
 // unit-tested in test/analytics.test.mjs.
 //
 // The SQL owns the parts that need the database: owner-exclusion, the person-key
@@ -39,17 +39,16 @@ export function dauByDay(rows) {
   return out;
 }
 
-// ── X meters (CHR-072) ──────────────────────────────────────────────────────
+// ── X meters ──────────────────────────────────────────────────────
 
 // Price per post retrieved from X, in USD. DISPLAY-ONLY: nothing here can refuse a fetch — the
 // fuse that does is a post COUNT, `X_DAILY_POST_QUOTA` (api/_quota.js). A wrong value here makes a
 // number on the owner's dashboard wrong and changes nothing a user can see.
 //
-// Source: the X developer portal's pay-per-use rate, confirmed 2026-09-03 (recorded in
-// recaps/session-recap-2026-09-03-meters-live-quota-counts-double.md:135; first recorded at signup
-// on 2026-07-04). A constant rather than an env var deliberately: a Vercel env var set for
-// Development alone leaves Production on the fallback path (Known Pitfalls §4), and a spend panel
-// reading $0.00 looks exactly like "nobody read any posts" — the very ambiguity this task exists to
+// Source: the X developer portal's pay-per-use rate.
+// A constant rather than an env var deliberately: a Vercel env var set for
+// Development alone leaves Production on the fallback path, and a spend panel
+// reading $0.00 looks exactly like "nobody read any posts" — the very ambiguity this meter exists to
 // remove. Changing it is a one-line edit whose value is then visible in git history.
 export const X_POST_PRICE_USD = 0.005;
 
@@ -100,7 +99,7 @@ export function xMeterRollup({ spendRows, volumeRows, today } = {}) {
   const first = observed[0];
   const lastObserved = observed[observed.length - 1];
   // Fill THROUGH today, not merely to the last day that has rows. recordUsage swallows every error
-  // by design (TASK-100 criterion 12), so metering that stopped two days ago leaves no error
+  // by design, so metering that stopped two days ago leaves no error
   // anywhere — a run of trailing zeros is the only symptom it can ever produce.
   const end = maxDay(lastObserved, asDay(today) || lastObserved);
 
@@ -117,8 +116,8 @@ export function xMeterRollup({ spendRows, volumeRows, today } = {}) {
       day,
       posts,
       // SPEND IS DISTINCT POSTS, NEVER x_usage. x_usage overstates on overlap by design
-      // (scripts/init-db.mjs:163) and by ~2.8x today while [BUG-110] is open; pricing it would
-      // overstate the trial's cost by the same factor. CHR-072 criterion 2.
+      // (scripts/init-db.mjs:163) and by ~2.8x while a known over-count remains open; pricing it would
+      // overstate the trial's cost by the same factor.
       costUsd: round(posts * X_POST_PRICE_USD, 4),
       volume: vol,
       // BOTH terms are guarded, not just the denominator. `vol === 0` with `posts > 0` means the
@@ -145,7 +144,7 @@ export function xMeterRollup({ spendRows, volumeRows, today } = {}) {
   };
 }
 
-// An account is named by its email; a device is never named at all — CHR-072 criterion 3. The raw
+// An account is named by its email; a device is never named at all. The raw
 // id is not on the returned row either (see the push above), so "anonymous" is a property of the
 // payload and not only of the rendering.
 function ownerLabel(r) {

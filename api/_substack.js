@@ -1,4 +1,4 @@
-// Server-side Substack client (TASK-022). Substack publishes a keyless RSS 2.0 feed per
+// Server-side Substack client. Substack publishes a keyless RSS 2.0 feed per
 // publication at https://<host>/feed — reachable from Vercel (Cloudflare-fronted, unlike
 // Reddit, which IP-blocks datacenter ranges). Pure parsers map the feed into Focus's shared
 // item shape. The leading underscore keeps Vercel from treating this as a routable endpoint.
@@ -29,7 +29,7 @@ export function substackFeedUrl(input) {
   try {
     const u = new URL(s.includes('://') ? s : `https://${s}`);
     // Guard on the NORMALISED hostname so IP-literals / localhost — and short forms like 127.1 that
-    // new URL() expands to 127.0.0.1 — are all rejected before we ever fetch it (SSRF, BUG-020).
+    // new URL() expands to 127.0.0.1 — are all rejected before we ever fetch it (SSRF).
     if (!isSafePublicHost(u.hostname)) return null;
     return `https://${u.hostname}/feed`;
   } catch {
@@ -63,7 +63,7 @@ export async function fetchSubstackXml(feedUrl, { fetchImpl = fetch, sleep = def
   return null;
 }
 
-// Fetch a Substack post page's HTML for the reader (TASK-059). Same UA / timeout / transient-retry
+// Fetch a Substack post page's HTML for the reader. Same UA / timeout / transient-retry
 // as the feed fetch — a page GET is the same kind of request. Returns the HTML text, or null.
 export const fetchSubstackHtml = fetchSubstackXml;
 
@@ -104,9 +104,9 @@ export function parseSubstackChannel(xml) {
 
 // The collapsed card's teaser is bounded here, at parse time, so every consumer inherits the bound:
 // the feed payload, the rendered card, and — via toArchiveItem's spread — what an archived post
-// pushes into the 256KB-capped state row. ([BUG-115])
+// pushes into the 256KB-capped state row.
 //
-// 280 characters INCLUDING the ellipsis, cut at the last word boundary. Measured 2026-09-09 over the
+// 280 characters INCLUDING the ellipsis, cut at the last word boundary. Measured over the
 // 175 openers the app can actually reach (feeds without a <generator>Substack tag are 502'd upstream
 // by handleSubstack, so they never become a card): p50 233, p90 472, max 781 — the tail, which is the
 // whole problem at ~17 lines on a phone, collapses to ~6.
@@ -148,7 +148,7 @@ export function capPreview(s, cap = PREVIEW_CAP) {
 }
 
 // The plain text of the first non-empty <p> in the article HTML — the collapsed card's teaser
-// paragraph ("one paragraph → …read more", TASK-059). Inner tags are stripped and entities decoded.
+// paragraph ("one paragraph → …read more"). Inner tags are stripped and entities decoded.
 function firstParagraph(contentEncoded) {
   if (!contentEncoded) return '';
   const re = /<p\b[^>]*>([\s\S]*?)<\/p>/gi;
@@ -193,7 +193,7 @@ export function parseSubstackFeed(xml) {
 // A Substack post page embeds the article in <div class="available-content"><div class="body
 // markup">…. Return that container's HTML (still raw — the caller sanitises), or null when the
 // page has no such container. Bracket-matches nested <div>s so the whole article is captured and
-// page chrome (footer, comments, the paywall gate) is excluded. (TASK-059)
+// page chrome (footer, comments, the paywall gate) is excluded.
 export function extractSubstackArticle(html) {
   if (!html || typeof html !== 'string') return null;
   const k = html.indexOf('available-content');
@@ -217,7 +217,7 @@ export function extractSubstackArticle(html) {
 // links under "Other Reading…" and a wall of tweet embeds under "On X…" — that read as noise in the
 // in-app reader. Strip any heading-delimited section whose heading text matches a known marker,
 // taking everything from that heading up to the next heading (or the end) with it, so the embeds
-// inside go too. (BUG-012)
+// inside go too.
 const APPENDIX_HEADINGS = [/^other reading\b/i, /^on x\b/i];
 
 export function stripSubstackAppendix(html) {

@@ -8,7 +8,7 @@
 const API_BASE = 'https://www.googleapis.com/youtube/v3';
 const RSS_BASE = 'https://www.youtube.com/feeds/videos.xml';
 
-// Resilience (BUG-004). Single host (no fallback host like X has), so this is retry-only.
+// Resilience. Single host (no fallback host like X has), so this is retry-only.
 const YT_TRIES = 3;      // 1 initial attempt + 2 retries on the Data API
 const RSS_TRIES = 2;     // 1 initial + 1 retry on the keyless RSS fallback
 const BACKOFF_MS = 300;  // base backoff between attempts (grows with attempt index)
@@ -44,7 +44,7 @@ function pickAvatar(thumbnails) {
 }
 
 // Fetch a Data API endpoint with the key injected, retrying transient failures with backoff
-// (BUG-004). Returns parsed JSON, or null when the key is unset OR the request ultimately
+//. Returns parsed JSON, or null when the key is unset OR the request ultimately
 // fails — callers fall back to scraping/RSS. A non-transient failure (403 quota / other 4xx)
 // returns null immediately (no retry). On any failure we console.warn the status, so a prod
 // outage isn't diagnosed blind (previously every failure collapsed silently to null).
@@ -78,7 +78,7 @@ export async function ytFetch(endpoint, params, { fetchImpl = fetch, sleep = def
 }
 
 // Fetch a channel's RSS upload feed (the keyless fallback), retrying a transient failure once
-// (BUG-004). The shared-datacenter-IP 502 throttle (this bug's origin) lands here, and this
+//. The shared-datacenter-IP 502 throttle (this bug's origin) lands here, and this
 // path is reached exactly when the Data API is already down — so it's the last line of
 // defense. Returns the raw XML, or null if every attempt fails. Injectable for tests.
 export async function fetchRssXml(channelId, { fetchImpl = fetch, sleep = defaultSleep } = {}) {
@@ -128,7 +128,7 @@ export function parseSearchResults(json, limit = 5) {
   return out;
 }
 
-// ── Subscription import (TASK-015) ────────────────────────────────────────────
+// ── Subscription import ────────────────────────────────────────────
 
 // A subscriptions.list response -> [{ channelId, name, avatarUrl }] for the channels the user
 // follows, deduped by channelId. IMPORTANT: the followed channel is `snippet.resourceId.channelId`;
@@ -184,7 +184,7 @@ export async function listSubscriptions(accessToken, { fetchImpl = fetch, maxPag
   return { channels, truncated };
 }
 
-// ── Feed parsing (TASK-006) ───────────────────────────────────────────────────
+// ── Feed parsing ───────────────────────────────────────────────────
 
 export const SHORTS_MAX_SECONDS = 180; // YouTube caps Shorts at 3 minutes
 

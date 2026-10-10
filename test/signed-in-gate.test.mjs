@@ -1,7 +1,7 @@
-// The signed-in gate on /api/feed and /api/resolve-channel ([BUG-025]), and on /api/group ([BUG-130]).
+// The signed-in gate on /api/feed and /api/resolve-channel, and on /api/group.
 //
 // Both endpoints spend money or shared quota per request — X bills $0.005 a post read and $0.010 a
-// user read, YouTube's daily quota burns on every Data API call — and until BUG-025 both answered
+// user read, YouTube's daily quota burns on every Data API call — and ungated both would answer
 // anyone. The quantity under test is therefore the OUTBOUND request, not only the status: a 401 that
 // still fetched has already spent the money. Two instruments count it: the fake `xFetch` the feed
 // handler takes, and a stub over `globalThis.fetch`, which every other upstream call resolves at call
@@ -11,20 +11,19 @@
 // unset, so without the X key resolve's X-handle branch would make no upstream request on the unfixed code
 // either, and its "nothing sent upstream" would prove nothing. YouTube is different: without its key
 // `ytFetch` skips the Data API, but RSS and the scrape still call `fetch`, so the YouTube branches are
-// observable either way; the key is set so the Data API path is the one exercised. (Corrected in review
-// round 1, which measured it — the first version of this comment claimed both keys were load-bearing.)
+// observable either way; the key is set so the Data API path is the one exercised.
 // The G4 twins show every branch DOES reach the stub once it is allowed through.
 //
 // Sessions run through the REAL `sessionAccount`, so the tests see what the gate actually asks for — the
 // cookie header it reads and the `strict` mode that separates "no session" from "could not check" — and a
-// store failure is the REAL Neon driver's error (G6d), because the first staged one carried a `code` the
-// driver never sets, and a gate serving only coded errors passed (review round 1, battery survivor S3).
+// store failure is the REAL Neon driver's error (G6d), because a staged one carrying a `code` the
+// driver never sets would let a gate serving only coded errors pass.
 //
-// DECISION B (Asli, 2026-09-13: "ok go ahead with B and round 2"). When the session check cannot be made —
+// DECISION B. When the session check cannot be made —
 // the store errors, or has not answered within the time limit — YouTube and Substack are still served,
 // and both X paths are refused with a 503, because X is the one that spends money and the account it
-// would be billed against is unknown. It replaced "serve every branch", which served X unmetered to anyone
-// sending any `focus_session` value for as long as a store failure lasted (review round 1, claims M1/M2).
+// would be billed against is unknown. The alternative, "serve every branch", would serve X unmetered to anyone
+// sending any `focus_session` value for as long as a store failure lasted.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { neon, neonConfig } from '@neondatabase/serverless';
@@ -51,8 +50,8 @@ const DAY = new Date().toISOString().slice(0, 10);
 
 // A store failure as the real driver produces it: Neon's own client, with the network replaced by one
 // that fails the way undici does on a reset. No request leaves the process. What comes back is a
-// `NeonDbError` with no `code` — the property is `undefined` (measured; this said `null` until review
-// round 2, L6) — and G6d pins it as `code ?? null`, so this fixture cannot drift back to a coded error.
+// `NeonDbError` with no `code` — the property is `undefined` —
+// and G6d pins it as `code ?? null`, so this fixture cannot drift back to a coded error.
 neonConfig.fetchFunction = async () => {
   throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNRESET' } });
 };
@@ -67,18 +66,18 @@ const DB_DOWN = () => unreachableNeon`select 1`;
 //          'hang' — the lookup never answers
 //
 // Two kinds of count, on purpose. `lookups` and `failures` record what the fixture SET OUT to do; `rejected`
-// and `resolved` record what the lookup it handed back actually DID, observed on that promise. The first
-// version read only the first kind, and `failures` is bumped before the failure is staged — so a fixture that
-// kept the bump and lost the `return` answered Alice while its counter still said "failed", and a hang
-// fixture that failed fast looked exactly like a hang (review round 2, M1: mutations R9 and R3).
+// and `resolved` record what the lookup it handed back actually DID, observed on that promise. Reading
+// only the first kind is not enough: `failures` is bumped before the failure is staged — so a fixture that
+// kept the bump and lost the `return` would answer Alice while its counter still said "failed", and a hang
+// fixture that failed fast would look exactly like a hang.
 function withSessions(sql, { expiresAt = FUTURE, store = 'ok' } = {}) {
   const state = { lookups: 0, failures: 0, rejected: 0, resolved: 0 };
   const observe = (answer) => answer.then(
     (rows) => { state.resolved += 1; return rows; },
     (e) => { state.rejected += 1; throw e; },
   );
-  // The body keeps the indentation it had inside `wrapped`: mutation specs (mutations/BUG-025.mjs T1, T4, T5 and
-  // review round 2's R3, R5, R9) find these lines by their exact text, and a battery with one absent anchor
+  // The body keeps the indentation it had inside `wrapped`: mutation specs
+  // find these lines by their exact text, and a mutation run with one absent anchor
   // refuses to run at all.
   const lookup = (values) => {
       if (store === 'fail') { state.failures += 1; return DB_DOWN(); }
@@ -191,9 +190,9 @@ function assertServed({ res, upstream }) {
 }
 
 // Every store-failure test first proves the failure HAPPENED: the lookup was made and failed. Without this,
-// a fixture that stopped staging the failure would turn those tests into silent copies of G4 (review round 1,
-// battery weak spot T4). The rejection is read off the promise the gate received, not off the fixture's own
-// intent (review round 2, M1).
+// a fixture that stopped staging the failure would turn those tests into silent copies of G4.
+// The rejection is read off the promise the gate received, not off the fixture's own
+// intent.
 function assertLookupFailed(sql) {
   assert.equal(sql.session.lookups, 1, 'the gate asked the store exactly once');
   assert.equal(sql.session.failures, 1, 'and that one lookup failed');
@@ -203,8 +202,7 @@ function assertLookupFailed(sql) {
 
 // Every hang test proves the lookup was STILL WAITING when the handler answered — so the answer came from the
 // time limit, not from a lookup that failed or answered quickly. Without it, a hang fixture that failed fast
-// turned G11a and G11b into silent copies of G6a and G6x, and no handler-level test exercised the limit at all
-// (review round 2, M1: mutation R3 survived the whole suite).
+// would turn G11a and G11b into silent copies of G6a and G6x, and no handler-level test would exercise the limit at all.
 function assertLookupHung(sql) {
   assert.equal(sql.session.lookups, 1, 'the gate asked the store exactly once');
   assert.equal(sql.session.rejected, 0, 'the lookup had not failed when the handler answered');
@@ -228,8 +226,8 @@ for (const b of FEED_BRANCHES) {
 
   // Twin: passes on the unfixed code too, by design. It is the control for the refusals' "0 upstream" —
   // the same request, allowed through, does reach the instrument. It also pins ONE lookup per request
-  // (round 2, battery survivor F12: an X owner re-read through a second lookup doubled the queries and
-  // left a confirmed account unmetered whenever only the second one failed).
+  // (an X owner re-read through a second lookup would double the queries and
+  // leave a confirmed account unmetered whenever only the second one failed).
   test(`G4 feed ${b.name}: signed in → served, and the request reaches upstream`, async () => {
     const out = await callFeed(b.query, { cookie: COOKIE });
     assertServed(out);
@@ -277,8 +275,8 @@ for (const b of FEED_BRANCHES) {
 
 test('G6b feed X: a store failure refuses X even over the limit and with an X-Device-Id — no 429, no X call, no meter write', async () => {
   // The account is over a limit of 1 and the request carries a device id. Guessing an owner — the account
-  // (a 429 or an increment) or the client-supplied device (a new row, a quota reset by rotating the header,
-  // battery survivor F6) — would show here. Under decision B nothing is guessed: X is not reached at all.
+  // (a 429 or an increment) or the client-supplied device (a new row, a quota reset by rotating the header)
+  // — would show here. Under decision B nothing is guessed: X is not reached at all.
   const store = fakeDb({ xUsage: [{ owner_kind: 'account', owner_id: ALICE.accountId, day: DAY, posts: 5 }] });
   const sql = withSessions(store, { store: 'fail' });
   const out = await callFeed(FEED_BRANCHES[1].query, {
@@ -292,7 +290,7 @@ test('G6b feed X: a store failure refuses X even over the limit and with an X-De
 });
 
 test('G6c feed: a store failure does not serve a request with NO cookie — the store is never asked', async () => {
-  // Risk 3. "Serve the free sources when the store cannot be asked" must not become "serve strangers during an
+  // "Serve the free sources when the store cannot be asked" must not become "serve strangers during an
   // outage": with no cookie there is no lookup to fail, so the refusal happens before the store is touched.
   const sql = withSessions(fakeDb({}), { store: 'fail' });
   assertRefused(await callFeed(FEED_BRANCHES[0].query, { sql }));
@@ -300,8 +298,8 @@ test('G6c feed: a store failure does not serve a request with NO cookie — the 
 });
 
 test('G6d harness: the staged store failure is the real driver\'s error — NeonDbError, no code', async () => {
-  // Pins the fixture every store-failure test relies on. The first version staged `code: 'ECONNRESET'`, which
-  // the driver never sets, so a gate that served only errors carrying a code passed (battery survivor S3).
+  // Pins the fixture every store-failure test relies on. Staging `code: 'ECONNRESET'`, which
+  // the driver never sets, would let a gate that served only errors carrying a code pass.
   const e = await DB_DOWN().then(() => null, (err) => err);
   assert.ok(e, 'the unreachable store must reject');
   assert.equal(e.name, 'NeonDbError');
@@ -320,7 +318,7 @@ test('G11c feed: with a hanging store, a request with NO cookie is refused witho
 });
 
 test('G11d signedInGate gives up after exactly 3 s by default', async (t) => {
-  // Criterion 11's production number, pinned on mock timers so the suite does not wait three real seconds.
+  // The production time limit, pinned on mock timers so the suite does not wait three real seconds.
   assert.equal(session.SESSION_CHECK_TIMEOUT_MS, 3000);
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const flush = () => new Promise((r) => setImmediate(r));
@@ -336,9 +334,9 @@ test('G11d signedInGate gives up after exactly 3 s by default', async (t) => {
   assert.equal(answer.account, null, 'as "could not be asked", not as a refusal');
 });
 
-// Criterion 11 through the handlers' OWN wiring (review round 2, L1). G11d pins `signedInGate`'s default, but both
+// The time limit through the handlers' OWN wiring. G11d pins `signedInGate`'s default, but both
 // factories forward `sessionTimeoutMs`, and every other test either injects a limit or answers at once — so a
-// factory whose own default drifted to 30 s (mutation R2) passed the whole suite while production waited 30 s on
+// factory whose own default drifted to 30 s would pass every other test while production waited 30 s on
 // a hanging store. These build each handler with NO limit, as the default exports do. The X paths are used because
 // their answer at the limit is a 503 that sends nothing upstream, so the mock clock is the only thing that runs.
 for (const [name, build, query] of [
@@ -371,7 +369,7 @@ for (const [name, build, query] of [
   });
 }
 
-// Round 2, battery survivor F11: the gate runs BEFORE validation, so a malformed anonymous request is refused
+// The gate runs BEFORE validation, so a malformed anonymous request is refused
 // as signed-out rather than told what is wrong with it. Twins on the unfixed code; each reds if validation moves
 // above the gate.
 for (const [name, query] of [
@@ -443,7 +441,7 @@ for (const r of RESOLVE_INPUTS) {
 for (const [name, query] of [
   ['resolve X, no handle', { source: 'twitter' }],
   ['resolve YouTube, no url', {}],
-  // The sixth branch, missing until review round 2 (L2: mutation R1 moved this 400 above the gate and survived).
+  // The sixth branch: without it, moving this 400 above the gate goes unnoticed.
   ['resolve Substack, no url', { source: 'substack' }],
 ]) {
   test(`G13 ${name}: a malformed anonymous request is 401, not 400`, async () => {
@@ -453,10 +451,10 @@ for (const [name, query] of [
 
 // ── The instrument ───────────────────────────────────────────────────────────────────────────────────
 
-// A real Node response refuses a header once the body has gone (`ERR_HTTP_HEADERS_SENT`); the fake used to
-// accept one in any order, so a `no-store` set AFTER `json()` looked identical to one set before it — and on
-// Vercel that 401 would leave without the header (review round 1: claims L4, battery survivor S10). This
-// proves the fake now behaves like Node before any refusal test leans on it.
+// A real Node response refuses a header once the body has gone (`ERR_HTTP_HEADERS_SENT`); a fake that
+// accepts one in any order makes a `no-store` set AFTER `json()` look identical to one set before it — and on
+// Vercel that 401 would leave without the header. This
+// proves the fake behaves like Node before any refusal test leans on it.
 test('H1 harness: fakeRes refuses a header set after the body, as Node does, and snapshots headers at send', () => {
   const res = fakeRes();
   res.setHeader('Cache-Control', 'no-store');
@@ -466,9 +464,9 @@ test('H1 harness: fakeRes refuses a header set after the body, as Node does, and
   assert.equal(res.sentHeaders['Cache-Control'], 'no-store', 'a late header never reaches what was sent');
 });
 
-// ── /api/group ([BUG-130]) ───────────────────────────────────────────────────────────────────────────
+// ── /api/group ───────────────────────────────────────────────────────────────────────────
 //
-// Every POST here bills a Claude call on the server's key, and until BUG-130 the endpoint answered anyone.
+// Every POST here bills a Claude call on the server's key, and ungated the endpoint would answer anyone.
 // The same quantity is under test as above: the OUTBOUND request, counted on a stub over `globalThis.fetch`,
 // which `groupItems` resolves at call time.
 //
@@ -478,12 +476,12 @@ test('H1 harness: fakeRes refuses a header set after the body, as Node does, and
 // the stub exactly once.
 //
 // There is no free branch on this endpoint, so decision B has one side only here: when the session cannot be
-// checked the request is refused with a 503 (Asli, 2026-10-07: "yes to all three, go ahead").
+// checked the request is refused with a 503.
 const GROUP_POSTS = [
   { id: 'n1', source: 'twitter', text: 'Senate advances the spending bill' },
   { id: 'n2', source: 'twitter', text: 'The budget vote is scheduled for Thursday' },
 ];
-// Posts reach the model as positional indices ([BUG-077]), so the fake reply answers in indices. Two posts in
+// Posts reach the model as positional indices, so the fake reply answers in indices. Two posts in
 // one group, so nothing is folded and the label survives.
 const GROUP_REPLY = {
   content: [{
@@ -569,8 +567,8 @@ test('GG11 group: a lookup that never answers → 503 within the time limit, not
   assertRefused(out, 503);
 });
 
-// Twins: these three pass on the unfixed code too, by design. They pin what a signed-in caller must KEEP
-// (criterion 10), so a gate that swallowed the method check, the boundary check or the degrade shape reds here.
+// Twins: these three pass on the unfixed code too, by design. They pin what a signed-in caller must KEEP,
+// so a gate that swallowed the method check, the boundary check or the degrade shape reds here.
 test('GG10a group: signed in, a non-POST → 405 with Allow: POST, nothing sent to Anthropic', async () => {
   const out = await callGroup(null, { method: 'GET', cookie: COOKIE });
   assert.equal(out.res.statusCode, 405);
@@ -593,7 +591,7 @@ test('GG10c group: signed in, an unusable model reply → 200 with the degrade s
   assert.equal(out.upstream, 1);
 });
 
-// Review round 1 (M2, independent battery survivor I11): GG11 injects a 30 ms limit, so nothing pinned the
+// GG11 injects a 30 ms limit, so it does not pin the
 // limit production actually runs with. Twin of G11e: no limit injected, mock timers, answered at exactly 3 s.
 test('GG11e group: with no limit injected, the handler answers at exactly 3 s — 503, nothing sent to Anthropic', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
@@ -625,7 +623,7 @@ test('GG11e group: with no limit injected, the handler answers at exactly 3 s �
   }
 });
 
-// Review round 1 (M3, survivors I10 and I6): GG9 pinned "the gate comes first" for a non-POST only. Twins of
+// GG9 pins "the gate comes first" for a non-POST only. Twins of
 // G13: a signed-out POST is refused as signed-out whatever its body is — never told what is wrong with it, and
 // never let through because the body arrived as a string.
 for (const [name, body] of [

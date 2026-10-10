@@ -23,26 +23,26 @@
   --btn-strong-bg: #1c1d22;
   --btn-strong-ink: #ffffff;
   --btn-strong-active: #3a3c44;
-  --toast-action: #6fd3ab; /* bright mint — the Undo action on the dark toast pill (TASK-016) */
+  --toast-action: #6fd3ab; /* bright mint — the Undo action on the dark toast pill */
 
   --radius-card: 18px;
   --radius-btn: 11px;
 
-  /* [TASK-099] The bloom's gold, stored as BARE RGB CHANNELS so `rgb(var(--shine) / a)` can vary the
+  /* The bloom's gold, stored as BARE RGB CHANNELS so `rgb(var(--shine) / a)` can vary the
      alpha per keyframe from one token. A DELIBERATE FIRST for this file — `rgb(… / …)` appears
      nowhere else (color-mix is landing-only) — flagged so it reads as a considered choice rather than
      as precedent. The alternative was the colour inlined as six rgba() literals per keyframe: twelve
      places, and the light/dark pair no longer expressible as a single token. */
   --shine: 201 154 47;
 
-  /* [TASK-101] The ready note's surface, BARE RGB CHANNELS for the same reason `--shine` is: the
+  /* The ready note's surface, BARE RGB CHANNELS for the same reason `--shine` is: the
      note has to be translucent (a user's one hard requirement — explicitly NOT the toast's solid
      `--btn-strong-bg`, "too black and solid"), and `opacity` is the wrong tool because it would
      wash out the sentence along with the panel. Second user of this idiom, following the precedent
      flagged above rather than setting a new one. */
   --note-bg: 255 255 255;
 
-  /* [TASK-092] The first-run tour: the dim, the ring's glow and the card's shadow. The dim is 58%
+  /* The first-run tour: the dim, the ring's glow and the card's shadow. The dim is 58%
      here and 66% in dark (UI & states), so the cut-out still reads against a dark page. */
   --tour-scrim: rgba(10, 12, 16, .58);
   --tour-glow: rgba(47, 143, 107, .22);
@@ -53,7 +53,7 @@
    sets it: the inline <head> script paints it before first paint when this browser
    was signed in last time, and showView applies it on every screen except the
    sign-in page, which is always light. The phone's setting is never read, so the
-   app is light unless its reader chose Dark. [TASK-109] Same variables, dark values. */
+   app is light unless its reader chose Dark. Same variables, dark values. */
 :root[data-theme="dark"] {
   color-scheme: dark;
 
@@ -85,7 +85,7 @@
   --btn-strong-bg: #e8e9ec;
   --btn-strong-ink: #131419;
   --btn-strong-active: #cfd2d8;
-  --toast-action: #196049; /* deep green — Undo action on the light toast pill in dark mode (TASK-016) */
+  --toast-action: #196049; /* deep green — Undo action on the light toast pill in dark mode */
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -104,10 +104,10 @@ html, body {
 .hidden { display: none !important; }
 
 /* ── Setup ── */
-/* Fixed-height app-shell: header + CTA stay pinned and only the channel list scrolls (TASK-045) — WHEN
+/* Fixed-height app-shell: header + CTA stay pinned and only the channel list scrolls — WHEN
    IT FITS. The list never shrinks below one channel row (`.setup-scroll`'s 68px floor); on a screen too
    short for the pinned parts plus that row, the whole view scrolls instead. This was `overflow: hidden`,
-   which on an SE-sized screen clipped Open my feed below the edge with nothing able to scroll. [TASK-111] */
+   which on an SE-sized screen clipped Open my feed below the edge with nothing able to scroll. */
 #view-setup { height: 100dvh; overflow-y: auto; }
 
 .setup-wrap {
@@ -117,7 +117,7 @@ html, body {
   padding: 56px 24px 24px;
   width: 100%;
   /* Fills the view, but never shrinks below its content's minimum — which, with the list's 68px floor,
-     is what makes a short screen scroll the view rather than clip it. [TASK-111] */
+     is what makes a short screen scroll the view rather than clip it. */
   flex: 1 0 auto;
   min-height: auto;
   display: flex;
@@ -127,7 +127,7 @@ html, body {
 /* Phones: the stack starts 16px below the page top — the gap the feed's appbar uses — plus any top
    inset, so it never touches the status bar. It was 56px, and every pixel of that came out of the one
    region that scrolls. Desktop keeps 56px: there the gear is fixed in the corner (`.profile-btn`,
-   min-width 760px), so this boundary mirrors that one. [TASK-111] */
+   min-width 760px), so this boundary mirrors that one. */
 @media (max-width: 759px) {
   .setup-wrap { padding-top: calc(16px + env(safe-area-inset-top, 0px)); }
 }
@@ -135,7 +135,7 @@ html, body {
 .setup-head { flex: 0 0 auto; }
 
 /* The list's scroll region. A zero basis plus grow fills whatever the pinned parts leave; the 68px floor
-   (one channel row and its gap) is what the view scrolls to protect on a short screen. [TASK-111] */
+   (one channel row and its gap) is what the view scrolls to protect on a short screen. */
 .setup-scroll {
   flex: 1 1 0;
   min-height: 68px;
@@ -149,7 +149,7 @@ html, body {
    the panel (handleAddChannel) and shows it only as it closes it (showAddForm). A browser without :has()
    keeps Shorts in view, which is the old layout. Shorts is not a tour card, and handleAddChannel's
    `finally` re-places the tour after this reflow. Phones only, like the padding above: desktop is
-   unchanged. [TASK-111] */
+   unchanged. */
 @media (max-width: 759px) {
   .setup-head:has(#add-form.hidden) #pref-shorts { display: none; }
 }
@@ -179,7 +179,7 @@ html, body {
 
 /* 16px is a FLOOR for every field you can type in, not a type choice: iOS Safari zooms the whole
    page in when a focused input's text is smaller, and leaves it zoomed — so a reader who adds a
-   channel then reads the rest of the app magnified and cropped. Keep new fields at 16px. [BUG-125] */
+   channel then reads the rest of the app magnified and cropped. Keep new fields at 16px. */
 .add-form input {
   width: 100%;
   padding: 13px 14px;
@@ -232,7 +232,7 @@ html, body {
   margin-bottom: 28px;
 }
 
-/* TASK-032: shown when the active source tab has no channels/accounts yet. */
+/* Shown when the active source tab has no channels/accounts yet. */
 .channel-list-empty {
   color: var(--ink-soft);
   font-size: 14px;
@@ -374,7 +374,7 @@ html, body {
 }
 .btn-go:active { background: var(--btn-strong-active); }
 
-/* ── Account / sign-in (TASK-025) ── one block, three states, at the foot of setup ── */
+/* ── Account / sign-in ── one block, three states, at the foot of setup ── */
 .acct-block {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -409,7 +409,7 @@ html, body {
   padding: 12px 13px;
   border: 1.5px solid var(--line);
   border-radius: var(--radius-btn);
-  font-size: 16px;  /* the 16px floor — see .add-form input [BUG-125] */
+  font-size: 16px;  /* the 16px floor — see .add-form input */
   color: var(--ink);
   background: var(--surface);
   outline: none;
@@ -487,14 +487,14 @@ html, body {
 }
 .acct-btn-quiet:active { background: var(--danger-bg); }
 
-/* ── Account data controls (TASK-028b) ── export + delete, in the signed-in panel state.
+/* ── Account data controls ── export + delete, in the signed-in panel state.
    Divider off the Sign-out button above; Export reads neutral (safe), Delete reads danger. ── */
 .acct-data {
   display: flex; flex-direction: column; gap: 9px;
   margin-top: 14px; padding-top: 14px;
   border-top: 1px solid var(--line);
 }
-/* Privacy disclosure for identified analytics (TASK-070) — a quiet note under the account block. */
+/* Privacy disclosure for identified analytics — a quiet note under the account block. */
 .acct-privacy {
   margin-top: 14px; padding-top: 14px;
   border-top: 1px solid var(--line);
@@ -547,7 +547,7 @@ html, body {
 .acct-btn-danger-solid:disabled { opacity: .5; cursor: default; }
 .acct-btn-danger-solid:active:not(:disabled) { filter: brightness(.92); }
 
-/* ── Profile panel (TASK-028a) ── the account/identity surface as a left slide-in drawer. The
+/* ── Profile panel ── the account/identity surface as a left slide-in drawer. The
    .acct-* block above is relocated inside; the identity header carries the name/state. ── */
 .profile-btn {
   display: flex; align-items: center; justify-content: center;
@@ -578,7 +578,7 @@ html, body {
   border-right: 1px solid var(--line);
   box-shadow: 8px 0 40px rgba(0, 0, 0, .28);
   transform: translateX(-102%);
-  /* Off-screen must also mean out of the tab order (TASK-084). This panel is body-level, so
+  /* Off-screen must also mean out of the tab order. This panel is body-level, so
      `transform` alone left all 14 of its controls focusable while the sign-in wall was the only
      visible view — four Tab presses from the landing reached "Manage channels". `display:none`
      would kill the slide, so visibility is switched instead, delayed by the transition duration so
@@ -627,20 +627,18 @@ html, body {
    description under it — otherwise it rides up against the Manage-channels divider. */
 .profile-panel .acct-desc { margin-top: 0; }
 
-/* Preferences block in the Settings drawer (TASK-071) — theme + manage-channels, above Account. */
+/* Preferences block in the Settings drawer — theme + manage-channels, above Account. */
 .pref-block { display: flex; flex-direction: column; gap: 16px; padding-bottom: 20px; margin-bottom: 2px; border-bottom: 1px solid var(--line); }
 .pref-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .pref-label { font-size: 14px; font-weight: 600; color: var(--ink); }
 .pref-theme { display: flex; background: var(--line); border-radius: 999px; padding: 3px; }
 /* ⚠️ These rows are ~17px tall (14px/600 type, `padding: 0`), well under the 44px minimum tap
-   target. [BUG-106] fixed that for `.btn-mark-all` ONLY, and the narrowness of that fix is
-   deliberate rather than an oversight — recorded here because the next person to touch this rule
-   will wonder. Enlarging BOTH rows is not a bigger version of the same fix: at a 33px pitch (17px
+   target. That is fixed for `.btn-mark-all` ONLY, and the narrowness of that fix is
+   deliberate rather than an oversight. Enlarging BOTH rows is not a bigger version of the same fix: at a 33px pitch (17px
    tall, 16px gap) two 44px hit areas overlap by 11px, so widening the second one re-opens the
-   ambiguity the first one closed. `#btn-drawer-manage` was left alone on merit — its worst case is
-   landing on a screen you did not want and tapping back, where the bulk control's was marking your
-   whole feed read on every device. Judged 2026-08-29 as below /log-task's bar and routed here
-   instead of onto a 133-item Inbox. If this row ever fronts something destructive, that judgement
+   ambiguity the first one closed. `#btn-drawer-manage` is left alone on merit — its worst case is
+   landing on a screen you did not want and tapping back, where the bulk control's is marking your
+   whole feed read on every device. If this row ever fronts something destructive, that judgement
    expires. */
 .pref-manage {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -662,7 +660,7 @@ body.profile-open { overflow: hidden; }
   .profile-panel, .profile-panel.open, .profile-scrim { transition: none; }
 }
 
-/* ── First-run landing (TASK-027) ── soft account-first welcome; its own view, built on the
+/* ── First-run landing ── soft account-first welcome; its own view, built on the
    existing tokens. The sign-in controls reuse the .acct-* classes above. ── */
 .landing-wrap {
   max-width: 480px;
@@ -672,7 +670,7 @@ body.profile-open { overflow: hidden; }
   padding: 56px 24px calc(28px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  justify-content: center; /* center the lean sign-in block (TASK-069 M5 trimmed the hero) */
+  justify-content: center; /* center the lean sign-in block */
 }
 .landing-brand { display: flex; align-items: center; gap: 9px; }
 .landing-brand .dot { width: 15px; height: 16px; background: var(--accent); -webkit-mask: var(--toque-mask) center/contain no-repeat; mask: var(--toque-mask) center/contain no-repeat; flex-shrink: 0; }
@@ -702,10 +700,10 @@ body.profile-open { overflow: hidden; }
 }
 .landing-sources svg { width: 19px; height: 19px; display: block; }
 
-/* Sits a comfortable gap below the lean welcome (the wrap centers the whole block — TASK-069 M5). */
+/* Sits a comfortable gap below the lean welcome (the wrap centers the whole block). */
 .landing-auth { margin-top: 36px; }
 
-/* The skip button's rules were deleted with the button itself (TASK-084). .landing-reassure
+/* The skip button's rules were deleted with the button itself. .landing-reassure
    survives — it now reassures about your data, not about bypassing sign-in. */
 .landing-reassure {
   align-self: center;
@@ -728,34 +726,26 @@ body.profile-open { overflow: hidden; }
   z-index: 10;
 }
 
-/* [TASK-104] Row 1 of the FEED bar: gear left, grouping switch right. `justify-content` does all of
-   the work and there is NO auto margin anywhere in this row — `.appbar-actions` lost the one it
-   carried under [TASK-099] (see its rule, and `.btn-feed-manage`). Keep it that way: an auto margin
+/* Row 1 of the FEED bar: gear left, grouping switch right. `justify-content` does all of
+   the work and there is NO auto margin anywhere in this row — `.appbar-actions` carries none
+   (see its rule, and `.btn-feed-manage`). Keep it that way: an auto margin
    on either child consumes the free space before `justify-content` can distribute it, so a third
-   control added here would collapse against the gear instead of spacing evenly.
-   ⚠️ An earlier version of this comment said `.appbar-actions` "keeps the one it already had", which
-   the same change had already removed — corrected 2026-08-29 after review measured its computed
-   `margin-left` as 0px. */
+   control added here would collapse against the gear instead of spacing evenly. */
 .appbar-controls { display: flex; align-items: center; justify-content: space-between; }
 
 .brand { display: flex; align-items: center; gap: 8px; }
 .dot { width: 15px; height: 16px; background: var(--accent); -webkit-mask: var(--toque-mask) center/contain no-repeat; mask: var(--toque-mask) center/contain no-repeat; flex-shrink: 0; }
-/* `color` is EXPLICIT since [TASK-104], and that is a fix rather than tidying: `.brand` moved into
-   `.appbar-sub`, which sets `color: var(--ink-soft)`, and this rule declared no colour — so the feed
-   wordmark silently inherited the muted token. ⚠️ THE MEASUREMENT BELOW DESCRIBES AN INTERMEDIATE
-   STATE THAT NO LONGER EXISTS, and is kept only because it is what found the bug: it was taken while
-   the archive brand was still in row 1, so the two screens disagreed — feed rgb(148,152,161) vs
-   archive rgb(232,233,236) in dark. Asli then had the archive bar mirror the feed bar, so BOTH
-   brands now sit inside `.appbar-sub` and both would be muted without this rule. The fix is more
-   load-bearing than when it was written, not less; only the two-colour symptom is historical.
+/* `color` is EXPLICIT, and that is a fix rather than tidying: `.brand` sits inside
+   `.appbar-sub`, which sets `color: var(--ink-soft)`, so with no colour declared here the
+   wordmark silently inherits the muted token — on the feed bar and the archive bar alike.
    Declared here rather than as an `.appbar-sub .brand h1` override so the wordmark cannot inherit a
-   container's colour again wherever it is moved next. */
+   container's colour wherever it is moved next. */
 .brand h1 { font-size: 19px; font-weight: 700; letter-spacing: -.3px; color: var(--ink); }
 
 .appbar-sub {
   display: flex;
   justify-content: space-between;
-  /* `center`, not `baseline`, since [TASK-104]: the feed's row 2 now holds the toque mark and the
+  /* `center`, not `baseline`: the feed's row 2 holds the toque mark and the
      wordmark on its left, and a mask-image span has no baseline to align the count against. */
   align-items: center;
   margin-top: 6px;
@@ -765,7 +755,7 @@ body.profile-open { overflow: hidden; }
 
 .count { font-weight: 600; color: var(--ink); }
 
-/* Mark-all-done (TASK-016) now sits in the Settings drawer as a preference row ([TASK-104]), so it
+/* Mark-all-done now sits in the Settings drawer as a preference row, so it
    takes `.pref-manage`'s layout and only tints itself: a bulk action over the whole feed should not
    read as one more navigation item. `.sub-right` went with it — the feed's row 2 is the wordmark
    and the count, and nothing else needed a wrapper.
@@ -774,17 +764,16 @@ body.profile-open { overflow: hidden; }
    source order and silently shown a button updateCount believes is hidden. */
 .btn-mark-all {
   color: var(--accent);
-  /* [BUG-106] The tint above was the ONLY thing separating this from `#btn-drawer-manage` 16px
+  /* The tint above was the ONLY thing separating this from `#btn-drawer-manage` 16px
      above it — same `.pref-manage` shape, same 14px/600 type, same trailing glyph — and
      `.pref-manage` is `padding: 0`, so the control was its bare line box: 17px measured in Chrome,
      against a 44px minimum. A slip on a 17px strip fires a bulk write over the whole feed, synced
-     everywhere, with a 5s Undo (~1.5s for a halted reader, [BUG-105]).
+     everywhere, with a 5s Undo (~1.5s for a halted reader).
      24 + 17 + 4 + 1px border = 46px.
      ⚠️ NOT SYMMETRIC, and that is the point rather than an oversight. The band a reader sees runs
      between two RULES — this `border-top` and `.pref-block`'s `border-bottom` — and the block puts
      its own `padding-bottom: 20px` between this label and that lower line. Symmetric 14/14 padding
-     therefore RENDERS off-centre: 14px above the label, 34px below, which is what it looked like on
-     localhost (Asli, 2026-08-29: "it is closer to the top one right now and looks bad"). 24 above
+     therefore RENDERS off-centre: 14px above the label, 34px below. 24 above
      and 4 + 20 = 24 below is what actually centres it. If `.pref-block`'s padding changes, this
      number must change with it — T42 asserts the coupling so that cannot drift silently.
      ⚠️ NOT the `::before` overlay `.switch-grouping` uses (line ~2074). That restores a hit area
@@ -803,7 +792,7 @@ body.profile-open { overflow: hidden; }
 .btn-mark-all .pref-arrow { color: var(--accent); }
 .btn-mark-all:active { color: var(--accent-active); }
 
-/* ── Toast (TASK-016) ── reusable pill with one optional action; floats above the bottom nav. */
+/* ── Toast ── reusable pill with one optional action; floats above the bottom nav. */
 .toast {
   position: fixed;
   left: 50%;
@@ -812,9 +801,9 @@ body.profile-open { overflow: hidden; }
   /* Above the Settings drawer (61) AND its scrim (60), not merely above the bottom nav (50).
      At 60 this TIED with `.profile-scrim` and lost on DOM order — #toast is declared at
      index.html:291, the scrim at :323 — so the scrim laid rgba(0,0,0,.46) over every toast raised
-     while the drawer was open. Harmless for "Marked done"; not harmless for [BUG-047]'s sync notice,
+     while the drawer was open. Harmless for "Marked done"; not harmless for the sync notice,
      whose two triggers (the theme toggle and Sign out) BOTH live inside the drawer, so it was
-     dimmed every time it appeared in the flow it exists for. Found by looking, 2026-08-24 — no unit
+     dimmed every time it appeared in the flow it exists for. No unit
      test can see a stacking order. Kept below the import modal (70/71) so nothing else moves. */
   z-index: 62;
   display: flex;
@@ -833,12 +822,11 @@ body.profile-open { overflow: hidden; }
 }
 .toast.show { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
 .toast-msg { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* The one notice that is allowed more than a line ([BUG-047]). The default pill is deliberately a
+/* The one notice that is allowed more than a line. The default pill is deliberately a
    single truncated line — fine for "Marked as done", useless for a notice that has to say both what
-   pressing does AND what not pressing does. Asli's call 2026-08-23, after the one-line limit turned
-   out to be load-bearing for her "no second button" decision: the notice carries the wording that
-   decision assigns to it, or the decision is not met. Scoped to a modifier so every other toast is
-   unchanged; the pill still bounds itself with max-width. (The general fix is CHR-032.) */
+   pressing does AND what not pressing does: there is no second button, so the notice has to
+   carry that wording itself. Scoped to a modifier so every other toast is
+   unchanged; the pill still bounds itself with max-width. */
 .toast.toast-wrap { flex-direction: column; align-items: stretch; gap: 8px; }
 .toast.toast-wrap .toast-msg { white-space: normal; overflow: visible; text-overflow: clip; }
 .toast.toast-wrap .toast-action { align-self: flex-end; }
@@ -866,7 +854,7 @@ body.profile-open { overflow: hidden; }
   border-radius: 10px;
 }
 
-/* Informational skip-note (TASK-040) — softer than .feed-error: no alarm color, just muted text. */
+/* Informational skip-note — softer than .feed-error: no alarm color, just muted text. */
 .feed-note {
   max-width: 600px;
   width: calc(100% - 32px);
@@ -910,15 +898,14 @@ body.profile-open { overflow: hidden; }
 }
 
 /* ── Card ── */
-/* The `.group-grid` that sat here went with [TASK-098]: topics are cards inside `#feed` now, so they
-   inherit the feed's 600px centered column instead of needing their own. `.group-note` stays — it is
-   the capped-classify signal (criterion 13), now revealed by `renderTopicCards`. */
+/* Topics are cards inside `#feed`, so they
+   inherit the feed's 600px centered column instead of needing their own. `.group-note` is
+   the capped-classify signal, revealed by `renderTopicCards`. */
 .group-note { font-size: 12.5px; color: var(--ink-soft); max-width: 600px; width: 100%; margin: 0 auto 10px; padding: 0 16px; }
 .group-note.hidden { display: none; }
 
-/* Screen-reader-only text: in the accessibility tree, out of the visual layout. Added for
-   [TASK-101] — the deleted pill announced "Gathering the topics…" through `role="status"`, and a
-   bare ring would have left a non-sighted reader with strictly less than before. */
+/* Screen-reader-only text: in the accessibility tree, out of the visual layout. Needed because a
+   bare busy ring would leave a non-sighted reader with nothing. */
 .sr-only {
   position: absolute;
   width: 1px; height: 1px;
@@ -929,8 +916,7 @@ body.profile-open { overflow: hidden; }
   border: 0;
 }
 
-/* The busy indicator beside the grouping switch while /api/group runs ([TASK-101], replacing
-   [TASK-073]'s `.g-spinner` inside the pill). */
+/* The busy indicator beside the grouping switch while /api/group runs. */
 .g-busy {
   flex: none;
   width: 13px; height: 13px;
@@ -941,32 +927,28 @@ body.profile-open { overflow: hidden; }
 }
 .g-busy.hidden { display: none; }
 @keyframes g-spin { to { transform: rotate(360deg); } }
-/* The trough is .45, not the .3 this first shipped with. At .3 the ring composites to roughly
+/* The trough is .45, not .3. At .3 the ring composites to roughly
    1.3:1 against `--bg` at the bottom of every cycle — visible at the peak, gone at the trough, which
-   is a slower version of the same disappearing act [BUG-095] is about. */
+   is a slower version of the disappearing act the reduced-motion rule below exists to prevent. */
 @keyframes g-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 
-/* ⚠️ [BUG-095] LIVES HERE. Do NOT "simplify" this to `animation: none`.
-   That was the previous rule, and it is the defect: killing the only motion left a ring with one
+/* ⚠️ Do NOT "simplify" this to `animation: none`.
+   Killing the only motion leaves a ring with one
    differently-coloured quarter — a shape that reads as a SPINNER — sitting perfectly still, on the
    one screen that already takes 15-20s. Dead, not calm. It reads as a hang, which is worse than no
    indicator at all, and it does so for the people who asked for the accommodation.
    The accessibility need is NO SPINNING, not NO FEEDBACK. So: the rotation goes and an opacity
    pulse takes over.
 
-   ⚠️ AND THE RING IS LEVELLED **UP**, TO `--accent`, NOT DOWN TO `--accent-soft`. The first version
-   of this fix did the latter and it was WRONG in the most embarrassing possible way — found by an
-   independent accessibility review, 2026-08-27, and confirmed by computing the ratios rather than by
-   looking. Measured against `--bg`: `--accent-soft` is **1.05:1** in light and 1.30:1 in dark, i.e.
-   three quarters of this ring were NEVER visible to anyone. The single perceivable part was the
-   `--accent` top border at 3.69:1 / 5.91:1 — and levelling down deleted exactly that. It turned
+   ⚠️ AND THE RING IS LEVELLED **UP**, TO `--accent`, NOT DOWN TO `--accent-soft`.
+   Measured against `--bg`: `--accent-soft` is **1.05:1** in light and 1.30:1 in dark, i.e.
+   three quarters of the spinning ring are not visible to anyone. The single perceivable part is the
+   `--accent` top border at 3.69:1 / 5.91:1 — and levelling down would delete exactly that, turning
    "a ring that looks frozen" into "no ring at all", for the one group of people this rule exists to
    serve. Levelling UP still destroys the differently-coloured quarter that makes the shape read as a
-   spinner, which was the real goal, and keeps the contrast.
-   [BUG-081] is the precedent for a reduced-motion accommodation working AGAINST the people it
-   exists for. This was the second instance; the version above was very nearly the third.
-   test/docs.test.mjs is the tripwire, and it did NOT catch this — a string assertion cannot see a
-   colour. It has since been tightened; it is still not a substitute for the handset walk. */
+   spinner, which is the real goal, and keeps the contrast.
+   test/docs.test.mjs is the tripwire, but a string assertion cannot see a
+   colour; it is not a substitute for looking at it on a handset. */
 @media (prefers-reduced-motion: reduce) {
   .g-busy {
     animation: g-pulse 1.6s ease-in-out infinite;
@@ -974,7 +956,7 @@ body.profile-open { overflow: hidden; }
   }
 }
 
-/* The ready note ([TASK-101]): one sentence under the switch, at the moment it blooms. */
+/* The ready note: one sentence under the switch, at the moment it blooms. */
 .toggle-note {
   position: absolute;
   top: 100%;
@@ -994,13 +976,13 @@ body.profile-open { overflow: hidden; }
   border-radius: 10px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, .10);
   /* It is an aside, not a dialog: the reader can tap straight through it to the feed underneath,
-     and it never takes focus. Criterion 8. */
+     and it never takes focus. */
   pointer-events: none;
   animation: note-in .22s ease-out;
 }
 .toggle-note.hidden { display: none; }
 
-/* KNOWN, NOT FIXED ([TASK-101] review, 2026-08-27): `.ptr` is `position: fixed; z-index: 30` and is
+/* KNOWN, NOT FIXED: `.ptr` is `position: fixed; z-index: 30` and is
    offset down by the appbar height, so a pull-to-refresh started while the note is up paints the
    throbber over it. Cosmetic, bounded by the note's six seconds, and both elements are
    `pointer-events: none`, so nothing is blocked — below /log-task's threshold, recorded here at the
@@ -1008,34 +990,18 @@ body.profile-open { overflow: hidden; }
    lowering `.ptr` is the safer half if this ever matters. */
 
 /* The caret, pointing at the SWITCH rather than at the note's own edge. The offset is MEASURED in a
-   real browser, not derived on paper, and the two disagreed: the gear renders 26px wide, not the
-   22px its `svg` rule declares (`.btn-feed-manage` adds to it), so the paper figure was 55px and the
-   real one was 53 while the gear sat to the switch's right.
-   ⚠️ RE-DERIVED FOR [TASK-104], 2026-08-29. The gear has moved to the far LEFT of row 1, so the
-   switch is now the rightmost thing on the bar and the gear + gap terms are gone: right to left from
+   real browser, not derived on paper. The switch is the rightmost thing on the bar: right to left from
    the note's shared right edge (both are at the appbar's 20px padding) it is half the 38px switch =
-   19px to its centre, less the caret's own 6px half-width, so 13px.
-   The old 53px is measured from the NOTE's right edge, not the viewport's — getting that frame
-   wrong gives 33px, which is where this was first written down and corrected before it shipped.
-   ⚠️ CORRECTED AGAIN to 12px by independent review, 2026-08-29, and this is the SAME 1px the old
-   53px carried (its own reading above records a 2px miss). An absolutely-positioned pseudo-element
+   19px to its centre, less the caret's own 6px half-width, so 13px — and then 1px less, because an
+   absolutely-positioned pseudo-element
    resolves against its ancestor's PADDING box, not its border box, and `.toggle-note` has a 1px
-   border — so the note's padding-box right is 1491, not 1492. 1491 - 1473 (switch centre) - 6 (the
-   caret's half-width) = 12. Verified live at 1512px: at 13px the delta was -1px; at 12px it is 0.
-   CONFIRMED ON A HANDSET 2026-08-29 (criterion 9), which this line spent two days saying was still
-   owed. WALKED BY ASLI on her own iPhone (a Pro Max), reading the values out of Safari's Web
-   Inspector — attribution recorded because CLAUDE.md makes the handset walk hers, and a measurement
-   with no owner is the kind of claim this file has already been wrong about twice.
-   THE WIDTHS ARE THE FACT, not the model name: the device reported 402 CSS px portrait and 874
-   landscape, and those are what the arithmetic below is checked against. A reviewer noted 402x874 is
-   narrower than a Pro Max's native 440x956 — Display Zoom would explain it — but that was not
-   confirmed and is deliberately NOT asserted here. Nothing depends on the model; everything depends
-   on the two numbers, which were read off the device. Safari: caret centre and switch centre coincide at BOTH 402px and 874px — delta 0.0,
+   border. So 12px. Verified live at 1512px: at 13px the delta was -1px; at 12px it is 0.
+   Confirmed on a handset in Safari: caret centre and switch centre coincide at BOTH 402px and 874px — delta 0.0,
    not a tolerance. The reading carries a control: forcing this rule to `right: 60px` moved the delta
    to -48.0 and restoring it returned 0.0, so the zero is a measurement rather than an instrument
    echoing a constant back. Width-independent as the arithmetic above predicts, because the note and
    the switch share the appbar's right edge — the two readings are 472px apart and identical.
-   T15 now derives 38/2 - 1 from this stylesheet instead of allowing a +/-2px window, so 13 reds. */
+   T15 derives 38/2 - 1 from this stylesheet instead of allowing a +/-2px window, so 13 reds. */
 .toggle-note::after {
   content: '';
   position: absolute;
@@ -1046,7 +1012,7 @@ body.profile-open { overflow: hidden; }
   /* The caret's FILL is the note's surface, which against `--bg` is 1.07:1 in light and 1.09:1 in
      dark — the bubble itself reads (its shadow and its text carry it) but the pointer connecting the
      sentence to the switch did not, so the alignment measured so carefully above pointed with
-     something nobody could see. Found by an independent accessibility review, 2026-08-27.
+     something nobody could see.
      `box-shadow` on `.toggle-note` is drawn on its border box and never reaches a pseudo-element;
      `drop-shadow` follows the rendered alpha, so it outlines the triangle's two upper edges and
      continues the note's own 1px border across the notch. */
@@ -1063,10 +1029,10 @@ body.profile-open { overflow: hidden; }
 }
 
 /* X posts awaiting classification are held out of the stream so they don't flash under "Posts"
-   before being grouped (TASK-073). Revealed by revealPendingText() if grouping leaves them. */
+   before being grouped. Revealed by revealPendingText() if grouping leaves them. */
 .card.grouping-pending { display: none; }
 
-/* "Topics" / "Posts" section headers (TASK-068; "Videos" until TASK-094) — small uppercase labels that pin the two
+/* "Topics" / "Posts" section headers — small uppercase labels that pin the two
    sections and hide when their section is empty. */
 .section-head {
   font-size: 12px;
@@ -1079,14 +1045,14 @@ body.profile-open { overflow: hidden; }
   margin: 8px auto 12px;
   padding: 0 16px;
 }
-/* [TASK-104] The `#videos-head { margin-top: 2px }` override is GONE. It was written for the case
-   where the head sits below the group grid — but ungrouped is the DEFAULT view ([TASK-099]), the
+/* The `#videos-head { margin-top: 2px }` override is GONE. It was written for the case
+   where the head sits below the group grid — but ungrouped is the DEFAULT view, the
    grid is hidden there, and the head was left 2px under the appbar, which is the complaint. The
    section head's own 8px applies in both views now. */
 .section-head.hidden { display: none; }
 
-/* [TASK-098] ONE STREAM. A topic is a card among the posts, always expanded: a pinned header, a
-   summary as the rail's own first slide since [TASK-107], a horizontal scroll-snap rail of the
+/* ONE STREAM. A topic is a card among the posts, always expanded: a pinned header, a
+   summary as the rail's own first slide, a horizontal scroll-snap rail of the
    topic's posts, and a 28px dot row. 530px tall so ~127px of the next card peeks — enough to show
    its title, count and first bullet. Geometry from the agreed artboards, not chosen round.
 
@@ -1117,8 +1083,7 @@ body.profile-open { overflow: hidden; }
 .topic-card .tc-count { flex: none; font-size: 12.5px; color: var(--ink-soft); white-space: nowrap; }
 .topic-card .tc-done {
   flex: none;
-  /* 44px, which is [BUG-106]'s NUMBER and not merely its lesson. This was WRITTEN at 34px under a comment
-     citing that task — the same shape as the bug itself: a control fronting a bulk mark-read at a
+  /* 44px, the minimum tap target, and not less: a control fronting a bulk mark-read must not sit at a
      target below the minimum. This one marks every post in its topic read on every device. */
   min-height: 44px;
   background: var(--accent); color: #fff; border: 1px solid var(--accent);
@@ -1127,7 +1092,7 @@ body.profile-open { overflow: hidden; }
 }
 .topic-card .tc-done:active { background: var(--accent-active); }
 
-/* [TASK-107] THE 190px IS GONE. The summary is the rail's first slide now, so it takes the slide's
+/* THE 190px IS GONE. The summary is the rail's first slide now, so it takes the slide's
    full 432px instead of a third of the card. The scroll and the fade STAY — they were the normal
    reading path at 190px and they become the exception they were always meant to be, for the rare
    summary that outgrows even 432px. `flex: 1` + `min-height: 0` is the same pair `.tc-rail` and
@@ -1151,16 +1116,16 @@ body.profile-open { overflow: hidden; }
   flex: 1; min-height: 0;
   display: flex; align-items: center; justify-content: center;
   padding: 0 14px;
-  /* `--ink-soft`, NOT `--faint`, which is what this was written with. `--faint` on `--bg` measures
+  /* `--ink-soft`, NOT `--faint`. `--faint` on `--bg` measures
      1.92:1 in the light theme and 3.70:1 in dark, against AA's 4.5:1 for 13.5px text — and this is
      the worst placement for it: when the note shows it is the ONLY content on the page the card
      opens on, and telling the reader why the page is empty is the entire point of it. The bullets it
-     stands in for use `--ink-soft`. Found by an independent review, 2026-09-08. */
+     stands in for use `--ink-soft`. */
   font-size: 13.5px; color: var(--ink-soft);
 }
 
-/* The rail reuses [TASK-037]'s mechanism verbatim — scroll-snap on x with dots synced by an
-   IntersectionObserver, and NO touch handler, which is why this task needed no new gesture code. */
+/* The rail reuses the tweet media carousel's mechanism verbatim — scroll-snap on x with dots synced by an
+   IntersectionObserver, and NO touch handler, so it needs no gesture code of its own. */
 .topic-card .tc-rail {
   flex: 1;
   min-height: 0;
@@ -1171,8 +1136,7 @@ body.profile-open { overflow: hidden; }
   scroll-snap-type: x mandatory;
   padding: 0 14px;
   scrollbar-width: none;
-  /* [TASK-037]'s `.tweet-media-carousel` carries this and the first version of this rule did not —
-     found by an independent battery checking whether "reuses the mechanism verbatim" was true of the
+  /* `.tweet-media-carousel` carries this too: "reuses the mechanism verbatim" has to be true of the
      CSS as well as the JS. Without it an iOS swipe stops dead instead of coasting. */
   -webkit-overflow-scrolling: touch;
 }
@@ -1181,25 +1145,22 @@ body.profile-open { overflow: hidden; }
   flex: 0 0 356px; max-width: 86%; scroll-snap-align: start; display: flex;
   transition: opacity .3s ease, transform .3s ease;
 }
-/* [TASK-107] SLIDE ONE — THE SUMMARY, AS ITS OWN CARD. It wears the same treatment as `.tc-post`
-   below (Asli, 2026-09-08): same surface, same 1px line, same 14px radius, so the thing you read to
+/* SLIDE ONE — THE SUMMARY, AS ITS OWN CARD. It wears the same treatment as `.tc-post`
+   below: same surface, same 1px line, same 14px radius, so the thing you read to
    decide about a topic looks like the things it describes.
 
    THE GUTTERS ARE THE WHOLE REASON THIS RULE IS SHAPED THIS WAY, and the shape is not obvious.
    `scroll-padding-left` on the rail is what makes a card possible at all: without it the rail comes
    to rest with its own 14px left padding scrolled out of view, so a bordered slide sits FLUSH against
    the topic card's edge — measured at 0px left against 14px right, which reads as a mistake rather
-   than a design. Three widths were built and measured before this one was chosen; a post-width card
-   brought back the 65px peek that was already rejected, and the naive card was the lopsided one.
+   than a design. A post-width card
+   brings back a 65px peek, and the naive card is the lopsided one.
 
    With the rail snapping past its padding, `100%` is exactly the right width — it resolves against
    the CONTENT box, which is the visible box minus both paddings, which is precisely a card with
-   matching gutters. The earlier `calc(100% + 14px)` existed to reach the right EDGE, which is what a
-   full-bleed page wants and a card does not: WITH the scroll-padding in force it costs the right
-   gutter (0px against the left's 14px), and it is the lopsided variant. The 4px of post 1 it also
-   showed belongs to the layout BEFORE the scroll-padding existed — a measurement from the first
-   variant, correct there and not here, corrected 2026-09-08 after an independent review caught it
-   standing in two records.
+   matching gutters. `calc(100% + 14px)` would reach the right EDGE, which is what a
+   full-bleed page wants and a card does not: it costs the right
+   gutter (0px against the left's 14px), and it is the lopsided variant.
 
    `margin-right: 10px` rides on top of that gap so post 1 clears the viewport entirely: 0px, not 4px.
    `max-width: none` is load-bearing and easy to miss — the base rule above caps every slide at 86%,
@@ -1207,16 +1168,15 @@ body.profile-open { overflow: hidden; }
    `column` because this slide stacks the list over its empty-state note rather than holding a post. */
 .topic-card .tc-slide.tc-summary {
   flex: 0 0 100%;
-  /* [TASK-107] THE GUTTER, AND IT BELONGS TO THIS SLIDE ALONE. A snapped slide otherwise rests with
+  /* THE GUTTER, AND IT BELONGS TO THIS SLIDE ALONE. A snapped slide otherwise rests with
      the rail's left padding scrolled out of view and sits flush against the card's edge — fine for
      bare text, wrong for a bordered card: measured at 0px left against 14px right, which reads as a
      misalignment rather than a design.
 
-     `scroll-margin-left` HERE, not `scroll-padding-left` on the rail, which is where this started.
-     The rail-level property applies to every slide, and Asli's reading of it was that a post should
-     show nothing at all to its left when you swipe to it ("i dont see the summary card on the left
-     of the post's card", 2026-09-08). Rail-level left 5px of the PREVIOUS POST showing at each snap;
-     this leaves 0px, measured, and returns the post slides to exactly what `main` does. */
+     `scroll-margin-left` HERE, not `scroll-padding-left` on the rail.
+     The rail-level property applies to every slide, and a post should
+     show nothing at all to its left when you swipe to it. Rail-level leaves 5px of the PREVIOUS
+     POST showing at each snap; this leaves 0px, measured. */
   scroll-margin-left: 14px;
   max-width: none;
   flex-direction: column;
@@ -1227,22 +1187,20 @@ body.profile-open { overflow: hidden; }
   padding: 12px 0;
   overflow: hidden;
 }
-/* A cleared post leaves the rail the way a feed card leaves the stream (Asli, 2026-08-31).
+/* A cleared post leaves the rail the way a feed card leaves the stream.
    `finishGroupCardAction` ALREADY calls `slideOutCard`, which adds `.removing` and removes the node
-   320ms later — but the reduced post deliberately carries no `.card` (criterion 7, so the badge
-   cannot count it twice), so `.card.removing` never applied and the post sat still for 320ms and
-   then blinked out. The animation was asked for by the code and never written.
+   320ms later — but the reduced post deliberately carries no `.card` (so the badge
+   cannot count it twice), so `.card.removing` never applies: without this rule the post sits still for 320ms and
+   then blinks out.
 
    MOVES ON Y, not X. `.card.removing` slides right, but the rail's own axis IS X, so the same
    animation here reads as the carousel PAGING rather than the post being cleared. Up is free: the
    rail sets `overflow-y: hidden`, so the post is CLIPPED as it lifts rather than extending
    any scroll region — which is the hazard that ruled out the horizontal slide.
 
-   ⚠️ THE FIRST VERSION OF THIS RULE WAS `scale(.97)` AND NO TRANSLATE, AND ASLI COULD NOT SEE IT.
-   A 3% shrink over 200ms is not a perceptible animation, so the post still read as blinking out —
-   the reported defect, unfixed, behind a green T33 that asserted a transform EXISTED without
-   asserting anything MOVED. The lesson is the CLAUDE.md one about a test measuring the wrong
-   quantity; T33 now requires a translate.
+   ⚠️ IT MUST TRANSLATE. A `scale(.97)` with no translate — a 3% shrink over 200ms — is not a
+   perceptible animation, so the post still reads as blinking out. T33 requires a translate, not
+   merely that a transform exists.
 
    The .3s MUST stay inside `slideOutCard`'s 320ms or the node is removed mid-animation — a coupling
    across two files that nothing else states, which is why T33 pins both halves. `.card` runs the
@@ -1263,14 +1221,11 @@ body.profile-open { overflow: hidden; }
 .topic-card .tc-link { color: var(--accent); text-decoration: none; }
 .topic-card .tc-post .actions { flex: none; }
 
-/* 28px. One dot per SLIDE since [TASK-107], so a one-post topic shows two.
+/* 28px. One dot per SLIDE, so a one-post topic shows two.
 
-   THE "Swipe →" HINT IS GONE, PROVISIONALLY — and NOT because Asli asked for it. ⚠️ MISREAD, corrected 2026-09-08. Asli's words were "no hints shown at the right... just make them all look same regardless of how many cards there are", and the author read them as a decision about the "Swipe →" LABEL. She confirmed the same day that she meant the SLIVER of the previous slide showing to the left of a post card — a different thing, already fixed separately by the summary slide's `scroll-margin-left` (0px, measured). So the removal is the author's misreading, NOT her decision, and it is PROVISIONAL: she is considering restoring it on multi-post cards and will decide after the handset walk.
-
-   What is true either way: it was the one element on the card whose presence depended on how many
-   posts a topic held, so removing it is what makes every topic card render identically, and the dots
-   now carry the "there is more sideways" cue alone. Whether that trade is right is exactly what the
-   handset walk answers. Criteria 3 and 7 are retired pending that. */
+   There is no "Swipe →" hint. It would be the one element on the card whose presence depends on how
+   many posts a topic holds, so leaving it out is what makes every topic card render identically, and
+   the dots carry the "there is more sideways" cue alone. */
 .topic-card .tc-dots { flex: none; height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 14px; }
 .topic-card .tc-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--line); transition: background .15s ease; }
 .topic-card .tc-dot.active { background: var(--accent); }
@@ -1422,7 +1377,7 @@ body.profile-open { overflow: hidden; }
   margin-bottom: 12px;
 }
 
-/* Substack card body (TASK-022): the article headline links out; the subtitle is muted. */
+/* Substack card body: the article headline links out; the subtitle is muted. */
 .substack-title {
   display: block;
   font-size: 15px;
@@ -1441,7 +1396,7 @@ body.profile-open { overflow: hidden; }
 }
 .substack-link, .substack-link:hover { color: #ff6719; } /* Substack brand orange (overrides .tweet-x) */
 
-/* Post cover image (TASK-058): a banner below the subtitle on the collapsed card, hidden on
+/* Post cover image: a banner below the subtitle on the collapsed card, hidden on
    expand (the full article leads with the same image). Styled to match .tweet-media. */
 .substack-cover {
   display: block;
@@ -1455,7 +1410,7 @@ body.profile-open { overflow: hidden; }
 }
 .substack-cover[hidden] { display: none; } /* display:block above would otherwise override [hidden] */
 
-/* In-app reader (TASK-059): one preview paragraph, then "…read more" expands the full post. */
+/* In-app reader: one preview paragraph, then "…read more" expands the full post. */
 .substack-reader { margin-bottom: 12px; }
 .substack-preview {
   font-size: 14px;
@@ -1549,7 +1504,7 @@ body.profile-open { overflow: hidden; }
 
 .btn-done svg { width: 15px; height: 15px; flex-shrink: 0; }
 
-/* Archive ("save for later") — secondary action beside the primary Done (TASK-008) */
+/* Archive ("save for later") — secondary action beside the primary Done */
 .btn-archive {
   border: 1px solid var(--line);
   border-radius: var(--radius-btn);
@@ -1568,7 +1523,7 @@ body.profile-open { overflow: hidden; }
 .btn-archive:active { background: var(--press); color: var(--ink); }
 .btn-archive svg { width: 15px; height: 15px; flex-shrink: 0; }
 
-/* Bottom nav — Feed / Archive (TASK-008). Fixed to the bottom on the feed-side views. */
+/* Bottom nav — Feed / Archive. Fixed to the bottom on the feed-side views. */
 .bottom-nav {
   position: fixed;
   left: 0; right: 0; bottom: 0;
@@ -1596,12 +1551,12 @@ body.profile-open { overflow: hidden; }
 .nav-tab svg { width: 22px; height: 22px; }
 .nav-tab.is-active { color: var(--accent); }
 
-/* Archive empty state (TASK-008) */
+/* Archive empty state */
 .archive-empty { text-align: center; padding: 60px 28px; color: var(--ink-soft); }
 .archive-empty h2 { font-size: 17px; color: var(--ink); margin-bottom: 8px; }
 .archive-empty p { font-size: 14px; line-height: 1.5; }
 
-/* Caught-up → Archive nudge link (TASK-008) */
+/* Caught-up → Archive nudge link */
 .archive-nudge {
   border: none;
   background: transparent;
@@ -1667,13 +1622,10 @@ body.profile-open { overflow: hidden; }
 
 /* ── Feed app bar manage button ── */
 .btn-feed-manage {
-  /* `margin-left: auto` is deliberately ABSENT here. Removed for [TASK-099] because the feed's gear
-     then sat inside `.appbar-actions`, which carried the auto margin for that whole group.
-     ⚠️ REWRITTEN FOR [TASK-104], 2026-08-29 — the old wording described a structure that no longer
-     exists and was the only thing stopping someone restoring this property. NEITHER user is inside
-     `.appbar-actions` now, and neither needs an auto margin: BOTH gears are direct children of an
+  /* `margin-left: auto` is deliberately ABSENT here. NEITHER gear is inside
+     `.appbar-actions`, and neither needs an auto margin: BOTH are direct children of an
      `.appbar-controls` row that pins them left with `justify-content: space-between` (the archive
-     bar was brought into the same shape on 2026-08-29).
+     bar has the same shape as the feed bar).
      Do not put it back on the shared class: `.appbar-controls` would then hold an auto margin on its
      first child, which consumes the free space BEFORE `justify-content` can distribute it. */
   background: none;
@@ -1728,7 +1680,7 @@ body.profile-open { overflow: hidden; }
    scrolled to the end the row sits in its own place. The background and the fade are the PAGE colour, so they
    are invisible when the row is not pinned; if setup ever gets its own background they show as a band. No
    z-index: the row covers earlier panel content by DOM order, so anything positioned placed AFTER it in the
-   panel would paint over it. [BUG-126] */
+   panel would paint over it. */
 .confirm-actions {
   display: flex;
   gap: 8px;
@@ -1827,7 +1779,7 @@ body.profile-open { overflow: hidden; }
 /* Keyword filter now lives in the confirm step (pick channel, then filter) */
 .confirm-keyword { margin-bottom: 14px; }
 
-/* Keyword filter chips input (TASK-044) — used in the add flow (#keyword-chips) and the
+/* Keyword filter chips input — used in the add flow (#keyword-chips) and the
    inline channel editor (.ch-edit-chips). Reads like the text inputs above, but wraps pills. */
 .chips-input {
   display: flex;
@@ -1885,7 +1837,7 @@ body.profile-open { overflow: hidden; }
   outline: none;
   background: transparent;
   padding: 5px 3px;
-  font-size: 16px;  /* the 16px floor — see .add-form input [BUG-125] */
+  font-size: 16px;  /* the 16px floor — see .add-form input */
   color: var(--ink);
 }
 .chips-text::placeholder { color: var(--faint); }
@@ -2037,7 +1989,7 @@ body.profile-open { overflow: hidden; }
    that opens just below it. #ptr lives at body level — outside the transformed
    #feed-body — so its position stays independent of the pull; JS offsets it down
    by the appbar height. `.snapping` animates the spring-back and the hold-open. */
-.feed-body { flex: 1; display: flex; flex-direction: column; padding-bottom: 76px; } /* clear the fixed bottom nav (TASK-008) */
+.feed-body { flex: 1; display: flex; flex-direction: column; padding-bottom: 76px; } /* clear the fixed bottom nav */
 #feed-body.snapping { transition: transform .3s ease; }
 
 .ptr {
@@ -2081,7 +2033,7 @@ body.profile-open { overflow: hidden; }
 .ptr i:nth-child(12) { transform: rotate(330deg); animation-delay: 0s; }
 @keyframes ptr-fade { 0% { opacity: 1; } 100% { opacity: .15; } }
 
-/* ── Tweet card (TASK-020) ──
+/* ── Tweet card ──
    Reuses the .card shell + .chan header from the video card. The body inverts:
    the post text is the hero; media is optional and secondary. No new tokens. */
 
@@ -2110,13 +2062,13 @@ body.profile-open { overflow: hidden; }
 .tweet-text:last-child { margin-bottom: 0; }
 .tweet-text a { color: var(--accent); text-decoration: none; }
 
-/* Media below the text. Aspect ratio is clamped to [4/5, 2/1] inline per image (TASK-037), so
+/* Media below the text. Aspect ratio is clamped to [4/5, 2/1] inline per image, so
    portrait shows ~whole and one image can't dominate; hairline keeps it crisp in light. */
 .tweet-media { border-radius: 12px; overflow: hidden; margin-bottom: 12px; background: var(--media-bg); border: 1px solid var(--line); }
 .tweet-media img { display: block; width: 100%; object-fit: cover; } /* aspect-ratio set inline */
-.tweet-video { display: block; width: 100%; object-fit: cover; background: var(--media-bg); } /* aspect-ratio inline (TASK-038) */
+.tweet-video { display: block; width: 100%; object-fit: cover; background: var(--media-bg); } /* aspect-ratio inline */
 
-/* Swipeable carousel for 2–4 photos (TASK-037): one scroll-snap row; a peek + dots signal more. */
+/* Swipeable carousel for 2–4 photos: one scroll-snap row; a peek + dots signal more. */
 .tweet-media-carousel {
   display: flex; gap: 4px; overflow-x: auto; scroll-snap-type: x mandatory;
   border-radius: 12px; background: var(--media-bg); border: 1px solid var(--line);
@@ -2129,7 +2081,7 @@ body.profile-open { overflow: hidden; }
 .tweet-dot.active { background: var(--accent); }
 
 /* Quoted (referenced) tweet — a compact read-only card under the author's text/media; the whole
-   box links out to the quoted tweet on X. Text-only (quoted media isn't fetched). (TASK-034) */
+   box links out to the quoted tweet on X. Text-only (quoted media isn't fetched). */
 .tweet-quoted {
   display: block;
   border: 1px solid var(--line);
@@ -2150,7 +2102,7 @@ body.profile-open { overflow: hidden; }
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
 
-/* ── Connect YouTube: import subscriptions (TASK-015) ── */
+/* ── Connect YouTube: import subscriptions ── */
 .btn-connect-yt {
   margin-top: 10px;
   margin-bottom: 28px;
@@ -2196,7 +2148,7 @@ body.profile-open { overflow: hidden; }
 
 .import-tools { display: flex; gap: 8px; padding: 0 20px 12px; }
 .import-search {
-  flex: 1; padding: 9px 12px; font-size: 16px;  /* the 16px floor — see .add-form input [BUG-125] */
+  flex: 1; padding: 9px 12px; font-size: 16px;  /* the 16px floor — see .add-form input */
   background: var(--surface); color: var(--ink);
   border: 1px solid var(--line); border-radius: 9px;
 }
@@ -2262,25 +2214,20 @@ body.profile-open { overflow: hidden; }
 }
 
 
-/* ── The grouped-view switch ([TASK-099]) ─────────────────────────────────────
+/* ── The grouped-view switch ─────────────────────────────────────
    Ungrouped is the default, so this is how the reader discovers grouping exists at all.
-   SINCE [TASK-104] it sits at the RIGHT of `.appbar-controls` (row 1), with the gear opposite it on
-   the left — not in the brand row, and no longer left of the gear. The original note that
-   `.appbar-sub` was measured not to fit it at 375px still stands, and row 2 now carries the wordmark
-   and the count instead. */
+   It sits at the RIGHT of `.appbar-controls` (row 1), with the gear opposite it on
+   the left — not in the brand row. `.appbar-sub` was measured not to fit it at 375px, and row 2
+   carries the wordmark and the count instead. */
 /* The ARCHIVE appbar has no `.appbar-actions` — the switch is feed-only, because there is no
    grouping on the archive screen.
-   ⚠️ `#btn-archive-manage { margin-left: auto }` IS GONE ([TASK-104], 2026-08-29). It existed only
-   because that gear was a direct child of `.brand`, a flex row with no `justify-content`, so it
-   needed its own auto margin to reach the right edge. The archive bar now uses the same
-   `.appbar-controls` row as the feed and its gear belongs on the LEFT — and an auto margin left in
-   place would have pushed it straight back to the right, so the markup change would have looked
-   applied while the screen was unchanged. Pinned by test/appbar.test.mjs T24. */
+   ⚠️ There is NO `#btn-archive-manage { margin-left: auto }`. The archive bar uses the same
+   `.appbar-controls` row as the feed and its gear belongs on the LEFT — an auto margin
+   would push it straight back to the right. Pinned by test/appbar.test.mjs T24. */
 
 .appbar-actions {
-  /* No auto margin since [TASK-104]: `.appbar-controls` pins this group right with
-     `justify-content: space-between`, so the old one was inert — verified by overriding it to 0 in a
-     live page and measuring no movement. Removed rather than left as dead weight, because an auto
+  /* No auto margin: `.appbar-controls` pins this group right with
+     `justify-content: space-between`, so one would be inert — and worse than dead weight, because an auto
      margin consumes free space BEFORE `justify-content` distributes it, so a third control added to
      row 1 later would collapse against the gear instead of spacing evenly. */
   display: flex;
@@ -2305,8 +2252,8 @@ body.profile-open { overflow: hidden; }
 }
 
 /* Inert: the reader is OFF and a classify has never produced a tile, so there is nothing to switch
-   INTO. Never reached while ON — the way back out is always open ("always allow turning off", Asli
-   2026-08-27), so this rule cannot dim a switch the reader needs to escape a view with. `aria-disabled`
+   INTO. Never reached while ON — the way back out is always open,
+   so this rule cannot dim a switch the reader needs to escape a view with. `aria-disabled`
    rather than `disabled` keeps the control in the accessibility tree so its label can still be read;
    the click handler carries the real guard. */
 .switch-grouping[aria-disabled="true"] {
@@ -2317,11 +2264,8 @@ body.profile-open { overflow: hidden; }
 .switch-grouping:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 /* The bloom: three breaths of gold when topics first become showable. It says "the result is ready".
-   [TASK-099] paired it with the "Gathering the topics…" pill on the argument that "only the pill can
-   carry a sentence" — TASK-101 RE-TOOK that trade rather than dropping it, and both halves moved:
-   "work is happening" is now the `.g-busy` ring beside this switch, and the SENTENCE is
-   `.toggle-note`, raised at this same instant. Two facts still, in two places, both on the control.
-   The bloom itself is unchanged. */
+   "Work is happening" is the `.g-busy` ring beside this switch, and the SENTENCE is
+   `.toggle-note`, raised at this same instant. Two facts, in two places, both on the control. */
 .switch-grouping.is-shining { animation: shine-bloom 1.15s ease-in-out 3; }
 
 @keyframes shine-bloom {
@@ -2345,7 +2289,7 @@ body.profile-open { overflow: hidden; }
    feed cards excludes it — see updateCount / checkEmpty / updateSectionHeads / liftGroupedFromStream. */
 .card.grouped-out { display: none; }
 
-/* ── [BUG-051] The damaged-store notice ─────────────────────────────────────
+/* ── The damaged-store notice ─────────────────────────────────────
    In FLOW, not overlaid: it pushes content down rather than covering a control. Mobile-first — it
    is a single column at every width, so there is no row to wrap and nothing to reflow at 390px.
    Uses the existing danger tokens, which are defined in BOTH themes, rather than inventing a pair
@@ -2365,10 +2309,8 @@ body.profile-open { overflow: hidden; }
 }
 .damaged-notice-action {
   margin-top: 10px;
-  /* 44px, which is [BUG-106]'s NUMBER and not merely its lesson — and the same mistake this file
-     already records making once. Written at ~34px (8+8 padding on a 13px line box) under a comment
-     citing that task; found by independent review. This button is the ONLY escape from a
-     read-only app, so it is exactly the case that rule's own note says the judgement expires for. */
+  /* 44px, the minimum tap target: 8+8 padding on a 13px line box alone is ~34px.
+     This button is the ONLY escape from a read-only app, so it must not be undersized. */
   min-height: 44px;
   padding: 8px 12px;
   border: 1px solid var(--danger);
@@ -2380,11 +2322,11 @@ body.profile-open { overflow: hidden; }
   cursor: pointer;
 }
 /* `--danger-ink`, not `#fff`: white on `--danger` computes to 3.27:1 in dark theme, under AA's 4.5
-   for 13px text. Momentary, but the honest token costs nothing. (Independent review, 2026-09-10.) */
+   for 13px text. Momentary, but the honest token costs nothing. */
 .damaged-notice-action:active { background: var(--danger-bg); color: var(--danger-ink); }
 
-/* ── First-run tour ([TASK-092]) ──────────────────────────────────────────────
-   Look and numbers are mock version 2's, which Asli settled. Everything is `position: fixed` against
+/* ── First-run tour ──────────────────────────────────────────────
+   Everything is `position: fixed` against
    the viewport, because app.js places it from `getBoundingClientRect`, which is viewport-relative.
 
    THE DIM IS THE RING'S SHADOW, not a separate layer: a spread wide enough to cover any screen, so the
@@ -2409,7 +2351,7 @@ body.profile-open { overflow: hidden; }
   border: 1px solid var(--line); border-radius: 14px;
   box-shadow: var(--tour-shadow);
   padding: 13px 14px 11px; pointer-events: auto;
-  z-index: 3; /* above the blockers and the ring by declaration, not by markup order: a centred card sits under a full-screen blocker (review round 1, MED-4) */
+  z-index: 3; /* above the blockers and the ring by declaration, not by markup order: a centred card sits under a full-screen blocker */
   transition: top .28s ease, left .28s ease;
 }
 /* The caret toward the control; app.js sets which side and how far along. */
@@ -2447,7 +2389,7 @@ body.profile-open { overflow: hidden; }
 body.tour-open { overflow: hidden; }
 
 /* The ring and card JUMP instead of sliding. They still appear, and so does the dim: the tour is
-   information, not decoration ([TASK-099] criterion 11 as narrowed by [TASK-101]). */
+   information, not decoration. */
 @media (prefers-reduced-motion: reduce) {
   .tour-ring, .tour-card { transition: none; }
 }

@@ -1,17 +1,17 @@
-// Source-level guards on the two X meter queries in adminStats (CHR-072 criteria 2, 6 and 7).
+// Source-level guards on the two X meter queries in adminStats.
 //
 // WHY THIS IS A SOURCE TEST, stated plainly rather than dressed up. adminStats calls db() at module
 // scope and test-helpers/handler.mjs is a stateful fake store that throws on any query it does not
-// recognise; teaching it to EVALUATE `sum … group by` was priced during scoping and rejected as
+// recognise; teaching it to EVALUATE `sum … group by` would be
 // disproportionate for an owner-only read-only panel. So there is no behavioural test that can
-// reach these two queries, and three independent reviewers each confirmed the consequence: an
-// owner-exclusion clause, a timezone swap and a wrong-table swap all keep the suite green.
+// reach these two queries, and the consequence is that an
+// owner-exclusion clause, a timezone swap and a wrong-table swap would all keep the suite green.
 //
-// Criterion 7 does not say "the owner is included". It says "the owner account is included, AND A
-// TEST PINS THAT, so a future tidy-up toward TASK-087's exclusion rule cannot silently empty the
-// panel". A source assertion is a weaker instrument than a behavioural one — it pins the TEXT of
+// The owner account must be included, and a test must pin that, so a future tidy-up toward
+// the active-user metrics' exclusion rule cannot silently empty the
+// panel. A source assertion is a weaker instrument than a behavioural one — it pins the TEXT of
 // the query, not its result — but it is strictly stronger than the nothing that was there, and it
-// fails exactly when the tidy-up the criterion names is attempted. Replace it with a behavioural
+// fails exactly when that tidy-up is attempted. Replace it with a behavioural
 // test the day the fake store learns aggregates.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -48,7 +48,7 @@ const volume = () => query(meterBlock(), 'const volumeRows = await sql`');
 
 test('CHR-072 c2: the SPEND query reads x_posts_seen and never x_usage', () => {
   // The pure function prices whatever `spendRows` holds, so swapping the table here prices the
-  // fairness meter — ~2.8x overstated while BUG-110 is open — with every arithmetic test green.
+  // fairness meter — which overstates spend — with every arithmetic test green.
   const q = spend();
   assert.ok(q.includes('from x_posts_seen'), q);
   assert.ok(!q.includes('from x_usage'), q);
@@ -62,9 +62,9 @@ test('CHR-072 c2: the VOLUME query reads x_usage and never x_posts_seen', () => 
 });
 
 test('CHR-072 c7: the owner is INCLUDED — no exclusion clause on either meter query', () => {
-  // TASK-087 excludes the owner from the two ACTIVE-USER metrics, and this panel deliberately
+  // The two ACTIVE-USER metrics exclude the owner, and this panel deliberately
   // inverts that: before launch the owner's account is the only one with meter rows at all, so
-  // adopting the exclusion here would empty the panel this task exists to fill.
+  // adopting the exclusion here would empty the panel.
   for (const q of [spend(), volume()]) {
     assert.ok(!/<>\s*all/.test(q), `owner exclusion reached a meter query: ${q}`);
     assert.ok(!q.includes('ownerAccountIds'), q);

@@ -1,4 +1,4 @@
-// Sign in with Google (TASK-060). No npm dep — plain fetch over Google's OAuth 2.0 endpoints,
+// Sign in with Google. No npm dep — plain fetch over Google's OAuth 2.0 endpoints,
 // authorization-code flow. Accounts stay keyed on the *verified* email Google returns, so a
 // Google sign-in lands on the same account as a magic link with that email. Pure helpers here
 // (buildAuthUrl, verifiedEmail, state cookie) are unit-tested; the two network calls take an
@@ -33,7 +33,7 @@ export function buildAuthUrl({ clientId, redirectUri, state }) {
   return `${GOOGLE_AUTH_URL}?${params.toString()}`;
 }
 
-// ── Connect YouTube → import subscriptions (TASK-015) ──────────────────────────
+// ── Connect YouTube → import subscriptions ──────────────────────────
 // A separate OAuth flow from sign-in: same client, a distinct callback path, and the *sensitive*
 // youtube.readonly scope requested via incremental auth so only importers ever see it (sign-in
 // keeps GOOGLE_SCOPE). `access_type: 'online'` — the token is used once to read subscriptions and
@@ -69,7 +69,7 @@ export function verifiedEmail(userinfo) {
   return normalizeEmail(userinfo.email);
 }
 
-// Google's userinfo → { sub, email }, or null (BUG-013).
+// Google's userinfo → { sub, email }, or null.
 //
 // `sub` is the account's *identity*: unique to the Google account, never reused, and stable across
 // email changes. The email is only an *attribute* — it can be renamed upstream (Workspace/edu, or a

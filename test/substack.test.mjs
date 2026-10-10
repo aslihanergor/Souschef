@@ -80,7 +80,7 @@ test('parseSubstackFeed skips the Substack "Read more" boilerplate when building
   assert.equal(parseSubstackFeed(mk('<p>Read more</p><p>The real opener.</p>'))[0].preview, 'The real opener.');
 });
 
-// ── reader: article extraction + paywall detection (TASK-059) ─────────────────
+// ── reader: article extraction + paywall detection ─────────────────
 
 test('extractSubstackArticle returns the article body, not the page chrome', () => {
   const art = extractSubstackArticle(freeHtml);
@@ -109,7 +109,7 @@ test('isPaywalled detects the inline gate, ignoring footer subscribe widgets', (
   assert.equal(isPaywalled(freeHtml), false); // footer paywall-cta must NOT count
 });
 
-// ── stripSubstackAppendix: prune curated "Other Reading…/On X…" roundup sections (BUG-012) ──
+// ── stripSubstackAppendix: prune curated "Other Reading…/On X…" roundup sections ──
 
 const roundup =
   '<div class="available-content">' +
@@ -154,7 +154,7 @@ test('substackFeedUrl handles subdomains, custom domains, URLs, and bare names',
   assert.equal(substackFeedUrl(''), null);
 });
 
-// SSRF guard (BUG-020 vector 2): the resolver fetched substackFeedUrl(userInput) with no IP/localhost
+// SSRF guard: the resolver fetched substackFeedUrl(userInput) with no IP/localhost
 // guard, so 169.254.169.254 (cloud metadata) was fetchable. The guard now lives in substackFeedUrl,
 // so both the resolver and the feed handler inherit it.
 test('substackFeedUrl rejects IP literals and localhost as a HOST', () => {

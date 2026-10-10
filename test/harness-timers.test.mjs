@@ -2,9 +2,7 @@
 //
 // WHY THIS EXISTS. `runTimers(n)` fires every pending timer whatever its `ms`, so nothing built on
 // it can tell an 8s bound from a 0s one, and calling it before a short operation completes
-// MANUFACTURES a timeout. A driver that models delay was built once during [BUG-047] round 6, was
-// cut with the change that needed it, and its only copy — an uncommitted file in a review worktree —
-// was destroyed on 2026-08-27. This is the re-derivation.
+// MANUFACTURES a timeout. This driver models delay.
 //
 // It is a SECOND driver, not a replacement: 38 call sites across six files depend on runTimers'
 // fire-everything semantics, and quietly changing those would be a silent rewrite of what they pin.

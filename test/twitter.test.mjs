@@ -78,9 +78,9 @@ test('parseTweets carries type + dims; video uses preview_image_url (TASK-037)',
   assert.equal(items[0].url, 'https://x.com/someone/status/1');
 });
 
-// ── parseTweets video/GIF playback — TASK-038 ─────────────────────────────────────────────
+// ── parseTweets video/GIF playback ────────────────────────────────────────────────────────
 // A video/animated_gif media item gains a `videoUrl`: the mp4 variant nearest the target
-// bitrate (~832k). Photos carry no videoUrl. Shapes mirror the live probe (2026-07-05).
+// bitrate (~832k). Photos carry no videoUrl. Shapes mirror a live API probe.
 
 test('parseTweets picks the ~832k mp4 variant as videoUrl for a video (TASK-038)', () => {
   const json = {
@@ -135,8 +135,8 @@ test('parseTweets returns [] when there are no tweets', () => {
   assert.deepEqual(parseTweets({}), []);
 });
 
-// ── parseTweets text pipeline — Cluster A (036 strip t.co / 033 note_tweet / 035 urls) ────
-// Shapes mirror the live probe (2026-07-05): a media t.co is an entities.urls entry WITH a
+// ── parseTweets text pipeline (strip t.co / note_tweet / urls) ────────────────────────────
+// Shapes mirror a live API probe: a media t.co is an entities.urls entry WITH a
 // media_key; a real link has none and carries expanded_url + display_url.
 
 test('parseTweets strips the trailing media t.co link from text (TASK-036)', () => {
@@ -214,10 +214,10 @@ test('parseTweets yields [] urls for the captured fixture (no entities field) �
   assert.deepEqual(items[0].urls, []);
 });
 
-// ── parseTweets quoted (referenced) tweet — TASK-034 ──────────────────────────
+// ── parseTweets quoted (referenced) tweet ─────────────────────────────────────
 // A quote tweet carries referenced_tweets:[{type:'quoted', id}]; the quoted tweet is in
 // includes.tweets and its author in includes.users. We surface { text, author, url } and strip
-// the redundant quoted-status link from the main text. Shapes mirror the live probe (2026-07-05).
+// the redundant quoted-status link from the main text. Shapes mirror a live API probe.
 
 test('parseTweets surfaces a quoted tweet and strips its link from the text (TASK-034)', () => {
   const json = {
@@ -310,7 +310,7 @@ test('parseTweets emits no quoted (link kept) when the quoted author is missing 
   assert.equal(item.text, 'See this https://t.co/QUOTE');
 });
 
-// ── pageStep — incremental pagination loop control (TASK-040) ─────────────────
+// ── pageStep — incremental pagination loop control ─────────────────
 // After fetching a page: keep going only if there's a next_token AND we're under the cap;
 // flag `capped` only when we stop early WITH more still pending (older posts skipped).
 
@@ -347,8 +347,8 @@ test('xFetch returns null when no token is set (X source simply unavailable)', a
   }
 });
 
-// ── xFetch resilience: retry-with-backoff + host fallback (BUG-009) ───────────
-// A transient 5xx (e.g. BUG-008's 503) or a whole-host outage must NOT take the X
+// ── xFetch resilience: retry-with-backoff + host fallback ───────────
+// A transient 5xx or a whole-host outage must NOT take the X
 // source dark: retry the same host, then fall over to the other host. But a 4xx is a
 // real answer (bad token / no credits / no such user / rate-limit) — fail fast, no
 // retry, no double-charge. xFetch takes injectable { fetchImpl, sleep } so these
@@ -379,7 +379,7 @@ function recordingSleep() {
   return sleep;
 }
 
-const TW = 'https://api.twitter.com/2/'; // primary host (BUG-008: the stable v2 host)
+const TW = 'https://api.twitter.com/2/'; // primary host (the stable v2 host)
 const XC = 'https://api.x.com/2/';       // fallback host
 
 test('isTransient: 5xx is transient (retry/fallback); 4xx is a real answer (fail fast)', () => {

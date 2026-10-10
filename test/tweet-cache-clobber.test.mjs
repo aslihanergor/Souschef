@@ -1,15 +1,15 @@
-// [BUG-109] Parallel X channel loads clobber each other's tweetCache.
+// Parallel X channel loads clobber each other's tweetCache.
 //
 // `loadTwitterChannel` reads the whole cache object BEFORE its fetch await, then writes the whole
 // object back after. `loadFeed` runs channels through Promise.all, so every channel writes a
 // snapshot taken before any of them finished — and the last writer wins. Pre-existing, and invisible
 // for as long as every render was built from freshly fetched data.
 //
-// TASK-100 made it visible by making the cache load-bearing for what is DISPLAYED: at quota the feed
-// renders FROM the cache, so a clobbered channel contributes nothing. Found in Asli's live-verify —
+// The quota made it visible by making the cache load-bearing for what is DISPLAYED: at quota the feed
+// renders FROM the cache, so a clobbered channel contributes nothing —
 // 41 unread became 24 across one refresh with nothing archived and nothing marked done.
 //
-// B1 pins the mechanism, B2 the symptom she actually saw. Both are needed: B1 alone would keep
+// B1 pins the mechanism, B2 the symptom a user sees. Both are needed: B1 alone would keep
 // passing if the cache were written correctly but read from the wrong place, and B2 alone would not
 // say why.
 import { test } from 'node:test';
@@ -61,7 +61,7 @@ test('B1 two X channels loaded in parallel BOTH keep their cache entry', async (
 });
 
 test('B2 the unread count does not drop when a later load falls back to the cache', async () => {
-  // Asli's symptom, end to end: a good load, then a quota'd one, with nothing read or archived
+  // The symptom, end to end: a good load, then a quota'd one, with nothing read or archived
   // in between. The feed is rebuilt from the cache and must hold the same posts.
   const { app, setQuota } = boot();
   const first = await app.ctx.loadFeed();

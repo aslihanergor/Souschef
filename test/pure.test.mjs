@@ -10,7 +10,7 @@ import {
 } from '../lib/pure.js';
 import { SYNCED_KEYS } from '../api/_state.js';
 
-// app.js's pure functions, extracted so node:test can import them (TASK-081). Same file the
+// app.js's pure functions, extracted so node:test can import them. Same file the
 // browser loads — no copy to rot. These assert the OBSERVABLE contract, not the implementation.
 
 // ── esc: the HTML-escape trust primitive (used before every innerHTML) ─────────
@@ -86,7 +86,7 @@ test('foldKeywordChips returns [] for an empty filter', () => {
   assert.deepEqual(foldKeywordChips(''), []);
 });
 
-// ── matchesKeywordChips: AND within a chip, OR across chips (TASK-044) ─────────
+// ── matchesKeywordChips: AND within a chip, OR across chips ─────────
 
 test('an empty filter matches everything', () => {
   assert.equal(matchesKeywordChips('any title at all', []), true);
@@ -136,7 +136,7 @@ test('timeAgo flips buckets exactly at 60m / 24h / 7d', () => {
   assert.match(timeAgo(new Date(Date.now() - 7 * day).toISOString()), /^\d{1,2} [A-Z][a-z]{2}$/);
 });
 
-// [BUG-112] The month abbreviation has to be OURS. `toLocaleDateString` runs in the READER's
+// The month abbreviation has to be OURS. `toLocaleDateString` runs in the READER's
 // browser, so its month names come from that device's locale data: September rendered "1 Sept"
 // where every other month rendered three letters, and two devices could disagree about the same
 // post. These assert the EXACT string rather than a shape — a shape is precisely what let the
@@ -152,7 +152,7 @@ test('timeAgo renders September as Sep, not Sept', () => {
   assert.equal(timeAgo(new Date(Date.UTC(2025, 8, 1, 12)).toISOString()), '1 Sep');
 });
 
-// ── applyLookback: a newly added channel starts light (TASK-030) ───────────────
+// ── applyLookback: a newly added channel starts light ───────────────
 // Contract. With no valid addedAt: keep every item with a parseable `published` — the legacy
 // path, so channels added before this shipped are untouched. With one: keep items published at
 // or after (addedAt - 24h); if fewer than `floor` clear it, top up with the NEWEST of the rest,
@@ -249,9 +249,9 @@ test('applyLookback does not mutate the array it was given', () => {
   assert.deepEqual(ids(items), before);
 });
 
-// ── The filters' stage ORDER: keyword → lookback → hidden (TASK-030) ───────────
+// ── The filters' stage ORDER: keyword → lookback → hidden ───────────
 // The feature's correctness rests on stage 3 running LAST. These pin it. If a future edit folds
-// the hidden check into the keyword pass — the shape this code had before TASK-030 — the
+// the hidden check into the keyword pass, the
 // never-blank fallback recomputes over unhidden items only and walks backwards through the
 // backlog, one pair per visit, and the channel never finishes. That regression must fail here.
 
@@ -304,18 +304,18 @@ test('the filters leave a channel with no addedAt on the full server window', ()
   assert.deepEqual(filterFeedItems(items, legacy, new Set()).map(i => i.videoId), ['v1', 'v2', 'v3']);
 });
 
-// ── shouldShowLanding: the boot gate (TASK-084) ────────────────────────────────
-// Was an untested predicate inside app.js. TASK-084 removes "Continue without an account", so the
-// landing stops being a dismissible welcome and becomes the only way in: `landingSeen` no longer
-// participates at all. The second case below INVERTS today's behaviour and is the point of the move.
+// ── shouldShowLanding: the boot gate ────────────────────────────────
+// There is no "Continue without an account", so the
+// landing is not a dismissible welcome but the only way in: `landingSeen` does not
+// participate at all. The second case below is the point.
 
 test('shouldShowLanding: a signed-out visitor always sees it', () => {
   assert.equal(shouldShowLanding({ signedIn: false, landingSeen: false }), true);
 });
 
 test('shouldShowLanding: a signed-out visitor who dismissed it BEFORE still sees it', () => {
-  // Inverts the pre-TASK-084 behaviour, where SK.landing dismissed the wall permanently per device.
-  // Anyone who took the old skip carries landingSeen:'true' forever, so this is the upgrade path for
+  // SK.landing once dismissed the wall permanently per device.
+  // Anyone who took that old skip carries landingSeen:'true' forever, so this is the upgrade path for
   // every existing anonymous user — not a hypothetical.
   assert.equal(shouldShowLanding({ signedIn: false, landingSeen: true }), true);
 });
@@ -334,7 +334,7 @@ test('shouldShowLanding: landingSeen cannot affect the outcome, whatever it hold
   }
 });
 
-// ── exit key disposition: what sign-out and delete leave behind (BUG-017) ──────
+// ── exit key disposition: what sign-out and delete leave behind ──────
 // The bug is that leaving doesn't leave: both exits clear only SK.landing, so the next account to
 // sign in on this browser inherits the previous person's state. The policy of WHICH keys go is
 // pure and lives here; the clearing itself touches localStorage and stays on verify-by-looking.
@@ -410,13 +410,12 @@ test('every SK key in app.js has an exit disposition', () => {
   }
 });
 
-// ── sameSyncedState / canonicalJson ([BUG-047] review round 4, must-fix A) ──────────────────────
+// ── sameSyncedState / canonicalJson ──────────────────────
 //
 // The client-path tests (A1-A5 in test/sync-conflict-client.test.mjs) cover what a real boot can
 // produce. These cover the two properties a real boot CANNOT currently exercise — collectSyncedState
 // always emits exactly six keys, so no client state can put an extra key on one side — and which
-// would therefore be unfalsifiable if pinned only there. Both survived a mutation until this block
-// existed.
+// would therefore be unfalsifiable if pinned only there.
 test('sameSyncedState: a key the SERVER holds and local does not is a difference', () => {
   // The union of keys, not local's alone. Errs to "different", which is the direction that costs a
   // refusal rather than the direction that destroys the next boot's data.

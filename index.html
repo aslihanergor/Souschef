@@ -6,8 +6,8 @@
   <meta name="referrer" content="same-origin">
   <meta name="robots" content="index, follow">
 
-  <!-- Public landing / explainer (TASK-069), rebuilt as a scroll-driven dot story (TASK-091).
-       Carries JavaScript since TASK-091 — /landing.js, loaded as an EXTERNAL file because
+  <!-- Public landing / explainer: a scroll-driven dot story.
+       Carries JavaScript — /landing.js, loaded as an EXTERNAL file because
        vercel.json's script-src allows 'self' plus one hashed snippet (which lives in
        app/index.html) and no 'unsafe-inline'; an inline script here is blocked at runtime and the
        stage renders as a dead black rectangle. Pinned by test/public-landing.test.mjs.
@@ -18,7 +18,7 @@
   <title>SousChef: a feed you can finish</title>
   <meta name="description" content="SousChef is a finishable feed for the YouTube channels, X accounts and Substacks you follow. One calm, chronological feed you can actually reach the end of. No algorithm, no infinite scroll.">
 
-  <!-- Open Graph / Twitter (TASK-071: og:image is the branded card at /og-image.png). -->
+  <!-- Open Graph / Twitter (og:image is the branded card at /og-image.png). -->
   <meta property="og:title" content="SousChef: a feed you can finish">
   <meta property="og:description" content="Everything you follow, in one calm chronological feed you can actually finish. No algorithm, no infinite scroll.">
   <meta property="og:type" content="website">
@@ -464,7 +464,7 @@
     <a class="btn" href="/app">Get started</a>
   </nav>
 
-  <!-- The dot story (TASK-091). Five beats driven by scroll position; see /landing.js. -->
+  <!-- The dot story. Five beats driven by scroll position; see /landing.js. -->
   <div class="stage" id="stage">
     <div class="pin" id="pin">
       <canvas id="field" aria-hidden="true"></canvas>
@@ -520,7 +520,7 @@
                 </span>
                 <!-- A dedicated address, not a personal one: a mailto on an indexed page gets
                      scraped, and `+tag` is not protection. A forum is the better long-term home
-                     for this (TASK-093) — deferred because an empty board at launch tells a
+                     for this — deferred because an empty board at launch tells a
                      visitor nobody uses the product. Swapping this href is a one-line change. -->
                 <span class="sep">·</span>
                 <a class="tell" href="mailto:souschef.feedback@gmail.com?subject=Source%20request">Want another? Tell us →</a>

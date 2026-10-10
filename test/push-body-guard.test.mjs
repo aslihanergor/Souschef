@@ -1,12 +1,11 @@
-// [BUG-037] — `_pushNow` builds its request body OUTSIDE its try, so one malformed localStorage
+// `_pushNow` builds its request body OUTSIDE its try, so one malformed localStorage
 // value makes the push REJECT rather than return a failure. Two callers hold no handler: the
 // `schedulePush` debounce timer and `flushPush` from pagehide/visibilitychange. Sync then dies as an
 // unhandled rejection while `focus_dirty` still asserts there is un-pushed work.
 //
 // Fixture note: `SIGNED_IN`'s archive entry is a bare `{id:'a1'}` which throws in `avatarHtml` when
-// the boot lands on the ARCHIVE view ([BUG-117]). `focus_last_view: 'setup'` already prevents that,
-// so the empty-archive override below is belt-and-braces rather than load-bearing — stated because
-// the same override was justified with a false claim in BUG-051's first attempt.
+// the boot lands on the ARCHIVE view. `focus_last_view: 'setup'` already prevents that,
+// so the empty-archive override below is belt-and-braces rather than load-bearing.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp, SIGNED_IN } from '../test-helpers/app-harness.mjs';
@@ -42,7 +41,7 @@ async function watchRejections(fn) {
 }
 
 // ── c1 / c2 — the two unguarded callers ──────────────────────────────────────
-// Asserted SEPARATELY on purpose: one test cannot stand in for both, and the criterion names both.
+// Asserted SEPARATELY on purpose: one test cannot stand in for both.
 
 test('c1: the schedulePush debounce timer does not reject on a corrupt store', async () => {
   const app = await boot();
@@ -73,12 +72,10 @@ test('c2: flushPush does not reject on a corrupt store', async () => {
 
 // ── c3 — the contract every caller is written against ────────────────────────
 
-// AMENDED by [BUG-051] (Asli, 2026-09-10, asked as a named decision before the work began:
-// "yes to all five"). `r.ok === false` was true here only because the body-build THREW and no
-// request could leave. [BUG-051] downgrades a damaged-store push to events-only instead of
-// refusing it — survivor E1 measured that refusing takes such a session from 3 analytics events to
-// none — so a PUT does now go out and `ok` is legitimately true. The property this test exists for
-// is unchanged and is still asserted: pushNow RESOLVES an outcome. `confirmed` is the field callers
+// A damaged-store push is downgraded to events-only instead of being
+// refused — refusing takes such a session from 3 analytics events to
+// none — so a PUT does go out and `ok` is legitimately true. The property this test exists for
+// is that pushNow RESOLVES an outcome. `confirmed` is the field callers
 // gate destructive decisions on, and it must still be false.
 test('c3: pushNow resolves an outcome rather than rejecting', async () => {
   const app = await boot();
@@ -101,10 +98,10 @@ test('c3: pushNow resolves an outcome rather than rejecting', async () => {
 // that is the wrong way to go green here: swallowing state or draining the buffer would satisfy
 // c1-c3 and break these.
 //
-// WHAT THEY DO NOT COVER, measured by the battery (mutations/BUG-037.mjs, M05/M06): both exercise
+// WHAT THEY DO NOT COVER: both exercise
 // only the FAILED-body path, where execution returns before `confirmed` is computed or the event
-// gate is reached. So neither pins the HEALTHY-path handling of `dirty` or the buffer — M06 survives
-// the whole suite. Do not read these as coverage of those lines.
+// gate is reached. So neither pins the HEALTHY-path handling of `dirty` or the buffer.
+// Do not read these as coverage of those lines.
 
 test('c4: a push that could not build its body does not clear focus_dirty', async () => {
   const app = await boot();
@@ -116,11 +113,10 @@ test('c4: a push that could not build its body does not clear focus_dirty', asyn
     'dirty was cleared by a push that never carried state');
 });
 
-// AMENDED by [BUG-051], same authorisation as c3, and RENAMED because the old title would now be
-// false: the push DOES leave. The property is the same one — buffered analytics must never be lost
-// on a damaged store — but the mechanism that protects it flips from "nothing was sent, so nothing
-// was dropped" to "they were sent, which is why they were dropped". Asserting delivery is strictly
-// stronger than asserting the buffer stayed full: it is the difference survivor E1 names.
+// The push DOES leave. The property — buffered analytics must never be lost
+// on a damaged store — is protected not by "nothing was sent, so nothing
+// was dropped" but by "they were sent, which is why they were dropped". Asserting delivery is strictly
+// stronger than asserting the buffer stayed full.
 test('c5: buffered events are DELIVERED, not lost, when the store is damaged', async () => {
   const app = await boot();
   app.ctx.track('view', {}, 'feed');
@@ -136,10 +132,9 @@ test('c5: buffered events are DELIVERED, not lost, when the store is damaged', a
 });
 
 // ── c6 — a healthy path must be byte-identical ───────────────────────────────
-// STRENGTHENED after review (Asli, 2026-09-10: "strengthen the tests"). The original asserted a
-// SHAPE — `puts.length > 0`, a `state` key, `channels.length === 1` — while criterion 6 names
-// "same request count, same body, same headers". An independent battery reordered the body's keys
-// and no test in 1149 noticed, so the wire bytes were pinned by nothing.
+// Asserting a SHAPE — `puts.length > 0`, a `state` key, `channels.length === 1` — is not enough:
+// the requirement is "same request count, same body, same headers", and reordering the body's keys
+// would pass a shape check. So the wire bytes are pinned exactly.
 
 test('c6: a healthy push is unchanged — exact count, exact wire bytes, exact headers', async () => {
   const app = await boot();
@@ -171,19 +166,17 @@ test('c6: a healthy push is unchanged — exact count, exact wire bytes, exact h
 });
 
 // ── c7 — the exit path must NOT move ─────────────────────────────────────────
-// STRENGTHENED after review. The original could not observe this change AT ALL, and two reviewers
-// found it independently. `nothingToSave = !_statePending() && !_hasUserData(collectSyncedState())`
+// The fixture needs the dirty flag. `nothingToSave = !_statePending() && !_hasUserData(collectSyncedState())`
 // SHORT-CIRCUITS: with no dirty flag, `collectSyncedState()` is never evaluated there and signOut
-// throws before it ever reaches `pushNow`. The original fixture was exactly that sub-case — so it
-// exercised none of the changed code, asserted no toast, and passed unmodified on `main`. Blinding
-// the guard at app.js:2644 was killed by 12 pre-existing sign-out tests and NOT by c7.
+// throws before it ever reaches `pushNow`. A fixture in that sub-case
+// exercises none of the guarded code.
 //
 // Both sub-cases are now covered, because which one runs is decided by a flag the test must set.
 
 test('c7a: signOut with un-pushed work reaches the changed code and still refuses', async () => {
   const app = await boot();
   app.set('focus_channels', CORRUPT);
-  app.ctx.schedulePush();                     // sets focus_dirty — the state BUG-037 leaves behind
+  app.ctx.schedulePush();                     // sets focus_dirty — the state a rejected push leaves behind
   assert.equal(app.get('focus_dirty'), '1', 'precondition: this is the branch that reaches pushNow');
   const before = statePuts(app).length;
 
@@ -193,17 +186,14 @@ test('c7a: signOut with un-pushed work reaches the changed code and still refuse
     'sign-out destroyed local data it could not read');
   assert.equal(app.navigations.length, 0,
     'sign-out navigated away on a store it could not save');
-  // AMENDED by [BUG-051] (Asli, 2026-09-10, decision 4 of five: the guard lands sign-out on the
-  // INDETERMINATE refusal rather than the wrapper catch's generic message). The requirement — the
-  // refusal must SAY so, because a silent no-op is the [BUG-017] "button looks dead" shape — is
-  // unchanged; only which true sentence the user reads has moved, from "couldn't sign out —
-  // something went wrong" to a message that names the actual reason.
-  // NARROWED after review: the first amendment accepted EITHER the new indeterminate refusal or
-  // main's old wrapper-catch generic, so it could no longer tell the two dispositions apart —
-  // widening an assertion while the comment claimed only the wording had moved.
+  // The guard lands sign-out on the
+  // INDETERMINATE refusal rather than the wrapper catch's generic message. The requirement: the
+  // refusal must SAY so, because a silent no-op makes the button look dead — and it must name
+  // the actual reason, not "couldn't sign out — something went wrong". Accepting EITHER message
+  // could not tell the two dispositions apart.
   assert.ok(app.toasts.some(t => /^Not signed out/.test(String(t))),
     `the refusal must SAY so — a silent no-op is the BUG-017 "button looks dead" shape. toasts: ${JSON.stringify(app.toasts)}`);
-  // Also amended: a push DOES reach the wire now, carrying analytics and no state. What must never
+  // A push DOES reach the wire, carrying analytics and no state. What must never
   // reach it is a `state` claim built from a store that could not be read.
   const sent = statePuts(app).slice(before).map(q => JSON.parse(q.init.body));
   assert.ok(sent.every(b => !('state' in b)),

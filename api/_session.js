@@ -1,10 +1,10 @@
-// Session resolver (TASK-025). Given the request's Cookie header, return the logged-in
+// Session resolver. Given the request's Cookie header, return the logged-in
 // account or null. Called by api/auth/me.js, api/auth/delete.js and api/state.js, and — through
-// `signedInGate` below — by api/feed.js and api/resolve-channel.js ([BUG-025]) and api/group.js ([BUG-130]). Touches the DB, so
+// `signedInGate` below — by api/feed.js and api/resolve-channel.js and api/group.js. Touches the DB, so
 // it lives outside the pure api/_auth.js. No cookie → no DB hit (anonymous fast path).
 import { hashToken, readSessionToken, isExpired } from './_auth.js';
 
-// `strict` decides what a DATABASE ERROR means to the caller ([BUG-039] review round 2).
+// `strict` decides what a DATABASE ERROR means to the caller.
 //
 // Without it this function answers null for three different things: no cookie, no matching or
 // expired session, and "the database could not be asked". The first two really are "not signed in".
@@ -13,20 +13,19 @@ import { hashToken, readSessionToken, isExpired } from './_auth.js';
 // the refusal as determinate and dropped its unsaved mark, and the change died with the page.
 //
 // The default stays lax on purpose. `/api/auth/me` and `/api/auth/delete` call this and neither would be
-// made SAFER by the difference — which is not the same as "could do nothing useful with it", the first
-// wording, and Risk 21 contradicts that one: `/api/auth/delete` would say "Your session expired" where a
+// made SAFER by the difference — which is not the same as "could do nothing useful with it":
+// `/api/auth/delete` would say "Your session expired" where a
 // strict answer could say "Could not delete right now", which is more accurate. It is not worth a
 // behaviour change on endpoints that already degrade gracefully, and that is a judgement rather than an
-// impossibility (corrected in review round 3). Only a caller that says it needs to tell them apart gets
-// to see the error. `/api/feed` was a lax caller until [BUG-025]; it and `/api/resolve-channel` now ask
+// impossibility. Only a caller that says it needs to tell them apart gets
+// to see the error. `/api/feed` and `/api/resolve-channel` ask
 // for strict through `signedInGate` below, because for them the difference decides whether to serve.
 export async function sessionAccount(sql, cookieHeader, { strict = false } = {}) {
   const raw = readSessionToken(cookieHeader);
   // The anonymous fast path returns BEFORE the database is touched, in both modes — which is why a
   // request with no cookie can be refused but can never produce a 503 FROM HERE: there is no lookup to
   // fail. `/api/state` has its own 503 for a missing store, above any lookup, so a cookie-less request
-  // to that endpoint can still see one (review round 3 — the unqualified version mattered for the
-  // production probe's wording).
+  // to that endpoint can still see one.
   if (!raw || !sql) return null;
   try {
     const rows = await sql`
@@ -39,21 +38,21 @@ export async function sessionAccount(sql, cookieHeader, { strict = false } = {})
     if (!rows.length || isExpired(rows[0].expires_at)) return null;
     return { accountId: rows[0].account_id, email: rows[0].email };
   } catch (e) {
-    if (strict) throw e;  // the caller must tell "could not check" from "no session" ([BUG-039])
+    if (strict) throw e;  // the caller must tell "could not check" from "no session"
     return null;          // DB blip → treat as signed-out; the client degrades gracefully
   }
 }
 
-// How long the gate waits for the session lookup before treating the store as unreachable (criterion 11).
-// The Neon driver has no timeout of its own, so without this a hanging store stalled every YouTube, Substack
-// and resolve request, which never touched the store before [BUG-025] (review round 1, M2). Three seconds
+// How long the gate waits for the session lookup before treating the store as unreachable.
+// The Neon driver has no timeout of its own, so without this a hanging store stalls every YouTube, Substack
+// and resolve request. Three seconds
 // clears a cold Neon start — 1540 ms measured from a laptop, further from Neon than Vercel is — and the
 // client's own 2.5 s /api/auth/me bound puts it in the same range. The abandoned query is not cancelled.
 export const SESSION_CHECK_TIMEOUT_MS = 3000;
 
-// The signed-in gate ([BUG-025]) for the endpoints that spend money or a shared quota on every request:
+// The signed-in gate for the endpoints that spend money or a shared quota on every request:
 // `/api/feed` (X posts at $0.005 each; YouTube's daily units) and `/api/resolve-channel` (X user reads at
-// $0.010; YouTube's 100 searches a day) — and, since [BUG-130], `/api/group` (a Claude call per request).
+// $0.010; YouTube's 100 searches a day) — and `/api/group` (a Claude call per request).
 // Three answers:
 //
 //   { account }         a session the store confirmed                   → serve, as that account
@@ -63,15 +62,15 @@ export const SESSION_CHECK_TIMEOUT_MS = 3000;
 // UNVERIFIED IS NOT "SERVE". It covers ANY failure to get an answer — a Neon blip, but also a wrong or rotated
 // DATABASE_URL, a rate limit, an exhausted compute quota, a hang — and for as long as that lasts it is reached
 // by anyone who sends a `focus_session` cookie of ANY value, forged ones included, because a cookie is what
-// sends the request to the store at all. So callers split by cost (decision B, Asli 2026-09-13: "ok go ahead
-// with B and round 2"): YouTube and Substack are served — they spend quota, not money, and refusing them would
+// sends the request to the store at all. So callers split by cost:
+// YouTube and Substack are served — they spend quota, not money, and refusing them would
 // blank every signed-in feed during an outage — while the X paths refuse with 503, since the account X would
 // be billed and metered against is exactly what is unknown. `/api/group` has no free branch, so it refuses
-// every unverified request with 503. The first version of this comment said the gate
-// "cannot serve a stranger" during a store failure; that was false (review round 1, M1).
+// every unverified request with 503. The gate therefore CAN serve a stranger (YouTube and Substack
+// only) during a store failure.
 //
 // A request with NO cookie never reaches the store: `sessionAccount` returns null first, so it is refused even
-// mid-outage, without waiting. A MISSING store is a refusal by that same early return (To-be 4, "yes to 4"): a
+// mid-outage, without waiting. A MISSING store is a refusal by that same early return: a
 // deployment without DATABASE_URL cannot sign anyone in, and a missing env var must not reopen these endpoints.
 //
 // `strict` and the catch are the mechanism together: without `strict`, `sessionAccount` flattens a database

@@ -1,4 +1,4 @@
-/* Landing hero: the scroll-driven dot story (TASK-091).
+/* Landing hero: the scroll-driven dot story.
  *
  * Lifted from mockups/landing-redesign/souschef-landing-concept.html, which is a working prototype
  * rather than a mockup — the beat timings, the bloom sprite and the per-dot stagger are its code,
@@ -14,9 +14,7 @@
  * legible page. This script's first act is to take that back over, and it can only do so once the
  * markup it drives exists — which, last in <body>, it does.
  *
- * `defer` is omitted rather than forbidden. An earlier version of this comment claimed defer would
- * make "every visitor see a flash of the fallback state"; that was asserted, never measured, and a
- * reviewer was right that it does not follow — for a script that is already the last element in
+ * `defer` is omitted rather than forbidden: for a script that is already the last element in
  * <body>, defer changes almost nothing about when it runs.
  *
  * The five beats, and why each is shaped as it is, are documented in the brief that ships with the
@@ -52,11 +50,9 @@
   document.documentElement.classList.add("js-stage");
 
   // ── beat boundaries on scroll progress 0..1 ──────────────────
-  // Re-paced for BUG-082: the story used to spend 0.84 screen heights on an unchanging grey cloud
-  // before anything happened, and asked for 6.0 screens end to end. Reported from a phone: "the
-  // scroll amount is a bit too much before the dots turn gold." The track went 700vh -> 450vh AND
-  // the first beat moved forward — shortening alone still left the opening the longest stretch,
-  // and moving the first beat alone still asked for six screens.
+  // Paced so the story does not open on a long stretch of unchanging grey cloud: the track is
+  // 450vh AND the first beat starts early — a shorter track alone leaves the opening the longest
+  // stretch, and an early first beat alone still asks for six screens.
   var SELECT = [0.05, 0.19];   // dots light up in place
   var QUEUE  = [0.21, 0.37];   // column forms, greys leave
   // 0.37 → 0.485 is a deliberate hold: the column has to exist long enough to be
@@ -91,7 +87,7 @@
     return c;
   }
 
-  // ── The field's IDENTITY, drawn once and never again (BUG-079) ──
+  // ── The field's IDENTITY, drawn once and never again ──
   //
   // WHICH dot this is — its angle, its distance from centre, its size, how it wobbles — is a
   // property of the field. WHERE it lands on screen is a property of the viewport. layout()
@@ -126,7 +122,7 @@
   function layout() {
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-    // Measure the box we actually draw into, not the window (BUG-079, second half). #field is
+    // Measure the box we actually draw into, not the window. #field is
     // `position: absolute; inset: 0` inside .pin, and .pin is `height: 100vh` — which on iOS
     // resolves to the LARGE viewport and does NOT change when the URL bar shows or hides, while
     // window.innerHeight does, by 7-12%. Measuring the window therefore rescaled every dot's
@@ -305,10 +301,10 @@
     // On a narrow screen the SUBHEAD steps back so the phone owns the view — and then comes back as
     // the feed empties, finishing exactly as the daylight starts.
     //
-    // The variable is still set on `.copy` and inherits, but only `.sub` spends it (BUG-085). It
+    // The variable is still set on `.copy` and inherits, but only `.sub` spends it. It
     // used to be `.copy` itself, which wraps the headline and the CTA as well, and that cost two
     // separate defects: the button — the page's ONE conversion path — rendered at 0.26 on every
-    // phone for the entire beat that exists to convert (round-1 H1, found by two reviewers), and
+    // phone for the entire beat that exists to convert, and
     // the headline's third clause lit at p=0.60 *inside* the fade, so all nine words dimmed
     // together instead and the third beat was never seen at all. The return below is what fixed the
     // first; moving the opacity off `.copy` is what fixed the second. Pinned by
@@ -330,7 +326,7 @@
     // Counting UP while the feed fills, DOWN while it empties. Saying "2 left"
     // mid-pour reads as "only 2 exist" when four more are still on the way.
     //
-    // `left || NPOST` covers the gap the old three-way form left open (round-1 M1): the pour starts
+    // `left || NPOST` covers the gap a three-way form leaves open: the pour starts
     // at FLY[0] but the first post does not land until 0.652, so between them `left` is legitimately
     // 0 while the promise still stands — and the phone is fully opaque throughout, so the visitor
     // watched "6 new" fall to "0 new" over an empty feed and climb back. It also drops a hardcoded
@@ -344,7 +340,7 @@
     daylight.style.opacity = lift.toFixed(3);
     daylight.style.setProperty("--lr", (lift * 128).toFixed(1));
 
-    // TASK-091: the page's one CTA, arriving with the daylight rather than at a fixed
+    // The page's one CTA, arriving with the daylight rather than at a fixed
     // scroll point — it belongs to the moment the argument lands, not to a position.
     stageCta.classList.toggle("on", lift > 0.12);
 
@@ -357,7 +353,7 @@
   }
 
   // ── The frame loop ───────────────────────────────────────────
-  // TASK-091. The prototype re-requested a frame unconditionally, which was invisible there
+  // The prototype re-requested a frame unconditionally, which was invisible there
   // because the brief sat below the stage and nobody scrolled past it. Here the loop would run at
   // 60fps for as long as the tab is open.
   //
@@ -380,7 +376,7 @@
 
   // +0.01 for the boundary itself, so the last flight frame is not clipped.
   //
-  // `reduced` short-circuits it entirely (round-1 H2). Only the dots animate under their own steam,
+  // `reduced` short-circuits it entirely. Only the dots animate under their own steam,
   // and their whole time dependence is the per-dot wobble — which is 0 under reduced motion. So
   // every frame paints identical pixels and the loop is pure waste, on the one setting that has
   // explicitly asked for less of it. Scroll still repaints via request(); the still frames advance.
@@ -389,9 +385,9 @@
   function at() {
     var p = progress();
     if (!reduced) return p;
-    // Snap to beat centres: the same story, told in still frames. Re-derived when the beats moved
-    // for BUG-082 — a stop that no longer sits on a beat centre snaps the reduced-motion visitor to
-    // a position that is not a moment in the story, which is worse than the pacing it replaced.
+    // Snap to beat centres: the same story, told in still frames. Re-derive these whenever the beats
+    // move — a stop that no longer sits on a beat centre snaps the reduced-motion visitor to
+    // a position that is not a moment in the story.
     var stops = [0.02, 0.12, 0.29, 0.43, 0.57, 0.78, 0.96];
     var best = stops[0];
     for (var i = 0; i < stops.length; i++) if (Math.abs(stops[i] - p) < Math.abs(best - p)) best = stops[i];

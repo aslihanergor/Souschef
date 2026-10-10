@@ -1,22 +1,22 @@
-// [TASK-098] — ONE STREAM. A TOPIC IS A CARD AMONG THE POSTS.
+// ONE STREAM. A TOPIC IS A CARD AMONG THE POSTS.
 //
 // Today `renderGroupGrid` paints collapsed tiles into `#group-grid` above a separate `#feed`, and a
 // tile shows only a label and a count until it is tapped. A reader with 8 topics scrolls past 8
 // closed tiles to reach one post and learns nothing from them without tapping each one. The split is
 // structural cost too: the same feed is read in two places under two rules, which is where
-// [BUG-029], [BUG-092], [BUG-098] and [BUG-103] all lived.
+// several counting and routing bugs lived.
 //
 // This file pins the replacement: `#topics-head` and `#group-grid` are gone, a topic renders as an
 // always-expanded `.topic-card` INSIDE `#feed`, its posts sit on a horizontal rail as reduced cards
 // carrying Archive/Done, and the drill-in is deleted outright.
 //
 // ── THE DOM CONTRACT THESE TESTS DEFINE ──────────────────────────────────────────────────────────
-//   .topic-card[data-gid]              the card, inside #feed, WITHOUT `.card` (criterion 7)
+//   .topic-card[data-gid]              the card, inside #feed, WITHOUT `.card`
 //     .tc-label                        the topic label
 //     .tc-count                        "N posts"
 //     button.tc-done                   "Mark all done"
-//     .tc-rail > .tc-slide.tc-summary  slide one, the live summary — AMENDED BY [TASK-107], which
-//                                      moved it inside the rail and deleted its fixed 190px
+//     .tc-rail > .tc-slide.tc-summary  slide one, the live summary — it sits inside the
+//                                      rail and has no fixed 190px box
 //                > ul.tc-bullets > li  the live summary itself, no fixed height any more
 //                > .tc-empty           "No summary yet", `.hidden` unless the list painted nothing
 //            > .tc-slide[data-id]      one slide per post the count claims
@@ -28,34 +28,24 @@
 // never parses it, so a blob makes every routing decision here unassertable. Today's `.group-card`
 // is exactly such a blob, which is why its label, count, buttons and bullets are pinned by nothing.
 //
-// ── WHICH TESTS COULD RED BEFORE THE FIX ─────────────────────────────────────────────────────────
-// Stated because a merely-red suite hides the one that passed for the wrong reason (CLAUDE.md,
-// Mutation batteries). Predicted BEFORE running:
+// ── THE VACUITY TRAP ─────────────────────────────────────────────────────────────────────────────
+// T1-T13 each lead with an existence guard naming the value it read, so none of them can pass
+// vacuously against a tree where no `.topic-card` exists. That matters because three behaviours
+// hold even WITHOUT topic cards, for reasons that have nothing to do with them:
+//     - the badge reads L + G, because an assigned post is rendered into `#feed` and hidden with
+//       `.grouped-out`, so `updateCount` counts the stream once and adds `countGroupedUnread()`.
+//       What T4 pins is that it STAYS L + G once topic cards enter `#feed` — the L + 2G failure
+//       a nested card carrying `.card` would produce.
+//     - `#caughtup` stays hidden on an all-grouped feed.
+//     - grouping OFF returns every post visibly.
+//   Written without their guards, T4/T5/T11 would be green with no topic card built and pin nothing.
 //
-//   RED before the fix — ALL SIXTEEN. T1-T13 red because no `.topic-card` is ever built, and each
-//                        one leads with an existence guard naming the value it read, so none of them
-//                        can pass vacuously against a tree where the feature does not exist. T14-T16
-//                        red against the markup and the source directly.
+// The pull-to-refresh / nested-scroll arbitration IS testable here: the harness records listeners,
+// and a test can call them. `initPullToRefresh` attaches to `#view-feed`, which the harness memoises,
+// and the pull's effect is `#feed-body`'s `style.transform` — real observable output, not "was a
+// function called". T17-T19 below drive it.
 //
-//   THE VACUITY TRAP, and why every test here opens with a guard: three of these criteria are
-//   ALREADY SATISFIED by `main` for reasons that have nothing to do with this task.
-//     - criterion 5  — the badge already reads L + G today, because an assigned post is rendered
-//                      into `#feed` and hidden with `.grouped-out`, so `updateCount` counts the
-//                      stream once and adds `countGroupedUnread()`. What T4 pins is that it STAYS
-//                      L + G once topic cards enter `#feed` — the L + 2G failure a nested card
-//                      carrying `.card` would produce.
-//     - criterion 5b — `#caughtup` already stays hidden on an all-grouped feed today.
-//     - criterion 10 — grouping OFF already returns every post visibly ([TASK-099] shipped it).
-//   Written without their guards, T4/T5/T11 would be GREEN before the fix and pin nothing at all.
-//
-// ⚠️ CORRECTION, 2026-08-29. An earlier version of this header said criterion 11 (the pull-to-refresh
-// / nested-scroll arbitration) was NOT testable here, "because the harness records listeners and
-// never fires them". THE FIRST HALF IS TRUE AND THE CONCLUSION WAS WRONG: it records them, and a
-// test can call them. `initPullToRefresh` attaches to `#view-feed`, which the harness memoises, and
-// the pull's effect is `#feed-body`'s `style.transform` — real observable output, not "was a function
-// called". T17-T19 below drive it. The claim was retired by running it, not by re-reading it.
-//
-// WHAT REMAINS UNTESTABLE, and genuinely goes to Asli on a handset: whether the arbitration FEELS
+// WHAT REMAINS UNTESTABLE, and needs a person on a handset: whether the arbitration FEELS
 // right under a thumb — the thresholds, the rail's swipe, the 530px card, the 127px peek, and whether
 // the bullet fade reads as deliberate rather than broken. A test can pin WHICH gesture wins; only a
 // person can say whether the right one won.
@@ -69,7 +59,7 @@ const INDEX_HTML = fs.readFileSync(new URL('../app/index.html', import.meta.url)
 
 // RELATIVE to now, never a frozen constant: the prune treats an in-hand post older than WINDOW_DAYS
 // as evidence of a wrong device clock, so a fixed timestamp would drift a passing suite into one
-// asserting the opposite as months go by ([BUG-098] review round 1).
+// asserting the opposite as months go by.
 const PUBLISHED = Date.now() - 2 * 86400_000;
 
 const xPost = (id, text = `post ${id} says something about the topic`) => ({
@@ -77,7 +67,7 @@ const xPost = (id, text = `post ${id} says something about the topic`) => ({
   channel: { id: 'c1', name: 'X acct', handle: 'xacct', source: 'twitter' },
 });
 // Loose posts are YouTube on purpose: an unclassified X post is HELD (`.grouping-pending`) for
-// 4.4-10.3s by [TASK-073], so using X for the "L" half would make the badge arithmetic depend on a
+// 4.4-10.3s while it is classified, so using X for the "L" half would make the badge arithmetic depend on a
 // timer rather than on the criterion. A video is never groupable and never held.
 const ytPost = (id) => ({
   id, videoId: id, source: 'youtube', title: `video ${id}`, published: PUBLISHED,
@@ -135,16 +125,15 @@ const topicCards  = app => app.queryAll('#feed .topic-card');
 const cardFor     = (app, gid) => topicCards(app).find(c => c.dataset.gid === gid);
 const q           = (app, gid, sel) => app.queryAll(`#feed .topic-card[data-gid="${gid}"] ${sel}`);
 const textOf      = (app, gid, sel) => q(app, gid, sel)[0]?.textContent;
-// [TASK-107]: the rail's first slide is the SUMMARY, which carries no `data-id` — so the raw map
+// The rail's first slide is the SUMMARY, which carries no `data-id` — so the raw map
 // now leads with `undefined`. Filtered rather than re-worded: the question every caller asks is
 // "which POSTS does this rail list, in what order", and that question is unchanged.
 //
-// ⚠️ WHAT THE FILTER COSTS, stated honestly after an independent audit found the original note here
-// claiming it cost nothing. It drops only FALSY ids, so a summary that wrongly carried a `data-id`
-// is truthy, survives, and reds every ordered deepEqual on its own — that case is safe, but NOT for
-// the reason first written. What the filter genuinely hides is a summary appended in the wrong
+// ⚠️ WHAT THE FILTER COSTS. It drops only FALSY ids, so a summary that wrongly carried a `data-id`
+// is truthy, survives, and reds every ordered deepEqual on its own — that case is safe. What the
+// filter genuinely hides is a summary appended in the wrong
 // PLACE: unfiltered, a trailing `undefined` failed every ordered comparison here; filtered, only
-// TASK-107 T1 and T6 look at where the summary sits.
+// T1 and T6 look at where the summary sits.
 const railIds     = (app, gid) => q(app, gid, '.tc-slide').map(s => s.dataset.id).filter(Boolean);
 const bulletTexts = (app, gid) => [...(q(app, gid, '.tc-bullets')[0]?.children || [])].map(li => li.textContent);
 const streamIds   = app => app.el('feed').children.map(c => c.dataset.id).filter(Boolean);
@@ -154,7 +143,7 @@ const headHidden  = app => app.el('videos-head').classList.contains('hidden');
 
 // Everything a subtree renders, whichever way it was built. The harness keeps `innerHTML` as an
 // unparsed STRING, so a negative assertion that only walks `children` would be satisfied by markup
-// it never looked at — the exact blind spot CLAUDE.md names. Walk both.
+// it never looked at. Walk both.
 const deepHtml = (el) => {
   let out = `${String(el.innerHTML || '')} ${String(el.className || '')} ${String(el.textContent || '')}`;
   for (const c of el.children || []) out += ' ' + deepHtml(c);
@@ -172,7 +161,7 @@ function guardTopicCard(app, gid) {
   return card;
 }
 
-// ── criteria 1, 2: one card in the stream, always expanded ────────────────────
+// ── one card in the stream, always expanded ───────────────────────────────────
 
 test('TASK-098 T1 (C1,C2): a topic renders as one always-expanded card inside #feed', async () => {
   const app = boot({
@@ -247,7 +236,7 @@ test('TASK-098 T3 (C4): a post inside the rail renders reduced', async () => {
   await settle();
 
   guardTopicCard(app, G_AI);
-  // [TASK-107]: indexed by id rather than by position — slide 0 is the summary now. The subject of
+  // Indexed by id rather than by position — slide 0 is the summary now. The subject of
   // this test is what a POST slide renders, so it must name the post rather than take the first node.
   const slide = q(app, G_AI, '.tc-slide[data-id="x1"]')[0];
   assert.ok(slide, 'guard: the rail must hold a slide for x1');
@@ -269,7 +258,7 @@ test('TASK-098 T3 (C4): a post inside the rail renders reduced', async () => {
   assert.ok(!html.includes('new-badge'), 'no "New" badge in a rail slide');
 });
 
-// ── criteria 5, 6, 7: the counting contract ───────────────────────────────────
+// ── the counting contract ─────────────────────────────────────────────────────
 
 test('TASK-098 T4 (C5,C7): the badge reads L + G, not L + 2G, with topic cards in the stream', async () => {
   const app = boot({
@@ -284,8 +273,8 @@ test('TASK-098 T4 (C5,C7): the badge reads L + G, not L + 2G, with topic cards i
   render(app, [ytPost('v1'), ytPost('v2'), xPost('x1'), xPost('x2'), xPost('x3')]);
   await settle();
 
-  // The guard is the whole test. `main` ALREADY reads "5 new" here — 2 stream cards + 3 grouped —
-  // so without this the assertion below passes against a screen with no topic card on it at all.
+  // The guard is the whole test. The badge reads "5 new" here — 2 stream cards + 3 grouped — even
+  // with no topic cards, so without this the assertion below passes against a screen with no topic card on it at all.
   guardTopicCard(app, G_AI);
   guardTopicCard(app, G_MKT);
 
@@ -360,7 +349,7 @@ test('TASK-098 T7 (C7): neither a topic card nor its rail cards carry `.card`', 
     'and nothing anywhere in the rail may match `.card`');
 });
 
-// ── criteria 8, 9: the data-writing paths ─────────────────────────────────────
+// ── the data-writing paths ────────────────────────────────────────────────────
 
 test('TASK-098 T8 (C8): "Mark all done" marks exactly that topic, removes the card, offers Undo', async () => {
   const app = boot({
@@ -424,10 +413,8 @@ test('TASK-098 T9 (C9): Done on a rail post removes it and decrements the header
   // The dot row is a THIRD claim about the same number, and it was unpinned: the trim could pop the
   // local array and never touch the DOM, leaving a topic wearing a dot for every post it ever held.
   //
-  // [TASK-107] AMENDED BOTH, and both are requirement changes rather than accommodations. One post
-  // now means TWO slides, because slide one is the summary, so the row keeps two dots (T6). And the
-  // hint is currently gone from every card — see T3, which records that as a misreading rather than
-  // a decision, and provisional pending the handset walk.
+  // One post means TWO slides, because slide one is the summary, so the row keeps two dots (T6).
+  // And the hint is currently gone from every card — see T3, which records that as provisional.
   assert.equal(q(app, G_AI, '.tc-dot').length, 2, 'one dot per remaining SLIDE, not per slide ever');
   assert.equal(q(app, G_AI, '.tc-hint').length, 0, 'and no hint — there is no longer one to keep');
   assert.deepEqual(JSON.parse(app.get('focus_done') || '[]'), ['x1'], 'and x1 must be recorded read');
@@ -456,7 +443,7 @@ test('TASK-098 T10 (C9): the last post leaving removes the card and leaves no hi
   assert.deepEqual(streamIds(app), ['v1'], 'only the loose video remains');
 });
 
-// ── criterion 10: the toggle still works ──────────────────────────────────────
+// ── the toggle still works ────────────────────────────────────────────────────
 
 test('TASK-098 T11 (C10): turning grouping off returns every post to the stream, no reload', async () => {
   const app = boot({
@@ -481,7 +468,7 @@ test('TASK-098 T11 (C10): turning grouping off returns every post to the stream,
   assert.equal(badge(app), '3 new', 'and the badge counts each of them exactly once');
 });
 
-// ── criterion 12: the drill-in is gone ────────────────────────────────────────
+// ── the drill-in is gone ──────────────────────────────────────────────────────
 
 test('TASK-098 T12 (C12): the drill-in is deleted, with no path that can open it', async () => {
   const app = boot({
@@ -500,7 +487,7 @@ test('TASK-098 T12 (C12): the drill-in is deleted, with no path that can open it
   assert.ok(!INDEX_HTML.includes('id="group-detail"'), '#group-detail must be gone from the markup');
 });
 
-// ── criterion 13: the capped signal survives the grid ─────────────────────────
+// ── the capped signal survives the grid ───────────────────────────────────────
 
 test('TASK-098 T13 (C13): a capped classify still reaches the reader', async () => {
   const app = boot({
@@ -527,9 +514,9 @@ test('TASK-098 T14 (C13): the note no longer claims the posts are "below"', () =
     + 'interleaved in time order, so the sentence points at a layout that no longer exists');
   assert.ok(/time order|in the stream/i.test(m[1]),
     'it must say where they actually are');
-  // MEANING, not vocabulary. An independent battery inverted this sentence to "Every post WAS grouped
+  // MEANING, not vocabulary. Invert this sentence to "Every post WAS grouped
   // this time. They're in the stream, in time order." — announcing success at the exact moment
-  // grouping was truncated — and both keyword checks above passed it. Criterion 13 is about what the
+  // grouping was truncated — and both keyword checks above pass it. What matters is what the
   // reader is told, and a regex over nouns cannot see that.
   assert.ok(/weren't grouped|were not grouped|not all/i.test(m[1]),
     `the note must say some posts were NOT grouped; it reads "${m[1].trim()}"`);
@@ -564,7 +551,7 @@ test('TASK-098 T16 (C2): the accordion is gone from the codebase', () => {
 });
 
 
-// ── criterion 11: gesture arbitration ─────────────────────────────────────────
+// ── gesture arbitration ───────────────────────────────────────────────────────
 //
 // The one genuinely new interaction, and the reason the fallback exists: a vertically-scrolling
 // bullet box and a horizontally-scrolling rail, both inside a vertically-scrolling feed. Pull-to-
@@ -652,17 +639,11 @@ test('TASK-098 T19 (C11): a horizontal swipe on the rail does not pull the page'
 });
 
 test('TASK-098 T20 (C-carousel): the dots are wired to the rail\'s own slides', async () => {
-  // REGRESSION — on the branch, never in production. Written broken and caught by an independent
-  // mutation battery before the branch was pushed, by deleting the
-  // `wireCarouselDots` call and saw NOTHING fail. The cause: that function takes TWO parameters and
-  // queries hardcoded `.tweet-slide` / `.tweet-dot` ([TASK-037]'s in-tweet image carousel), so the
+  // The defect this guards: `wireCarouselDots` once took TWO parameters and queried hardcoded
+  // `.tweet-slide` / `.tweet-dot` (the in-tweet image carousel), so a
   // `'.tc-slide', '.tc-dot'` passed as a third and fourth argument were silently discarded by
   // JavaScript. Both lists came back empty, the observer watched nothing, and the first dot stayed
-  // lit forever while the reader swiped — visible on screen, invisible to 979 tests.
-  //
-  // The author's comment claimed it "reuses [TASK-037]'s mechanism verbatim". It reused the function
-  // and not the mechanism, which is exactly the kind of claim CLAUDE.md says to verify by mutation
-  // rather than by re-reading.
+  // lit forever while the reader swiped — visible on screen, invisible to every other test.
   const app = boot({
     store: {
       focus_groups: groupState({
@@ -675,7 +656,7 @@ test('TASK-098 T20 (C-carousel): the dots are wired to the rail\'s own slides', 
 
   guardTopicCard(app, G_AI);
   const slides = q(app, G_AI, '.tc-slide');
-  // [TASK-107]: four, not three — the summary is a page too. The assertions below are unchanged, and
+  // Four, not three — the summary is a page too. The assertions below are unchanged, and
   // they got STRONGER for free: "every slide must be watched" now includes the summary slide, which
   // is what makes dot 0 track it.
   assert.equal(slides.length, 4, 'guard: three posts plus the summary to page between');
@@ -691,18 +672,16 @@ test('TASK-098 T20 (C-carousel): the dots are wired to the rail\'s own slides', 
     + 'ones it missed');
 });
 
-// ── Gaps found by an INDEPENDENT mutation battery, 2026-08-29 ─────────────────────────────────────
-// 49 mutations over app.js, 35 killed and 14 survived. Each test below kills a named survivor. They
-// are here because the author's own tests could not see them — which is the entire argument for the
-// battery being written by someone with no access to the author's reasoning.
+// ── Gaps found by mutation testing ────────────────────────────────────────────────────────────────
+// Each test below pins a defect that the tests above could not see.
 
 test('TASK-098 T21 (battery G5): Undo after Mark-all brings the grouped posts back on screen', async () => {
-  // THE WORST SURVIVOR. `markAllDone` repaints (every count is 0, so every topic card is destroyed);
+  // THE WORST OF THEM. `markAllDone` repaints (every count is 0, so every topic card is destroyed);
   // only `undoMarkAll`'s own repaint rebuilds them. Drop that one line and Undo un-marks the posts in
   // storage and returns them to NOTHING on screen: their other home is a `.grouped-out` stream card
   // that stays hidden, while the badge counts them from storage. The reader sees "12 new" over twelve
   // posts visible nowhere, recoverable only by a pull-to-refresh. An exit path from a bulk write over
-  // user data, and 979 tests did not touch it — appbar's Undo guard is an UNGROUPED fixture.
+  // user data, and nothing else touches it — appbar's Undo guard is an UNGROUPED fixture.
   const app = boot({
     store: {
       focus_groups: groupState({
@@ -827,9 +806,7 @@ test('TASK-098 T25 (battery B2): a second paint does not stack duplicate topic c
 });
 
 // ── The CSS contract ─────────────────────────────────────────────────────────────────────────────
-// An independent mutation battery ran 29 mutations inside this task's CSS and **all 29 survived** —
-// while its two deliberate controls died, so the instrument was working and the gap was real. That is
-// [TASK-101]'s precedent walked into again: an author who mutates only the language he finds easiest.
+// Without these, a mutation to any of the topic card's CSS declarations passes the whole suite.
 //
 // This is a TEXT contract over `style.css`, which is weaker than rendering the page — it cannot see
 // cascade, specificity or what a browser actually computes. It is here because the alternative was
@@ -891,10 +868,9 @@ test('TASK-098 T28 (css): the header controls survive a long topic label', () =>
 
 test('TASK-098 T29 (css): the bullet box scrolls rather than silently truncating', () => {
   const bullets = cssRule('.topic-card .tc-bullets');
-  // [TASK-107] DELETED THE 190px THIS LINE USED TO ASSERT — a requirement change agreed with a user and
-  // recorded in the task, not a test bent to fit new code. The height was the defect: a third of the
-  // card spent on a box the summary was truncated inside. TASK-107 T5 now asserts its ABSENCE, so the
-  // number is still pinned — from the other side.
+  // No fixed 190px height is asserted here. The height was a defect: a third of the
+  // card spent on a box the summary was truncated inside. T5 of the summary-slide tests below asserts
+  // its ABSENCE, so the number is still pinned — from the other side.
   assert.match(bullets, /flex:\s*1/,
     'the list fills its slide instead. `flex: none` collapses it to its content and the fade lands '
     + 'mid-card, back to promising more than it shows');
@@ -906,20 +882,17 @@ test('TASK-098 T29 (css): the bullet box scrolls rather than silently truncating
     'and unprefixed too, or the cue is a webkit-only feature and Firefox gets a hard cut');
 });
 
-// ── Gaps found by ASLI'S HANDSET WALK, 2026-08-31 ─────────────────────────────────────────────────
-// The walk that criterion 11 was waiting for cleared the gesture arbitration, the rail's swipe and
-// the peek — and found two defects that 989 green tests, an independent 49-mutation battery and a
-// desktop live-verification had all passed over. Both are in the SURGICAL DOM patch
+// ── Gaps found on a real handset ──────────────────────────────────────────────────────────────────
+// Two defects that only showed on a phone. Both are in the SURGICAL DOM patch
 // `finishGroupCardAction` performs after a rail action: it updates the header count, trims the dot
 // row and drops the hint, and stops there.
 //
-// Neither test below could have been written from the old readings. The desktop check recorded
-// "dots 5→4", which is the dot COUNT and is correct; T20 asserts the observer WATCHES the slides and
-// never fires it. The question neither asks is which dot is lit afterwards.
+// The dot COUNT falling is correct and is not the question; T20 asserts the observer WATCHES the
+// slides and never fires it. The question neither asks is which dot is lit afterwards.
 
 test('TASK-098 T30 (handset): the dot row still points at the right slide after a post leaves', async () => {
-  // REGRESSION — on the branch, never in production. Asli, walking a handset: "when i mark a post
-  // done, the dot representing it below stays there". The dot COUNT does fall, which is why it reads
+  // The symptom: mark a post done and the dot representing it stays lit below. The dot COUNT does
+  // fall, which is why it reads
   // as intermittent — a glance at one topic looks right and the next looks stuck.
   //
   // The cause is a STALE CAPTURE, not a missing update. `wireCarouselDots` snapshots `slides` and
@@ -948,7 +921,7 @@ test('TASK-098 T30 (handset): the dot row still points at the right slide after 
     watching.forEach(io => io.cb([{ target, isIntersecting: true, intersectionRatio: 1 }]));
   };
 
-  // [TASK-107]: every count here gains one for the summary slide, and x2's INDEX gains one with it.
+  // Every count here gains one for the summary slide, and x2's INDEX gains one with it.
   // The defect this test pins is unchanged — a stale `slides` capture still lights the wrong dot, and
   // still by exactly one position, so the expected values below stay discriminating.
   assert.equal(q(app, G_AI, '.tc-slide').length, 4, 'guard: three posts plus the summary');
@@ -976,16 +949,15 @@ test('TASK-098 T30 (handset): the dot row still points at the right slide after 
 });
 
 test('TASK-098 T31 (handset): a bullet goes when its last post is read', async () => {
-  // REGRESSION — on the branch, never in production. Asli: "the bullet points do not go away when i
-  // mark a post done. they stay the same."
+  // The symptom: the bullet points do not go away when a post is marked done; they stay the same.
   //
   // `liveBullets` is a render-time filter and is only ever called from `buildTopicCard`, so the
   // bullets are computed once when the card paints. `finishGroupCardAction` never re-runs it, and a
   // single Done does not repaint the card — so the list goes stale until a reload, a grouping toggle
   // or a background classify happens to rebuild it. Correct, then wrong, then quietly correct again.
   //
-  // This is the behaviour the task file and `app.js`'s own bullet-builder comment already describe
-  // ("the count SHRINKS as you read"); what was missing was anything that made the claim fail.
+  // This is the behaviour `app.js`'s own bullet-builder comment describes
+  // ("the count SHRINKS as you read"); this test is what makes that claim able to fail.
   const app = boot({
     store: {
       focus_groups: groupState({
@@ -1014,11 +986,10 @@ test('TASK-098 T31 (handset): a bullet goes when its last post is read', async (
 });
 
 test('TASK-098 T33 (css): a cleared post fades out of the rail instead of blinking out', () => {
-  // Asli, on the handset: "can we add that vanishing effect that the other cards have when they are
-  // marked done to the posts inside the topics?" — and the answer was that the code already asks for
-  // it. `finishGroupCardAction` calls `slideOutCard`, which adds `.removing` and removes the node
-  // 320ms later; the rule it needs simply did not exist, because criterion 7 keeps `.card` off the
-  // reduced post on purpose and `.card.removing` therefore never reached it.
+  // A post inside a topic gets the same vanishing effect other cards have when marked done.
+  // `finishGroupCardAction` calls `slideOutCard`, which adds `.removing` and removes the node
+  // 320ms later; the rule it needs has to be its own, because the reduced post deliberately carries
+  // no `.card` and `.card.removing` therefore never reaches it.
   const slide = cssRule('.topic-card .tc-slide');
   assert.match(slide, /transition:\s*opacity[^;]*transform/,
     'the slide needs a transition at all — `.removing` on an untransitioned element is an instant '
@@ -1033,11 +1004,9 @@ test('TASK-098 T33 (css): a cleared post fades out of the rail instead of blinki
     'deliberately NOT `.card.removing`\'s horizontal slide: the rail\'s own axis is X, so a post '
     + 'sliding right reads as the carousel paging rather than the post being cleared');
 
-  // ⚠️ THIS ASSERTION EXISTS BECAUSE ITS ABSENCE SHIPPED THE BUG UNFIXED. The first version of this
-  // rule was `scale(.97)` with no translate, and this test passed — it asked whether a transform was
-  // PRESENT, never whether anything MOVED. Asli reloaded and reported "i dont see any fade", which
-  // was correct: a 3% shrink over 200ms is not a perceptible animation. Green, correct, and
-  // measuring the wrong quantity, which is the failure CLAUDE.md names by that phrase.
+  // ⚠️ A transform being PRESENT is not enough; something has to MOVE. A rule of `scale(.97)` with
+  // no translate passes a presence check, and a 3% shrink over 200ms is not a perceptible
+  // animation — green, correct, and measuring the wrong quantity.
   assert.match(removing, /translateY\(-?\d+px\)/,
     'the transform must MOVE the post, not merely scale it — a few percent of shrink is invisible '
     + 'at this size and leaves the blink the reader originally reported. Y rather than X because the '
@@ -1056,40 +1025,21 @@ test('TASK-098 T33 (css): a cleared post fades out of the rail instead of blinki
     + 'assertion is what tells you the CSS has to move with it');
 });
 
-// ══ [TASK-107] — THE SUMMARY BECOMES THE RAIL'S FIRST SLIDE ══════════════════════════════════════
+// ══ THE SUMMARY IS THE RAIL'S FIRST SLIDE ════════════════════════════════════════════════════════
 //
-// The summary stops being a fixed 190px band ABOVE the rail and becomes the rail's FIRST SLIDE, so
+// The summary is not a fixed 190px band ABOVE the rail; it is the rail's FIRST SLIDE, so
 // slide one is the bullets and slides 2..n+1 are the posts, unchanged. Card height, header and
 // "Mark all done" do not move. The bullets go from 190px to 432px and the posts from 242px to 432px.
 // Both new figures are CEILINGS, not constants: the card's content box is 528px (530 less its 2px
 // border) and the head is 68px only while the topic label fits two lines — a label that wraps to
-// four takes the rail to ~417px. Corrected from 244px and from a flat 432px by an audit, 2026-09-08.
+// four takes the rail to ~417px.
 //
-// ── THE AMENDED DOM CONTRACT ────────────────────────────────────────────────────────────────────
+// ── THE DOM CONTRACT ────────────────────────────────────────────────────────────────────────────
 //   .tc-rail > .tc-slide.tc-summary          slide one, FULL-BLEED, no data-id
 //                > ul.tc-bullets             the live summary — no fixed height any more
 //                > .tc-empty                 "No summary yet", `.hidden` unless the list is empty
 //              > .tc-slide[data-id]          one slide per post, exactly as today
 //   .tc-dots > .tc-dot                       n+1 dots, the summary's first
-//            > .tc-hint                      "Swipe →", now ALWAYS present
-//
-// ── WHICH OF THESE COULD RED BEFORE THE FIX, AND WHY ────────────────────────────────────────────
-// Predicted BEFORE running, per CLAUDE.md — a merely-red suite hides the one that passed for the
-// wrong reason. All EIGHT below appeared in the failing list by name at the RED step.
-//
-// T9 is not in this list and never went red: it was written LATER, from a defect the browser found
-// that the unit suite could not have (both children of the slide claimed `flex: 1`). It is pinned by
-// mutation instead — M22 and M23 — which is the substitute for RED, not an equal of it. T10-T14 are
-// later still, each closing a survivor an independent battery or review found; same standing.
-// Recorded because an audit found this header claiming eight when nine tests had been added.
-//   T1  n+1 slides            — today the rail holds n; the summary is a sibling band
-//   T2  n+1 dots              — today the loop runs over rail.children, which is n
-//   T3  hint at one post      — today `if (n > 1)` suppresses it outright
-//   T4  full-bleed rule       — `.tc-slide.tc-summary` does not exist in style.css at all
-//   T5  no fixed height       — today `.tc-bullets` declares `height: 190px`
-//   T6  dots after a Done     — today `while (dots.length > remaining)` trims to n, not n+1
-//   T7  hint after a Done     — today `if (remaining === 1)` removes it
-//   T8  "No summary yet"      — today an empty summary renders an empty 190px box and no note
 
 test('TASK-107 T1 (C1): the rail holds one slide per post PLUS the summary, summary first', async () => {
   const app = boot({
@@ -1147,15 +1097,12 @@ test('TASK-107 T2 (C2): the dot row gets one dot per slide, the summary\'s activ
 });
 
 test('TASK-107 T3: a one-post topic renders the same furniture as any other', async () => {
-  // AMENDED 2026-09-08, PROVISIONALLY. This asserted that "Swipe →" SHOWS at one post, which was
-  // TASK-107's own criterion 3. ⚠️ NOT ASLI'S DECISION — corrected 2026-09-08. Her words ("no hints shown at the right… just make them all look same regardless of how many cards there are") were read as being about the "Swipe →" LABEL; she confirmed the same day she meant the SLIVER of the previous slide showing left of a post card, which was already fixed separately by the summary's `scroll-margin-left`. The removal is the author's misreading and is PROVISIONAL — she may restore it on multi-post cards after the handset walk.
-  //
-  // What is true regardless: the hint was the only element whose presence depended on the post count,
+  // There is no "Swipe →" hint. It was the only element whose presence depended on the post count,
   // so it was the only thing making a one-post card look different from a three-post one, and the
-  // dots carry the sideways cue alone while it is absent.
+  // dots carry the sideways cue alone. Its removal is provisional: it may come back on multi-post
+  // cards.
   //
-  // What survives from the original is the half that was never about the hint: the carousel must be
-  // wired at one post, because there are two pages to move between.
+  // The carousel must be wired at one post, because there are two pages to move between.
   const app = boot({
     store: { focus_groups: groupState({ assignments: { x1: G_AI }, groups: { [G_AI]: AI_NEWS } }) },
   });
@@ -1176,10 +1123,9 @@ test('TASK-107 T3: a one-post topic renders the same furniture as any other', as
 });
 
 test('TASK-107 T4 (css): slide one is a card, and its gutters are what make it one', () => {
-  // AMENDED 2026-09-08, on the record. This asserted `calc(100% + 14px)` — full-bleed to the card's
-  // right EDGE. Asli then asked for the bullets to sit in their own card like a post does, and a card
-  // needs a gutter on both sides, so reaching the edge became the wrong target. Three variants were
-  // built and MEASURED at 390px before this one was chosen:
+  // The bullets sit in their own card like a post does, and a card needs a gutter on both sides,
+  // so full-bleed to the card's right EDGE (`calc(100% + 14px)`) is the wrong target. Three variants,
+  // MEASURED at 390px:
   //
   //   card, slide as-is        0px left gutter / 14px right / 4px of post 1   — lopsided
   //   card at post width       0px left / 74px right / 64px of post 1         — the rejected peek
@@ -1237,8 +1183,8 @@ test('TASK-107 T5 (C5): the bullets lose their fixed height and keep their conte
   assert.match(bullets, /-webkit-mask-image/, 'the fade is still the cue for that exceptional case');
   // AND IT MUST ACTUALLY FADE. Both mask declarations can be present with a zero-length gradient,
   // which satisfies every "the fade exists" assertion while the summary cuts dead at the boundary.
-  // Same shape as the recorded T33 defect — a transform asserted to EXIST without asserting anything
-  // MOVED. Found by an independent battery, 2026-09-08.
+  // Same shape as the T33 defect — a transform asserted to EXIST without asserting anything
+  // MOVED.
   const stop = /mask-image:\s*linear-gradient\(to bottom, #000 calc\(100% - (\d+)px\)/.exec(bullets);
   assert.ok(stop, 'guard: the gradient stop must be readable to be compared');
   assert.ok(Number(stop[1]) > 0,
@@ -1266,16 +1212,16 @@ test('TASK-107 T5 (C5): the bullets lose their fixed height and keep their conte
   assert.deepEqual(bulletTexts(app, G_AI), ['a first point about AI', 'a second point about AI'],
     'WHICH bullets show is untouched — `liveBullets` is the same filter over the same state, so '
     + '[BUG-089]\'s pruning and [BUG-091]\'s cached-bullet restore both still hold');
-  // RISK 3, checked at RED rather than assumed: `group-bullets` and `group-defer-lift` both reach the
-  // list with a CARD-SCOPED bare-class query, and CLAUDE.md records that such a query sees only
-  // elements memoised by id and their subtrees. The `ul` moves deeper into the card but stays inside
+  // Checked rather than assumed: `group-bullets` and `group-defer-lift` both reach the
+  // list with a CARD-SCOPED bare-class query, and in the harness such a query sees only
+  // elements memoised by id and their subtrees. The `ul` sits deeper in the card but stays inside
   // it, so this must still resolve — if it does not, that is a harness finding, not a test to edit.
   assert.equal([...(card.querySelectorAll('.tc-bullets')[0]?.children || [])].length, 2,
     'the card-scoped bare-class reader the other two test files use must still find the list once it '
     + 'moves inside the rail');
 
   // THE NOTE MUST BE HIDDEN HERE. An always-visible "No summary yet" under a summary that is right
-  // there is the permanently-visible element [TASK-101]'s independent battery found twice, and the
+  // there is a permanently-visible element, and the
   // toggle that prevents it is one argument at one call site.
   const empty = q(app, G_AI, '.tc-empty');
   assert.equal(empty.length, 1, 'the note exists on every summary slide — it is toggled, not built');
@@ -1309,7 +1255,7 @@ test('TASK-107 T6 (C6): a Done leaves one dot per REMAINING slide, summary inclu
   assert.deepEqual(railIds(app, G_AI), ['x2', 'x3'], 'guard: x1 must leave the rail');
   assert.equal(q(app, G_AI, '.tc-slide').length, 3, 'two posts plus the summary');
   // `railIds` filters the summary out, so ONLY this pins that it is still slide 0 after a rail
-  // action — the residual gap an audit found behind that filter. Without it, a Done that reordered
+  // action — the residual gap behind that filter. Without it, a Done that reordered
   // or re-appended the summary would pass every ordered assertion in two files.
   assert.ok(q(app, G_AI, '.tc-slide')[0].classList.contains('tc-summary'),
     'and the summary is still the FIRST page after a post leaves — the reader\'s place in the card '
@@ -1321,9 +1267,9 @@ test('TASK-107 T6 (C6): a Done leaves one dot per REMAINING slide, summary inclu
 });
 
 test('TASK-107 T7: a Done that leaves one post leaves the card looking like any other', async () => {
-  // AMENDED 2026-09-08 with T3. Its subject is unchanged and still load-bearing: `remaining === 1`
-  // used to be a branch in `finishGroupCardAction`, and a card must not restructure itself under the
-  // reader's thumb just because a Done took it down to one post. With the hint gone the observable is
+  // `remaining === 1` must not be a special branch in `finishGroupCardAction`: a card must not
+  // restructure itself under the
+  // reader's thumb just because a Done took it down to one post. With no hint the observable is
   // the dot row, which must be `remaining + 1` and carry no extra furniture.
   const app = boot({
     store: {
@@ -1385,10 +1331,8 @@ test('TASK-107 T8 (C8): unread posts with no live bullets keep slide one and say
   assert.ok(!empty[0].classList.contains('hidden'), 'and it must be visible in this state');
   // MEASURED IN CHROME: `.tc-bullets` and `.tc-empty` both carry `flex: 1`, so an empty list still
   // claims HALF the page and the note is centred in the remaining half — a quarter of the page below
-  // where it belongs, which is exact and does not move, unlike the pixel figure this comment used to
-  // quote. (It said 104px, measured before the card treatment changed the box; an independent audit
-  // measured 101.5px against the shipped layout. Both readings were real and the number was stale
-  // the moment the box changed, which is the argument for stating the ratio.) Hiding the list gives
+  // where it belongs, which is exact and does not move, unlike a pixel figure, which goes stale
+  // the moment the box changes. Hiding the list gives
   // the note the whole page — measured back to 0.0px off-centre.
   assert.ok(q(app, G_AI, '.tc-bullets')[0].classList.contains('hidden'),
     'the empty list must yield its half of the slide, or the note is centred in the bottom half of '
@@ -1446,13 +1390,9 @@ test('TASK-107 T9 (C9): a Done that empties the summary raises the note, not a b
 });
 
 
-// ── Gaps found by an INDEPENDENT mutation battery, 2026-09-08 ─────────────────────────────────────
-// 57 mutations, 41 killed, 16 survived — and EVERY survivor was in `style.css`, against an author
-// battery that had reported 27 of 28 killed. Exactly [TASK-101]'s measured pattern, repeated: the
-// author mutated the declarations he had ADDED and judged load-bearing, not every declaration in the
-// rules he had CHANGED, and never mutated the `.tc-empty` rule he wrote at all.
-//
-// These pin the survivors whose failure is invisible at desk width and ruinous on a handset, which
+// ── CSS gaps found by mutation testing ────────────────────────────────────────────────────────────
+// These pin the `style.css` declarations whose failure is invisible at desk width and ruinous on a
+// handset, which
 // is the bar `cssRule`'s own header sets. Pure appearance — where exactly the note sits inside its
 // box — stays verify-by-looking and is NOT pinned here.
 
@@ -1513,17 +1453,16 @@ test('TASK-107 T12 (css): nothing later in the file quietly outranks the summary
 });
 
 
-// ── Gaps found by an INDEPENDENT correctness review, 2026-09-08 ───────────────────────────────────
+// ── Gaps found by correctness review ──────────────────────────────────────────────────────────────
 
 test('TASK-107 T13: a rail with no post slides gets no carousel', async () => {
-  // THE PREMISE OF CRITERION 3 IS FALSE, and this is the state that proves it. The criterion reasons
-  // "a card only renders when counts[gid] > 0, so there are always at least two slides" — but
+  // "A card only renders when counts[gid] > 0, so there are always at least two slides" IS FALSE,
+  // and this is the state that proves it —
   // `counts` counts ASSIGNMENTS while a slide needs `items.get(id)` to resolve, and `items` comes
   // from `_lastFeedItems`. That is null after a caught-up boot and after a failed one (app.js:3566
   // already records the gap), so the rail can hold the summary ALONE while the header says "2 posts".
   //
-  // Unguarded that is worse than `main`: `main` painted zero dots and no hint, the new code paints a
-  // permanent "Swipe →" pointing at a page that does not exist. Reached in the real app through
+  // Unguarded, the card paints a carousel pointing at a page that does not exist. Reached in the real app through
   // Archive → Remove, which re-reveals #feed and repaints topics with no feed behind them.
   const app = boot({
     store: {
@@ -1549,14 +1488,12 @@ test('TASK-107 T13: a rail with no post slides gets no carousel', async () => {
 });
 
 test('TASK-107 T14 (css): the summary is a page the rail can actually stop on', () => {
-  // MEASURED GAP, not a hypothetical: an independent battery set `scroll-snap-align: none` on the
-  // summary slide, left every other declaration correct, and SURVIVED the whole suite. Under
-  // `scroll-snap-type: x mandatory` that makes slide one a page the rail can never rest on — the card
+  // Set `scroll-snap-align: none` on the summary slide with every other declaration correct, and
+  // under `scroll-snap-type: x mandatory` slide one is a page the rail can never rest on — the card
   // snaps straight past it to post 1 on load and the reader can never park on the summary. The
   // feature deleted outright, behind a green suite.
   //
-  // Nothing in the repo asserted `scroll-snap-align` anywhere; T27 pins `scroll-snap-type` on the
-  // rail and stopped there.
+  // T27 pins `scroll-snap-type` on the rail and stops there.
   const slide = cssRule('.topic-card .tc-slide');
   assert.match(slide, /scroll-snap-align:\s*start/,
     'the base rule is where every slide INCLUDING the summary gets its snap point — `.tc-summary` '
@@ -1569,11 +1506,11 @@ test('TASK-107 T14 (css): the summary is a page the rail can actually stop on', 
 
 
 test('TASK-107 T15: the swipe hint is gone from the code, not merely unrendered', () => {
-  // PINS THE CURRENT STATE, WHICH IS PROVISIONAL. ⚠️ NOT ASLI'S DECISION — corrected 2026-09-08. Her words ("no hints shown at the right… just make them all look same regardless of how many cards there are") were read as being about the "Swipe →" LABEL; she confirmed the same day she meant the SLIVER of the previous slide showing left of a post card, which was already fixed separately by the summary's `scroll-margin-left`. The removal is the author's misreading and is PROVISIONAL — she may restore it on multi-post cards after the handset walk.
+  // PINS THE CURRENT STATE, WHICH IS PROVISIONAL: the "Swipe →" label may come back on multi-post cards.
   //
   // It is asserted anyway because a half-removal is worse than either end state: leaving the builder
-  // or the rule behind invites the label back by accident rather than by decision. If Asli restores
-  // it on multi-post cards after the walk, this test is what has to be deliberately changed to let
+  // or the rule behind invites the label back by accident rather than by decision. If the label is
+  // restored on multi-post cards, this test is what has to be deliberately changed to let
   // that happen — which is the point.
   assert.doesNotMatch(APP_JS, /tc-hint/,
     'no builder should still construct one; `finishGroupCardAction` used to remove it too, and both '

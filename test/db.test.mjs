@@ -1,4 +1,4 @@
-// Pure helpers that answer "which database am I about to touch?" (TASK-064). The danger they
+// Pure helpers that answer "which database am I about to touch?". The danger they
 // guard against isn't a bug in a query — it's a correct query run against the wrong database.
 // Nothing here connects; these are string functions over a connection URL.
 import { test } from 'node:test';
@@ -36,7 +36,7 @@ test('isProductionDb says false for a branch, and for nothing at all', () => {
   assert.equal(isProductionDb(42), false);
 });
 
-// resolveDatabaseUrl (TASK-064). The Neon integration OWNS `DATABASE_URL` and points every Vercel
+// resolveDatabaseUrl. The Neon integration OWNS `DATABASE_URL` and points every Vercel
 // environment at production; Vercel makes integration-managed vars read-only, so we can't repoint it
 // per environment. Instead we own `DEV_DATABASE_URL` and prefer it — except in production, where
 // honouring it would be a *worse* bug than the one we're fixing (prod writing to a dev branch).
@@ -76,10 +76,9 @@ test('an unset URL is not production, but is also not a valid target', () => {
   assert.equal(dbHost(process.env.DEFINITELY_UNSET_VAR), null);
 });
 
-// scriptDatabaseTarget (CHR-016). A mutating script's `--prod` must SELECT production, not merely
+// scriptDatabaseTarget. A mutating script's `--prod` must SELECT production, not merely
 // permit it: resolveDatabaseUrl() prefers DEV_DATABASE_URL on any laptop, so a guard built on it sent
-// `--prod` to the dev branch with a normal-looking banner — twice (BUG-123's migration, BUG-055's
-// cleanup). Expected values are the fixture strings themselves, never computed through _db.js.
+// `--prod` to the dev branch with a normal-looking banner. Expected values are the fixture strings themselves, never computed through _db.js.
 const PROD_HOST = `${PRODUCTION_DB_ENDPOINT}-pooler.c-9.us-east-1.aws.neon.tech`;
 const BRANCH_HOST = 'ep-dev-branch-000000-pooler.c-9.us-east-1.aws.neon.tech';
 

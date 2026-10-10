@@ -1,4 +1,4 @@
-// The whole Connect-YouTube import flow (TASK-015) in ONE serverless function, dispatched on the
+// The whole Connect-YouTube import flow in ONE serverless function, dispatched on the
 // trailing path segment (req.query.action): /api/connect/youtube/{start,callback,result}. Collapsed
 // into a dynamic [action] route to stay under Vercel's 12-function-per-deployment ceiling; the
 // /callback path is preserved so the Google redirect URI registered in the console still matches.
@@ -30,7 +30,7 @@ async function start(req, res) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) {
     console.error('[connect/youtube/start] GOOGLE_CLIENT_ID unset');
-    return res.redirect(302, '/app?import=youtube_unavailable'); // app at /app (TASK-069)
+    return res.redirect(302, '/app?import=youtube_unavailable'); // app at /app
   }
   const { token: state } = generateToken();
   const secure = isSecureRequest(req.headers);

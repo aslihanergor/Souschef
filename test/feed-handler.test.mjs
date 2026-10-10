@@ -1,14 +1,14 @@
-// /api/feed handler tests — the X path (TASK-100).
+// /api/feed handler tests — the X path.
 //
 // FIRST handler test for this endpoint. `test/feed.test.mjs` covers the pure parsers only, so until
 // now nothing could ask what `/api/feed` does with an actual request: not which requests reach X,
 // not what a cap looks like to a caller, not whether validation happens before we spend money.
-// TASK-100 adds per-user quotas here, and a quota is unassertable without that.
+// Per-user quotas live here, and a quota is unassertable without that.
 //
 // These are CHARACTERISATION tests of the behaviour on `main` — they pin what the endpoint does
-// today, before any quota exists. F8 deliberately pins a conflation the task will CHANGE (an X
+// today, before any quota exists. F8 deliberately pins a conflation that is expected to CHANGE (an X
 // cap and a network blip are both 502 today, which is why the app tells the user "Couldn't load…
-// Try reopening the feed" and invites a retry that costs money). When criteria 9 and 10 land, F8
+// Try reopening the feed" and invites a retry that costs money). When the two are told apart, F8
 // is expected to change — and it should be changed knowingly, not discovered.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,10 +17,10 @@ import { fakeDb, fakeReq, fakeRes, fakeXFetch, xPage, xError } from '../test-hel
 
 const USER_ID = '1234567890';
 
-// Every call here is SIGNED IN ([BUG-025]). These tests characterise what the endpoint does with a
-// request it SERVES, and since BUG-025 it serves only a confirmed session — so the helper supplies one,
-// and a store for the X path to meter that account against. Nothing asserted below changed meaning
-// (Asli, 2026-09-13: "3 yes"); the signed-out behaviour lives in test/signed-in-gate.test.mjs.
+// Every call here is SIGNED IN. These tests characterise what the endpoint does with a
+// request it SERVES, and it serves only a confirmed session — so the helper supplies one,
+// and a store for the X path to meter that account against. Nothing asserted below changed meaning;
+// the signed-out behaviour lives in test/signed-in-gate.test.mjs.
 const SIGNED_IN = { accountId: 'acct-f', email: 'f@example.com' };
 
 // Build the handler over canned X pages. Returns the res so tests assert on the response, and the

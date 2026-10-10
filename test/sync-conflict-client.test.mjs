@@ -1,9 +1,9 @@
-// BUG-047 attempt 4 — the CLIENT half. Stage A: the base, and what may refresh it.
+// Sync conflicts — the CLIENT half. Stage A: the base, and what may refresh it.
 //
 // The rule the whole design hangs on: **the base is refreshed only by a pull the client actually
 // APPLIED, or a push the server actually ACCEPTED — never by a GET it merely read.** The dirty
-// branch pulls nothing, so it must not re-base; if it did it would re-arm the exact overwrite this
-// fixes, which is why criterion 4 exists and why it is mutation-verified.
+// branch pulls nothing, so it must not re-base; if it did it would re-arm the exact overwrite the
+// base exists to prevent.
 //
 // Assertions are on observable output — what the store holds, what went out on the wire — never on
 // "was this function called". Objects built inside the vm carry that realm's prototypes, so
@@ -67,7 +67,7 @@ test('C2 a boot that finds NO row stores no base', async () => {
 
 test('C3 the dirty branch pulls nothing, so it must NOT re-base', async () => {
   // Criterion 4, and the single line that would re-arm the whole bug. The row is READ here and
-  // deliberately not applied: local is ahead (BUG-015), so it is pushed instead. Re-basing from that
+  // deliberately not applied: local is ahead, so it is pushed instead. Re-basing from that
   // read would let this client overwrite a row it never looked at.
   // The PUT is made to FAIL on purpose. The dirty branch both reads and pushes, and an accepted push
   // re-bases legitimately — which overwrites the very evidence this test exists to look for. With the
@@ -81,7 +81,7 @@ test('C3 the dirty branch pulls nothing, so it must NOT re-base', async () => {
   await app.ctx.syncOnLoad();
   await settle();
   // Asserted against REV_A specifically — the value the GET carried. The dirty branch also PUSHES,
-  // and an accepted push re-bases on purpose (criterion 4's other half), so `null` is the wrong
+  // and an accepted push re-bases on purpose, so `null` is the wrong
   // assertion: it would fail for a correct implementation. What must never happen is the READ
   // becoming the base.
   assert.equal(app.get('focus_rev'), null, 'a GET that was merely READ must not become a base');
@@ -126,7 +126,7 @@ test('C6 BUG-057 — a write the server DISCARDED is not reported as saved', asy
 });
 
 test('C7 BUG-057 — dirty is CLEARED anyway, because leaving it set destroys data', async () => {
-  // The counter-intuitive half, and the measurement behind it (2026-08-23): with dirty left set, a
+  // The counter-intuitive half, and the measurement behind it: with dirty left set, a
   // later boot takes syncOnLoad's dirty branch, pushes an EMPTY blob over a row another device
   // created, and skips the pull. Replayed against the real handler that emptied a row holding
   // 1 channel + 2 done, at 200 OK, silently. `dirty` asserts "local is ahead of the server row" —
@@ -143,15 +143,13 @@ test('C7 BUG-057 — dirty is CLEARED anyway, because leaving it set destroys da
 });
 
 test('C8 the base may not outlive the data it describes', async () => {
-  // Criterion 9, as a pure invariant over the table rather than a scenario.
+  // A pure invariant over the table rather than a scenario.
   //
-  // The reason written here first was BACKWARDS and argued for the opposite of the line beneath it
-  // (review round 4, claim-verification; the same error as the one in lib/pure.js, corrected there
-  // too). "A dropped rev means an unconditional accept" is false: a write with no base can only ever
+  // "A dropped rev means an unconditional accept" is false: a write with no base can only ever
   // CREATE, so an emptied browser holding no rev is harmless. The hazard is a rev that SURVIVES and
   // still MATCHES — the exit wipes `channels` and leaves the row alone, so the stale rev is a valid,
   // current base for a row this browser has no business writing to, and the empty blob is ACCEPTED.
-  // That is [BUG-047] returning through the exit path.
+  // That is the silent overwrite returning through the exit path.
   assert.equal(EXIT_DISPOSITION.channels, 'clear', 'guard: the premise of this invariant changed');
   assert.equal(EXIT_DISPOSITION.rev, 'clear',
     'rev must not outlive the channels it is a version of');
@@ -190,8 +188,7 @@ async function halted(opts = {}) {
   await h.app.ctx.syncOnLoad();
   // Wire the controls, as a real boot does immediately after syncOnLoad. Needed because the sign-out
   // warning is resolved by a BUTTON, and a tap on an unwired button is silently a no-op that looks
-  // exactly like a handler which correctly did nothing — the confusion BUG-017's re-verification
-  // lost three clicks to. app.click() returning 0 is what catches it.
+  // exactly like a handler which correctly did nothing. app.click() returning 0 is what catches it.
   h.app.ctx.wireApp();
   await settle();
   h.puts.length = 0;
@@ -224,8 +221,8 @@ test('C11 the refusal tells the user, and offers exactly one way out', async () 
 });
 
 test('C12 the halt keeps saying so — sync-paused is a state, not an event', async () => {
-  // Punch-list item 6, found four times independently: the early return preceded the notice, so it
-  // showed once, auto-hid at 5s, and every later push no-opped in silence.
+  // If the early return precedes the notice, it
+  // shows once, auto-hides at 5s, and every later push no-ops in silence.
   const { app } = await halted();
   const before = app.toasts.length;
   app.ctx.saveChannels([{ id: 'UCagain', name: 'Again', source: 'youtube' }]);
@@ -292,10 +289,10 @@ test('C15 adopting when the row has vanished never drops the base', async () => 
 });
 
 test('C16 adopting cannot write behind an exit that is already under way', async () => {
-  // Punch-list item 3: adoptServerCopy was the only user-state writer not gated by the exit seal and
-  // the only sync fetch with no timeout, so a stalled GET could resolve after sign-out had wiped and
-  // rotated — writing the departing account's channels back into the anonymous browser. BUG-017's
-  // original leak, restored by the affordance built to fix a different one.
+  // adoptServerCopy must be gated by the exit seal and carry a timeout like every other user-state
+  // writer: otherwise a stalled GET can resolve after sign-out has wiped and
+  // rotated — writing the departing account's channels back into the anonymous browser. The
+  // account-data leak on exit, restored by the affordance built to fix a different one.
   const { app } = await halted();
   app.ctx.cancelPendingPushes({ sealed: true });
   const channelsAtSeal = app.get('focus_channels');
@@ -304,8 +301,7 @@ test('C16 adopting cannot write behind an exit that is already under way', async
   await settle();
   assert.equal(app.get('focus_channels'), channelsAtSeal, 'an exit is in flight — write nothing');
   // And issue nothing either. Checked separately because the post-await seal check alone satisfies
-  // the assertion above, which left the PRE-await one unobserved — mutation M20 survived on exactly
-  // that. A request that is merely discarded on return has still been sent, and its response can
+  // the assertion above, which would leave the PRE-await one unobserved. A request that is merely discarded on return has still been sent, and its response can
   // still arrive after the exit has wiped and rotated.
   assert.equal(app.urls().length, requestsAtSeal, 'no request may be issued behind an exit');
 });
@@ -332,19 +328,11 @@ test('C17 a refused push drains its events rather than re-shipping them forever'
 
 // ── Stage D: sign-out survives a halt, and still refuses a genuine failure ───
 //
-// Asli's decision, 2026-08-23. She was asked "You've made changes the app couldn't save. You tap
-// Sign out. What should happen?" and SELECTED the option labelled "Let them out, but warn first",
-// described as: "A confirm step naming the loss... Always escapable, and the destruction is chosen
-// rather than silent."
+// The product decision: when the user has changes the app could not save and taps Sign out, let
+// them out, but warn first — a confirm step naming the loss, always escapable, so the destruction
+// is chosen rather than silent.
 //
-// The wording above is the OPTION's, written by me — she chose it, she did not say it. An earlier
-// version of this comment presented it inside quote marks as her own words, and quoted it a second,
-// different way in a commit message, so the two could not both be verbatim. CLAUDE.md family 3 is
-// explicit: a cited authorisation must be one Asli actually gave, because a fabricated citation
-// reads exactly like a real one to every future reader — and it is load-bearing precisely where the
-// rules demand a human decision. Corrected 2026-08-23 after review round 4 caught it.
-//
-// The decision itself OVERRIDES BUG-017's refuse-and-stay-recoverable, but only for
+// That OVERRIDES the general refuse-and-stay-recoverable rule for sign-out, but only for
 // the DETERMINATE case. A network failure is still indeterminate and still refuses, which is why
 // these two tests are deliberately opposite and both must hold.
 
@@ -372,7 +360,7 @@ test('C19 confirming the warning completes the sign-out', async () => {
 });
 
 test('C20 a NETWORK-failed sign-out still refuses — the opposite direction', async () => {
-  // Criterion 6, unchanged by Asli's decision. A retry may yet work, so staying recoverable is still
+  // Unchanged by the warn-first decision. A retry may yet work, so staying recoverable is still
   // right here. If this ever starts warning instead, un-pushed work is destroyed on a blip.
   const b = mk({ store: { focus_channels: MINE }, putThrows: true });
   await b.app.ctx.syncOnLoad();
@@ -417,10 +405,8 @@ function racing({ gateState = false } = {}) {
   let n = 0;
   // An EXPLICIT gate on the state PUT, for the one test that needs "did this wait for that" to be a
   // fact rather than a race. Without it, C24 asserted an exact interleaving of two promise chains
-  // against a fake that hops setImmediate twice — one extra turn anywhere and it flips. Review round
-  // 4 saw it fail once and could not reproduce it in ~55 attempts; whatever caused that, a test whose
-  // result depends on scheduler turns is fragile by construction, and is fixed rather than re-run
-  // until it agrees.
+  // against a fake that hops setImmediate twice — one extra turn anywhere and it flips. A test whose
+  // result depends on scheduler turns is fragile by construction.
   let release;
   const gate = new Promise((r) => { release = r; });
   const app = createApp({ store: { focus_device_id: DEVICE_ID, focus_channels: MINE } });
@@ -487,7 +473,7 @@ test('C24 analytics are not made to queue behind a state push', async () => {
   // "Did the events push wait for the state push" is now a FACT, not a race. The state PUT is held
   // open by an explicit gate this test controls, so if analytics were serialised behind it the events
   // push simply CANNOT settle until the gate is released — no scheduler turn can change that.
-  // Completion is still not the observable (mutation M28 survived on exactly that confusion); what is
+  // Completion is still not the observable; what is
   // asserted is that the events push finished WHILE the state push was still outstanding.
   let stateDone = false;
   const state = app.ctx.pushNow().then(() => { stateDone = true; });
@@ -520,7 +506,7 @@ test('C25 a storage failure writing the base does not take down the boot', async
   assert.ok(app.get('focus_channels').includes('UCrow'), 'and the pull that did succeed must stand');
 });
 
-// ── Fix A: the absorbing state ([BUG-047] review round 4, must-fix A) ───────────────────────────
+// ── Fix A: the absorbing state ───────────────────────────
 //
 // The defect these pin: `syncOnLoad`'s dirty branch returns before the re-base (correct — criterion
 // 4), so the push it fires declares a stale base, is refused, and `dirty` is never cleared, because
@@ -575,10 +561,9 @@ test('A3 jsonb key REORDERING is not a difference', async () => {
   // correct, and measuring the wrong quantity.
   //
   // The reordering has to be INSIDE a value, not at the top level: sameSyncedState compares
-  // value-by-value per key, so a top-level reordering is invisible to it by construction. The first
-  // version of this test reordered only the top level, passed for that reason, and let the mutation
-  // that removes the sort survive — the "green, correct, and measuring the wrong quantity" shape,
-  // caught by the battery rather than by re-reading it.
+  // value-by-value per key, so a top-level reordering is invisible to it by construction. A test
+  // that reorders only the top level passes for that reason, and stays green with the sort
+  // removed — green, correct, and measuring the wrong quantity.
   const reorderedChannels = [{ source: 'youtube', keyword: '', name: 'My Channel', id: 'UCmine' }];
   const reordered = { groups: null, done: [], theme: null, archive: [], shorts: null, channels: reorderedChannels };
   const { app, puts } = mk({
@@ -593,7 +578,7 @@ test('A3 jsonb key REORDERING is not a difference', async () => {
 
 test('A4 a boot with NO base at all still reconciles when the row matches', async () => {
   // `rev` absent rather than stale — the rollout shape, and what a browser that has never completed
-  // a pull holds. Measured in round 4 as `dirty=1 rev=null` repeating identically over three boots.
+  // a pull holds. Unreconciled, it shows as `dirty=1 rev=null` repeating identically over three boots.
   const { app, puts } = mk({
     store: { focus_channels: MINE, focus_dirty: '1' },
     get: { state: asRow(MINE_ARR), updatedAt: '2026-01-01T00:00:02.000Z', rev: REV_B },
@@ -623,17 +608,17 @@ test('A5 CONTROL: local genuinely AHEAD of the row still pushes, and is still re
   assert.ok(app.get('focus_channels').includes('UCmine'), 'local data survives the refusal');
 });
 
-// ── Fix B: adopting across namespaces ([BUG-047] review round 4, must-fix B) ────────────────────
+// ── Fix B: adopting across namespaces ────────────────────
 //
-// Found by the exit-paths reviewer and independently by data-safety. `api/_session.js` returns null
+// `api/_session.js` returns null
 // on a DB BLIP as well as on expiry, so the adopt GET can silently resolve to the DEVICE namespace
-// while the user is signed in — and the response carried no indication of which namespace answered.
-// Reproduced in round 4: a signed-in user presses "Use saved copy", receives a stale anonymous
+// while the user is signed in — unless the response says which namespace answered.
+// Without the check, a signed-in user presses "Use saved copy", receives a stale anonymous
 // snapshot, loses their un-pushed change, and their NEXT push writes their own curated list into the
-// anonymous device row. That is this task's own subject, reached through the affordance built to
+// anonymous device row: the cross-namespace overwrite, reached through the affordance built to
 // fix it.
 //
-// The `updatedAt == null` branch showed the case had been CONSIDERED — it handles only the sub-case
+// The `updatedAt == null` branch handles only the sub-case
 // where the device namespace happens to be empty.
 
 /** A halted client that has also completed a sign-in, so _authEmail is set. */
@@ -692,7 +677,7 @@ test('B2 CONTROL: the SAME press adopts when the namespace is the expected one',
 });
 
 test('B3 an anonymous browser is NOT handed an account row either', async () => {
-  // The reverse leak, and the one BUG-063 is about: _authEmail can be stale-null while the cookie is
+  // The reverse leak: _authEmail can be stale-null while the cookie is
   // still good. Adopting there pours an account's channels into a browser nobody has signed in on.
   const { app } = await halted();
   const before = app.get('focus_channels');
@@ -715,14 +700,13 @@ test('B4 a response that does not SAY which namespace answered is refused', asyn
   assert.equal(app.get('focus_dirty'), '1');
 });
 
-// ── Fix C: a storage throw mid-adopt ([BUG-047] review round 4, must-fix C) ─────────────────────
+// ── Fix C: a storage throw mid-adopt ─────────────────────
 //
-// exit-paths HIGH-2. `applySyncedState` does six unguarded `setItem` calls and only the REPAINT was
-// wrapped, so a throw on the third key left local half-replaced. `showToast` then calls the action as
-// `onAction()` without awaiting, so the rejection was UNHANDLED and the toast hid as if it had
-// worked. Measured in round 4: the user's channel gone, `dirty` still set, the base not re-based,
-// and `toasts: []`. The function's own comment claimed "a failed resolution must leave NOTHING
-// half-adopted" — a false claim sitting directly above the code that violated it.
+// `applySyncedState` does six `setItem` calls; unguarded, a throw on the third key leaves local
+// half-replaced. `showToast` then calls the action as
+// `onAction()` without awaiting, so the rejection is UNHANDLED and the toast hides as if it had
+// worked: the user's channel gone, `dirty` still set, the base not re-based,
+// and `toasts: []`. A failed resolution must leave NOTHING half-adopted.
 
 test('CS1 a storage failure mid-adopt leaves NOTHING half-adopted, and says so', async () => {
   const { app } = await haltedSignedIn();
@@ -781,17 +765,15 @@ test('CS3 a toast action that REJECTS is handled, not dropped on the floor', asy
   assert.equal(seen.length, 0, `a rejected toast action must not escape; saw ${seen.map(String)}`);
 });
 
-// ── Fix E: the notice must be REACHABLE ([BUG-047] review round 4, must-fix E) ──────────────────
+// ── Fix E: the notice must be REACHABLE ──────────────────
 //
-// claim-verification #17: punch-list item 6 was HALF closed while commit 8cdccf0 listed it as
-// closed. The early-return ordering was fixed; the drawer-close re-show was never implemented, and
-// `_showSyncConflict` had exactly two call sites, neither of them closeProfile.
+// Closing the profile drawer must re-show the conflict notice.
 //
-// Measured in style.css this session: `.profile-panel` is z-index 61 and `.toast` is z-index 60, so
+// In style.css `.profile-panel` is z-index 61 and `.toast` is z-index 60, so
 // the drawer paints OVER the notice. The drawer also contains the theme toggle, which makes it the
 // likeliest way to raise a conflict in the first place — so the most probable route to a halt is the
-// one where the user never sees it. That matters more than it would otherwise, because Asli's "no
-// second button" decision is conditional on the notice being reachable.
+// one where the user never sees it. That matters more than it would otherwise, because having no
+// second button is only acceptable while the notice is reachable.
 
 test('E1 closing the drawer re-shows the notice while sync is still halted', async () => {
   const { app } = await halted();
@@ -832,15 +814,15 @@ test('E3 the notice comes back on EVERY drawer close, not just the first', async
   assert.ok(app.toasts.some((t) => /not syncing/i.test(t)), 'the second close must say it too');
 });
 
-// ── Phase 2: the guards review round 4 found UNPINNED ───────────────────────────────────────────
+// ── Phase 2: guards that nothing else pins ──────────────────────────────────────────────────────
 //
-// Each of these SURVIVED an independent mutation. The code was right; nothing would have noticed if
+// For each of these the code was right, but nothing would have noticed if
 // it stopped being. That distinction matters more than a bug count: a guard nothing watches is a
 // guard that will be deleted by a future refactor with a green suite as its evidence.
 
 test('G1 (R1) the POST-await seal: an exit beginning DURING the adopt GET writes nothing', async () => {
   // C16 sealed BEFORE pressing, so only the pre-await check ever fired and the duplicated post-await
-  // one — the very window the duplication exists for, [BUG-017]'s original leak — was unobserved.
+  // one — the very window the duplication exists for, the leak on exit — was unobserved.
   // Here the exit begins while the GET is in flight, which only the second check can catch.
   const { app } = await haltedSignedIn();
   const before = app.get('focus_channels');
@@ -894,9 +876,9 @@ test('G3 (R4) analytics still ride while sync is halted', async () => {
 });
 
 test('G4 a push blocked by an EXIT must not report a refusal', async () => {
-  // One of the scope's own verification rows, omitted by the round-4 battery: adding `refused: true`
-  // to the `_leaving` early return survived the whole suite. It would make sign-out's second press
-  // complete MID-DELETE — [BUG-017] H3's shape, arriving through the new affordance.
+  // Adding `refused: true`
+  // to the `_leaving` early return would make sign-out's second press
+  // complete MID-DELETE, arriving through the new affordance.
   const { app } = await halted();
   app.ctx.cancelPendingPushes({ sealed: true });
   const r = await app.ctx.pushNow();
@@ -905,24 +887,17 @@ test('G4 a push blocked by an EXIT must not report a refusal', async () => {
 });
 
 test('G5 (R2/R3) a push stays blocked while ANY exit still holds a seal', async () => {
-  // R2 and R3 mutated the two terms of `_leaving || _heldSeals.size` separately and both survived,
+  // The two terms of `_leaving || _heldSeals.size` cannot be pinned separately,
   // because in today's code the two are EQUIVALENT: cancelPendingPushes sets both, and unsealPushes
   // clears `_leaving` only once the set is empty. No input can separate them, so no fixture can pin
   // them apart, and writing one that pretended to would be theatre.
   //
-  // What IS pinnable is the behaviour the redundancy exists for — R8-H1's overlapping exits, where
-  // sign-out's early refusal used to release deleteAccount's seal and let a timer fire mid-delete.
+  // What IS pinnable is the behaviour the redundancy exists for — overlapping exits, where
+  // sign-out's early refusal must not release deleteAccount's seal and let a timer fire mid-delete.
   //
-  // REWRITTEN 2026-08-24, because the version that claimed the above could not observe it. Its
-  // fixture was `halted()`, so `_syncHalted` was set and BOTH the seal branch and the halt branch
-  // returned {ok:false} with no PUT; it asserted only those two facts, which cannot tell them apart.
-  // Measured rather than argued — `mutations/BUG-047-G5-control.mjs` reintroduced both defects this
-  // test names and the old G5 killed NEITHER (CTRL-A died to one pre-existing exit-paths test,
-  // CTRL-B to six tests including G4). The file's "10 of 11 closed" tally had rested on it.
-  //
-  // Two things make it able to fail. The fixture is NOT halted, so the seal is the only guard that
-  // can block this push (CLAUDE.md family 2: size the fixture so only the guard under test can
-  // fire). And the block is followed by a POSITIVE CONTROL, because "nothing was sent" is satisfied
+  // Two things make it able to fail. The fixture is NOT halted — under `halted()` both the seal
+  // branch and the halt branch return {ok:false} with no PUT, which cannot tell them apart — so the
+  // seal is the only guard that can block this push. And the block is followed by a POSITIVE CONTROL, because "nothing was sent" is satisfied
   // just as well by a client that can no longer send anything at all.
   const { app, puts } = mk({ store: { focus_channels: MINE } });
   await app.ctx.syncOnLoad();
@@ -991,7 +966,7 @@ test('G7 criterion 5, second half: a RELOAD without pressing re-shows the notice
 
 test('G8 a boot that never learned what the server holds still reports, and claims nothing', async () => {
   // NOT the `!_stateLoaded` term of the queue bypass — that term is unreachable (see the comment on
-  // it in app.js), and a test written to "cover" it could never fail. This asserts the BUG-056
+  // it in app.js), and a test written to "cover" it could never fail. This asserts the
   // behaviour that is real and reachable: a document whose boot GET failed holds a copy of nothing,
   // so its pushes carry no state and declare no base, and it must still deliver analytics.
   const { app, puts } = mk({ store: { focus_channels: MINE } });
@@ -1015,10 +990,10 @@ test('G8 a boot that never learned what the server holds still reports, and clai
 });
 
 test('H1 the notice is honest in BOTH directions, and is allowed the room to say it', async () => {
-  // A condition of Asli's "no second button" decision (2026-08-23), not a copy preference. The
+  // A condition of having no second button, not a copy preference. The
   // argument for having no second button is that DOING NOTHING is already the non-destructive
   // option — local data survives, only syncing stops. That is only true for the user if the notice
-  // tells them so. The previous wording read as though the one button were the only move.
+  // tells them so, rather than reading as though the one button were the only move.
   //
   // And it must fit: `.toast-msg` is `white-space: nowrap; text-overflow: ellipsis`, so the default
   // pill is ONE TRUNCATED LINE and cannot carry two directions. Measured in style.css this session.
@@ -1041,23 +1016,21 @@ test('H2 an ORDINARY toast is not left wrapped behind the notice', async () => {
     'the next ordinary toast must go back to the single-line pill');
 });
 
-// ── The exit push and the in-flight latch ([BUG-047]) ──────────────────────────────────────
+// ── The exit push and the in-flight latch ──────────────────────────────────────
 //
-// BUG-047 added a one-state-push-at-a-time latch (`_pushInFlight`), because the base is read per
+// There is a one-state-push-at-a-time latch (`_pushInFlight`), because the base is read per
 // invocation: two overlapping pushes declare the SAME base, the server accepts the first, the row
 // moves, and the second is refused — a single user on one device gets a halt and an affordance
 // offering to discard their own newest state. `_signOut` is one of the three routes that made that
 // reachable from one page, so the latch only does its job if sign-out actually respects it.
 //
-// A related sub-fix was built here TWICE and cut both times, and the reasoning is recorded in
-// tasks/BUG-047.md so it is not re-picked blind: a hung PUT parks sign-out (round 4 MED-2), and
+// A known limit, deliberately left: a hung PUT parks sign-out, and
 // both remedies for it — an AbortController on the PUT, and a deadline on sign-out's wait — were
-// measured to be worse than the parking. See the comment in _pushNow. The parking is tracked on
-// its own; main's PUT is unbounded too, so this task does not make it worse.
+// measured to be worse than the parking. See the comment in _pushNow.
 
 /**
  * A signed-in app holding channels, whose PUT the test drives, over a server that does the
- * conditional write this task exists for: a PUT declaring a base that no longer describes the row
+ * conditional write: a PUT declaring a base that no longer describes the row
  * is refused. (It does NOT model the base-less case — the real handler refuses that too, via
  * `on conflict do nothing`, and no test here exercises it.)
  */
@@ -1090,13 +1063,11 @@ function signOutRig(put) {
 test('J3 sign-out never issues a write that declares a base another write already used', async () => {
   // What the latch is FOR, asserted on the path that made it necessary. Two writes declaring the
   // same base means the server accepts one and refuses the other, and sign-out reading that 409
-  // treats it as determinate and shows the panel whose second press discards local state. Measured
-  // 2026-08-24 against a _signOut that skipped the queue: reachable with an ordinary background
+  // treats it as determinate and shows the panel whose second press discards local state. With
+  // a _signOut that skips the queue this is reachable with an ordinary background
   // save, no network fault required.
   // The background save must still be IN FLIGHT when sign-out is pressed, or there is no overlap
-  // and this test pins nothing. Its first draft let it answer immediately, and the mutation written
-  // to validate it was killed by a DIFFERENT test — caught 2026-08-24 by predicting the killer's
-  // name before running the battery, not by re-reading the test.
+  // and this test pins nothing.
   let release;
   const held = new Promise((r) => { release = r; });
   const { app, puts } = signOutRig(async (rec, srv) => {
@@ -1105,7 +1076,7 @@ test('J3 sign-out never issues a write that declares a base another write alread
     const rev = rec.hasState ? srv.commit() : REV_A;
     return { ok: true, status: 200, json: async () => ({ updatedAt: '2026-01-01T00:00:02.000Z', rev }) };
   });
-  await app.ctx.checkAuth();               // a real boot resolves the sign-in before syncOnLoad decides ([BUG-063]) — setup-only edit, approved by Asli 2026-09-11: "yes to the 3 rigs"
+  await app.ctx.checkAuth();               // a real boot resolves the sign-in before syncOnLoad decides
   await app.ctx.syncOnLoad();
   await settle();
   const bg = app.ctx.pushNow();            // a routine background save, already in flight
@@ -1129,8 +1100,7 @@ test('C (round 5) a rollback that would exceed quota still leaves local byte-ide
   // FORWARD order, so an early key can be put back while a LATER one still holds the server's
   // larger value — an intermediate total the original never reached. That setItem throws, a bare
   // catch swallows it, and local is left holding the SERVER's value for one key and its own for
-  // another: a state neither side ever had. ([BUG-047] review round 5, C — reached independently
-  // by two reviewers.)
+  // another: a state neither side ever had.
   const pad = (n) => 'x'.repeat(n);
   const CH_O = JSON.stringify([{ id: 'UCmine', n: pad(280) }]);   // local channels: big
   const DN_O = JSON.stringify([pad(30)]);                          // local done: small
@@ -1187,7 +1157,7 @@ test('[BUG-100] the unload flush claims no state while a write is already in fli
   // one loses, a document that SURVIVES (visibilitychange fires on an ordinary tab switch) is left
   // halted, showing a notice whose action replaces local data.
   const { app, puts, firstOut } = flushRig();
-  await app.ctx.checkAuth();            // a real boot resolves the sign-in before syncOnLoad decides ([BUG-063]) — setup-only edit, approved by Asli 2026-09-11: "yes to the 3 rigs"
+  await app.ctx.checkAuth();            // a real boot resolves the sign-in before syncOnLoad decides
   await app.ctx.syncOnLoad();
   await settle();
   puts.length = 0;
@@ -1210,7 +1180,7 @@ test('[BUG-100] CONTROL: with nothing in flight, the flush still carries state',
   // The fix must narrow the flush, not disable it. "Mark a video done, close the tab" depends on
   // this write landing.
   const { app, puts } = flushRig({ hangFirst: false });
-  await app.ctx.checkAuth();            // a real boot resolves the sign-in before syncOnLoad decides ([BUG-063]) — setup-only edit, approved by Asli 2026-09-11: "yes to the 3 rigs"
+  await app.ctx.checkAuth();            // a real boot resolves the sign-in before syncOnLoad decides
   await app.ctx.syncOnLoad();
   await settle();
   puts.length = 0;
@@ -1240,7 +1210,7 @@ test('D (round 5) a boot re-pushing over corrupt storage raises no unhandled rej
   // syncOnLoad's dirty branch falls through to an UN-AWAITED pushNow() when local and the row
   // differ. collectSyncedState() JSON.parses raw localStorage and is read OUTSIDE _pushNow's try,
   // so on corrupt storage that promise rejects with nobody holding it. The BOOT survives either way
-  // (criterion 11, pinned separately) — which is exactly why this went unnoticed; the rejection is
+  // (pinned separately) — which is exactly why this is easy to miss; the rejection is
   // still real, and on Node an unhandled one is fatal.
   const { app } = mk({
     store: { focus_channels: '{{{ not json', focus_dirty: '1' },
@@ -1258,12 +1228,12 @@ test('D (round 5) a boot re-pushing over corrupt storage raises no unhandled rej
 test('G9 (R15) a boot whose PULL fails records no base, and does not take the app down', async () => {
   // The ordering, as a guard rather than an accident. A rev written BEFORE the apply leaves this
   // client based on a row it does not hold — and its next push, declaring a base that still MATCHES,
-  // is then ACCEPTED and overwrites the row with the state that failed to replace it. Review round 4
-  // found the ordering completely unpinned: G6 could not see it, because when the apply succeeds
+  // is then ACCEPTED and overwrites the row with the state that failed to replace it. G6 cannot
+  // see the ordering, because when the apply succeeds
   // both orders end identically.
   const { app, puts } = mk({ get: { state: ROW, updatedAt: '2026-01-01T00:00:01.000Z', rev: REV_A, kind: 'device' } });
   app.failSetItem((k) => k === 'focus_done');   // mid-apply, so some keys have already been written
-  await app.ctx.syncOnLoad();                    // criterion 11: this must not throw
+  await app.ctx.syncOnLoad();                    // this must not throw
   await settle();
   assert.equal(app.get('focus_rev'), null, 'a pull that failed is not a base');
   // And the consequence that makes it matter: with no base, the next push can create but never
@@ -1275,22 +1245,18 @@ test('G9 (R15) a boot whose PULL fails records no base, and does not take the ap
   assert.equal(puts[0].rev, null, 'and it declared no base, so the server can only refuse it');
 });
 
-// ── Round 8: the four guards round 5 found unpinned and re-measured as STILL unpinned ───────────
-//
-// Round 5 listed seven such rows plus a vacuous G5. Re-measured 2026-08-24 against the branch as it
-// stands after rounds 6/7 (`mutations/BUG-047-R8-guards.mjs`), because recorded evidence ages: S8 is
-// now pinned by round 7's own D test, and X1's row overstated — thirteen tests notice it, just not
-// R18, the one written for it. These four survived, each control-verified RED below.
+// ── Four more guards that nothing else pins ─────────────────────────────────────────────────────
 
 test('B5 (round 8) the namespace check covers the EMPTY-row branch, not just the populated one', async () => {
-  // Fix B was wired in ABOVE the `updatedAt == null` branch and its ordering was the whole guard —
-  // yet nothing could see the ordering. B1-B4 all use a POPULATED row and C15 boots an ANONYMOUS
-  // client, so no fixture reached an empty row in the WRONG namespace. Moving the check below that
-  // branch — the defect's real shape, a guard present but no longer covering — survived the suite.
+  // The namespace check sits ABOVE the `updatedAt == null` branch and its ordering is the whole
+  // guard. B1-B4 all use a POPULATED row and C15 boots an ANONYMOUS
+  // client, so no other fixture reaches an empty row in the WRONG namespace. Moving the check below
+  // that branch — a guard present but no longer covering — must fail here.
   //
   // It matters because that branch does not merely decline: it LIFTS the halt and rearms the push.
   // A signed-in user handed an empty DEVICE row would rearm and write their curated account list
-  // into the anonymous row — this task's own bug, arriving through the affordance built to fix it.
+  // into the anonymous row — the cross-namespace overwrite, arriving through the affordance built
+  // to fix it.
   const { app } = await haltedSignedIn();
   const before = app.get('focus_channels');
   answerAdoptWith(app, { state: null, updatedAt: null, rev: null, kind: 'device' });
@@ -1382,8 +1348,8 @@ test('K3 (round 8) a throw on the LAST key rolls back the ones CS1 never reaches
 });
 
 test('K4 (round 8) the rollback puts the THEME ATTRIBUTE back, not just the stored key', async () => {
-  // The adopt repaints the page as well as writing the key. Deleting the attribute half of the
-  // rollback survived the whole suite: local would report `light` while the page kept painting the
+  // The adopt repaints the page as well as writing the key. Without the attribute half of the
+  // rollback, local would report `light` while the page kept painting the
   // `dark` it had adopted and then abandoned — the visible half of a state neither side ever held.
   const { app } = await haltedSignedIn({ store: { focus_channels: MINE, focus_theme: 'light', focus_include_shorts: 'false' } });
   const html = app.ctx.document.documentElement;

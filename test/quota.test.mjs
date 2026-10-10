@@ -1,4 +1,4 @@
-// Per-user X quota helpers (TASK-100) — the pure half.
+// Per-user X quota helpers — the pure half.
 //
 // The day boundary is the piece most likely to be green while measuring the wrong quantity: X
 // deduplicates a post's billing "within a day", so a counter keyed to any other clock counts a
@@ -9,7 +9,7 @@ import { utcDay, readQuotaLimit, quotaExceeded } from '../api/_quota.js';
 
 // 2026-08-31T23:59:59.999Z and one millisecond later — the UTC midnight boundary. Deliberately a
 // PAST boundary: docs.test.mjs fails the suite on any future date in test/, and a fixture straddling
-// tomorrow would trip it (TASK-096's mechanism).
+// tomorrow would trip it.
 const BEFORE_MIDNIGHT = Date.UTC(2026, 7, 31, 23, 59, 59, 999);
 const AFTER_MIDNIGHT = BEFORE_MIDNIGHT + 1;
 
@@ -66,18 +66,17 @@ test('Q10 quotaExceeded: an unreadable count fails OPEN, it does not lock the fe
   }
 });
 
-// ── The fuse as the ADMIN PANEL must describe it (CHR-074) ───────────────────
+// ── The fuse as the ADMIN PANEL must describe it ───────────────────
 //
 // readQuotaLimit answers "what does the code ENFORCE" and collapses every non-value into one null.
 // That is right for enforcement and useless for diagnosis: "you never set it", "you typed it wrong"
 // and "you turned it off on purpose" need three different responses from a human, and today the
 // panel cannot tell a reader which of them happened. These pin the distinction.
 //
-// FOUR states, not the three the task's UI table lists. '0' is a DELIBERATE off switch — the code
+// FOUR states, not three. '0' is a DELIBERATE off switch — the code
 // comment at readQuotaLimit says so explicitly — and reporting it as "set but unreadable" would send
 // someone hunting a typo that does not exist. An instrument that invents a fault is the failure this
-// whole task exists to prevent, so it would be an odd one to build in on line one. Flagged to Asli
-// rather than absorbed silently; the task file's criteria and UI table need the same fourth row.
+// panel exists to prevent.
 import { fuseStatus } from '../api/_quota.js';
 
 const F = (v) => fuseStatus(v === undefined ? {} : { X_DAILY_POST_QUOTA: v });
@@ -119,7 +118,7 @@ test('Q16 zero reads as DISABLED, distinct from both unset and unreadable', () =
 
 test('Q17 fuseStatus and readQuotaLimit never disagree about whether the fuse is armed', () => {
   // The panel must describe the code that actually runs. If these two ever diverge, the panel is
-  // lying about enforcement — the precise failure CHR-074 exists to prevent.
+  // lying about enforcement — the precise failure this panel exists to prevent.
   for (const v of ['800', '1', '0', '', '   ', 'abc', '-5', '4.5', '"800"', undefined]) {
     const env = v === undefined ? {} : { X_DAILY_POST_QUOTA: v };
     const armed = readQuotaLimit(env) != null;

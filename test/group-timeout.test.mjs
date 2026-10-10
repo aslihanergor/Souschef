@@ -1,33 +1,28 @@
-// [BUG-104] — A STALLED /api/group MUST NOT WEDGE GROUPING FOR THE SESSION.
+// A STALLED /api/group MUST NOT WEDGE GROUPING FOR THE SESSION.
 //
-// `updateGroupsForFeed` awaits `fetch('/api/group')` with no AbortController and no timeout — the
-// only user-state fetch in `app.js` without one. A request that STALLS rather than fails never
+// If `updateGroupsForFeed` awaits `fetch('/api/group')` with no AbortController and no timeout,
+// a request that STALLS rather than fails never
 // settles, so the `finally` never runs: `_grouping` stays true and the busy indicator never hides.
 //
-// REPRODUCED before a line of the fix was written (recorded in tasks/BUG-104.md): three renders
+// Unbounded, three renders
 // against a stalled classify leave the badge reading "3 new" over a COMPLETELY EMPTY feed, swallow
 // posts that arrive after the wedge, and freeze the /api/group call count at 1.
 //
-// WHICH TESTS COULD RED BEFORE THE FIX, stated because a merely-red suite hides the one that passed
-// for the wrong reason (CLAUDE.md, Mutation batteries):
-//
-//   RED before the fix   — C1, C3, C4, C6. Four of six.
-//   GREEN before the fix — C2 and C5, BY DESIGN, and neither is decoration:
-//     C2 guards against a bound that is too TIGHT. It can only red if the fix is wrong, which is
-//        exactly what the 45000 → 2500 mutation does to it.
-//     C5 guards the degrade path's silence. Before the fix nothing is written because the classify
-//        never returns; after it, nothing is written because a timeout must not record posts as
+// C2 and C5 pass with or without the timeout, BY DESIGN, and neither is decoration:
+//     C2 guards against a bound that is too TIGHT. It can only red if the bound is wrong, which is
+//        exactly what cutting it to 2500ms does to it.
+//     C5 guards the degrade path's silence. Unbounded, nothing is written because the classify
+//        never returns; bounded, nothing is written because a timeout must not record posts as
 //        already-seen. Same assertion, two different reasons — and the second is the one that can
 //        break.
 //
-// THE FAKES' FIDELITY IS PROVEN BY TEST, NOT BY INSPECTION — but by TWO tests, not one, and saying
-// "C1 proves it" was false by omission until an independent battery said so.
+// THE FAKES' FIDELITY IS PROVEN BY TEST, NOT BY INSPECTION — by TWO tests, not one.
 //   `bootStalled` is covered by C1: if it ignored `init.signal` nothing would ever reject, the
-//   `finally` would never run, and C1 could not pass EVEN WITH THE FIX.
-//   `bootGated` is a DIFFERENT fake and C1 never touches it. Reverting its race to a plain
-//   `await gate` left the entire suite green and resurrected the 45000 → 2500 mutation — so C2, the
-//   only defence of the bound's SIZE, was one careless edit from being decoration. C8 exists to
-//   close that, and M14 mutates the fake itself to prove C8 can see it.
+//   `finally` would never run, and C1 could not pass at all.
+//   `bootGated` is a DIFFERENT fake and C1 never touches it. With its race reverted to a plain
+//   `await gate`, a bound cut to 2500ms passes C2 — so C2, the
+//   only defence of the bound's SIZE, is one careless edit from being decoration. C8 exists to
+//   close that.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -41,10 +36,9 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const DEVICE = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const PUBLISHED = '2026-08-20T10:00:00.000Z';
-// READ FROM THE SOURCE, not hand-synced. As a literal this said 45000, and when the bound moved to
-// 120000 six tests went red at once — they were testing a number this file happened to agree with
-// rather than the app's actual behaviour. C1-C9 are all about behaviour RELATIVE to the bound
-// (in flight just before it, abandoned at it), so deriving it is what they always meant.
+// READ FROM THE SOURCE, not hand-synced. A literal here would test a number this file happens to
+// agree with rather than the app's actual behaviour. C1-C9 are all about behaviour RELATIVE to the
+// bound (in flight just before it, abandoned at it), so deriving it is what they mean.
 // The absolute value is pinned separately and deliberately by C10, against the SERVER's MAX_ITEMS —
 // a test that derives the bound cannot also judge whether the bound is big enough.
 const BOUND = Number(
@@ -100,12 +94,12 @@ function bootStalled({ store = {}, grouped = true, stallBody = false } = {}) {
 
 /** A classify that hangs until `release()` — used where the point is "it answered in time".
  *
- *  IT MUST HONOUR `init.signal` TOO, and this is not symmetry for its own sake. The first version
- *  awaited the gate alone, so an abort simply went unnoticed and the request answered anyway. The
- *  M3 mutation — the bound cut from 45s to /api/state's 2500ms — then SURVIVED: the abort fired at
- *  2.5s inside C2's 44.9s window, the fake ignored it, the assignments landed, and C2 passed while
+ *  IT MUST HONOUR `init.signal` TOO, and this is not symmetry for its own sake. A fake that
+ *  awaits the gate alone lets an abort go unnoticed and the request answer anyway. With the bound
+ *  cut to /api/state's 2500ms, the abort then fires
+ *  inside C2's window, the fake ignores it, the assignments land, and C2 passes while
  *  asserting nothing about the quantity in its own name. Green, correct-looking, and measuring the
- *  wrong thing. Found by the battery, not by re-reading; the assertion below never changed. */
+ *  wrong thing. */
 function bootGated({ store = {}, reply = [], grouped = true, ok = true } = {}) {
   const reqs = [];
   let release;
@@ -156,8 +150,8 @@ test('BUG-104 C1: a classify whose response never arrives is abandoned at the bo
 });
 
 test('BUG-104 C2: a classify that answers just inside the bound is NOT aborted', async () => {
-  // GREEN BEFORE THE FIX, declared. Predicted killer: the 45000 → 2500 mutation, which aborts this
-  // classify 42.4s before it answers and leaves the assignments unwritten.
+  // Passes with or without the timeout. What it catches is a bound that is too tight: one cut to
+  // 2500ms aborts this classify long before it answers and leaves the assignments unwritten.
   const { app, reqs, release } = bootGated({ grouped: true, reply: [AI_NEWS] });
   app.ctx.wireApp();
 
@@ -214,8 +208,8 @@ test('BUG-104 C4: after the bound, the held posts are readable instead of hidden
 });
 
 test('BUG-104 C5: a timed-out classify records nothing — not even that the posts were seen', async () => {
-  // GREEN BEFORE THE FIX, declared, and the two reasons differ: before, nothing is written because
-  // the call never returns; after, because a timeout must not mark posts already-seen. The second is
+  // Passes with or without the timeout, and the two reasons differ: unbounded, nothing is written
+  // because the call never returns; bounded, because a timeout must not mark posts already-seen. The second is
   // the one that can break — writing `unfiled` here would let one stalled request permanently
   // suppress the hold for genuinely-new posts.
   const before = { assignments: {}, groups: {}, unfiled: [], updatedAt: 1 };
@@ -224,19 +218,15 @@ test('BUG-104 C5: a timed-out classify records nothing — not even that the pos
   app.ctx.wireApp();
   // A SYNCED boot, and the fixture is wrong without it. `pushNow` sends events-only for as long as
   // `_stateLoaded` is false, so in an unsynced fixture a state push is impossible BY CONSTRUCTION and
-  // this test cannot tell a timeout that writes state from one that does not. That is not a
-  // theoretical nicety: forcing `changed` true SURVIVED here until this line existed. Every real
-  // user is synced, so the unsynced fixture was the unrepresentative one.
+  // this test cannot tell a timeout that writes state from one that does not. Every real
+  // user is synced, so an unsynced fixture is the unrepresentative one.
   await app.ctx.syncOnLoad();
   await settle();
 
   render(app, [xPost('x1'), xPost('x2')]);
   await settle();
-  // THE GUARD C5 SHIPPED WITHOUT, and its absence made this test pass against a tree where
-  // `updateGroupsForFeed` was never called at all — no classify, no abort, nothing to record, green.
-  // Found by an independent reviewer and reproduced directly: replacing the call site with
-  // `void items` left C1-C4 and C6 red and THIS TEST GREEN. Every sibling opens with this line;
-  // C5 was the one that omitted it, which is exactly why it was the one that went vacuous.
+  // Without this guard the test passes against a tree where
+  // `updateGroupsForFeed` is never called at all — no classify, no abort, nothing to record, green.
   assert.equal(reqs.length, 1, 'guard: the classify actually went out');
 
   // The BASELINE is the record as it stands with the classify already in flight — NOT the seeded
@@ -263,11 +253,10 @@ test('BUG-104 C5: a timed-out classify records nothing — not even that the pos
   // BYTE-IDENTICAL, not field-by-field. Reading `assignments` and `unfiled` alone cannot see a WRITE
   // that changes neither: flipping `changed` to true makes every degrade call `saveGroupState`,
   // which stamps the record and calls `schedulePush()` — a billed /api/state PUT on every timeout.
-  // That mutation survived the first version of this test.
   assert.equal(app.get('focus_groups'), recordBeforeBound,
     'the stored record is byte-identical across the bound — a timeout writes nothing at all');
 
-  // BYTE-IDENTICAL IS NOT ENOUGH ON ITS OWN, and the battery is what proved it. Forcing `changed`
+  // BYTE-IDENTICAL IS NOT ENOUGH ON ITS OWN. Forcing `changed`
   // true makes the degrade call `saveGroupState`, but on this path `state` was never modified and
   // `postMetaEpoch` is already stamped — so the record it writes back is byte-for-byte what was
   // there, and the comparison above sees nothing. The WRITE is still real: it arms `schedulePush`,
@@ -292,10 +281,8 @@ test('BUG-104 C5: a timed-out classify records nothing — not even that the pos
 });
 
 test('BUG-104 C6: a successful classify clears its timer, so no late abort fires', async () => {
-  // Predicted killer of "delete clearTimeout(t)": this test. The fetch is long settled by then, so
+  // Fails if `clearTimeout(t)` is deleted. The fetch is long settled by then, so
   // the abort is a no-op FOR THE REQUEST — but the SIGNAL still flips, and that is observable.
-  // (Scoped as an expected mutation SURVIVOR in tasks/BUG-104.md on the reasoning that an abort
-  // after settle is unobservable. That prediction was wrong: the signal is the observable.)
   const { app, reqs, release } = bootGated({ grouped: true, reply: [AI_NEWS] });
   app.ctx.wireApp();
 
@@ -316,18 +303,17 @@ test('BUG-104 C6: a successful classify clears its timer, so no late abort fires
     'the timer was cleared on success — nothing aborts a request that already answered');
 });
 
-// ── Added after independent review, 2026-08-28 ────────────────────────────────
-// Three gaps an independent mutation battery found in the six above. Each is recorded with the
-// mutation that survived, because a test whose motivating defect is not written down is one
-// refactor away from looking redundant.
+// ── Gaps the six above leave open ─────────────────────────────────────────────
+// Each is recorded with the defect it catches, because a test whose motivating defect is not
+// written down is one refactor away from looking redundant.
 
 test('BUG-104 C7: while a classify is in flight, a second render does NOT start another', async () => {
-  // GREEN BEFORE THE FIX, declared — the guard is pre-existing. It is here because the CHANGE made
-  // it load-bearing and NOTHING pinned it: neutering it to `if (false && _grouping) return;` left
-  // all 908 tests green (reproduced directly, not taken on report). That mattered twice over —
+  // The re-entrancy guard does not depend on the timeout, but the timeout makes
+  // it load-bearing: neutered to `if (false && _grouping) return;`, nothing else fails.
+  // That matters twice over —
   // C1 and C3 assert "a second classify ran — the re-entrancy guard was released", and with the
   // guard unpinned that message could not distinguish "released" from "never existed".
-  // Predicted killer of both `if (false && _grouping)` and `_grouping = true` deleted: this test.
+  // This test fails for both `if (false && _grouping)` and `_grouping = true` deleted.
   const { app, reqs } = bootStalled({ grouped: true });
   app.ctx.wireApp();
 
@@ -366,9 +352,8 @@ test('BUG-104 C8: an aborted gated request lands nothing even if the server answ
 
 test('BUG-104 C9: the timer is cleared on a DEGRADE answer too, not only on success', async () => {
   // `finally`, not the success branch. Gating the clear on `changed` leaves the timer armed on a
-  // non-ok response, a bad body and a throw — three of the four exit paths — and that mutation
-  // survived C6, which only ever drove the successful one.
-  // Predicted killer of `finally { if (changed) clearTimeout(timer); ... }`: this test alone.
+  // non-ok response, a bad body and a throw — three of the four exit paths — and C6
+  // cannot see it, because it only ever drives the successful one.
   const { app, reqs, release } = bootGated({ grouped: true, ok: false });
   app.ctx.wireApp();
 
@@ -387,19 +372,17 @@ test('BUG-104 C9: the timer is cleared on a DEGRADE answer too, not only on succ
 
 test('BUG-104 C10: the bound clears the SERVER\'s own worst case, not just a literal in this file', async () => {
   // C2 pins the bound only RELATIVE to itself — its fixture is derived from the same constant, so a
-  // bound and a test moved together red nothing. That is how 45s survived: it looked defended, and
-  // the thing defending it could not see an absolute error. This test relates the bound to a value
+  // bound and a test moved together red nothing: a too-small bound looks defended, and
+  // the thing defending it cannot see an absolute error. This test relates the bound to a value
   // in ANOTHER file that the client does not control, so it reds if the bound shrinks OR if the
   // server's capacity grows.
   //
-  // The arithmetic is [BUG-077]'s decomposition, which its own file marks as the surviving half
-  // (:317 — the 80-post headline is superseded, the model is not), plus [TASK-090]'s measured
-  // finding that real latency runs ~1.45x ahead of it. Sources are cited so a future reader can
-  // re-derive rather than trust.
-  const FIXED_MS = 9603;          // BUG-077: prefill + network + queueing
-  const PER_TOKEN_MS = 7.41;      // BUG-077: output tokens drive wall clock
-  const TOKENS_PER_POST = 25.8;   // ≈23.7 bullets/labels + 2.1 short-index id (lever A shipped)
-  const MODEL_UNDERSHOOT = 1.45;  // TASK-090: "real latency runs ahead of the per-token model"
+  // The arithmetic is a measured latency model — a fixed cost plus a per-output-token cost — plus
+  // the measured finding that real latency runs ~1.45x ahead of it.
+  const FIXED_MS = 9603;          // prefill + network + queueing
+  const PER_TOKEN_MS = 7.41;      // output tokens drive wall clock
+  const TOKENS_PER_POST = 25.8;   // ≈23.7 bullets/labels + 2.1 short-index id
+  const MODEL_UNDERSHOOT = 1.45;  // real latency runs ahead of the per-token model
 
   const src = readFileSync(join(ROOT, 'app.js'), 'utf8');
   const m = /const GROUP_TIMEOUT_MS = (\d+);/.exec(src);
@@ -438,9 +421,8 @@ test('BUG-104 C11: a timeout is recorded in analytics; a classify that answers i
   assert.equal(timeouts(stalled.app).length, 0, 'guard: nothing recorded while the classify is still running');
 
   // Split, so the analytics flush timers come due BEFORE the abort rather than after it. Advancing
-  // in one step fires a flush that ships the buffer and CLEARS it — which is why the first version of
-  // this test read an empty buffer and reported the marker missing when it had fired perfectly well.
-  // The instrument was wrong, not the code.
+  // in one step fires a flush that ships the buffer and CLEARS it — the test would then read an
+  // empty buffer and report the marker missing when it had fired perfectly well.
   stalled.app.advance(BOUND - 1);
   await settle();
   assert.equal(timeouts(stalled.app).length, 0, 'guard: still nothing recorded one millisecond short of the bound');

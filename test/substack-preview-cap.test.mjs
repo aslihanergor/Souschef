@@ -1,15 +1,14 @@
-// [BUG-115] — the collapsed Substack card's teaser is bounded.
+// The collapsed Substack card's teaser is bounded.
 //
-// firstParagraph() returned the author's ENTIRE opening <p>, so a card's height was whatever they
-// happened to write. Measured 2026-09-09 over the 175 openers the app can actually reach (9 of 12
+// If firstParagraph() returns the author's ENTIRE opening <p>, a card's height is whatever they
+// happen to write. Measured over the 175 openers the app can actually reach (9 of 12
 // sampled publications clear isSubstackFeed; the rest are 502'd by handleSubstack and never become a
 // card): p50 233 characters, p90 472, p99 770, max 781 — ~17 lines on a 360px phone.
 //
 // The 1456-character fixtures below are DELIBERATELY beyond that observed maximum: headroom, not
-// "the measured worst case". An earlier draft called them that on the strength of a run that skipped
-// the isSubstackFeed gate and counted a WordPress blog the app answers with a 502.
+// "the measured worst case".
 //
-// WHY THESE TESTS GO THROUGH parseSubstackFeed AS WELL AS capPreview: the [BUG-116] shape is a
+// WHY THESE TESTS GO THROUGH parseSubstackFeed AS WELL AS capPreview: the hazard is a
 // helper that is written, exported, tested and never called. Testing only the pure helper would
 // leave "delete the call site in firstParagraph" killed by exactly one test. Every end-to-end case
 // here re-proves the wiring, so that mutation has nowhere to hide.
@@ -53,7 +52,7 @@ test('[BUG-115] c1: an over-cap paragraph is bounded to PREVIEW_CAP, ellipsis in
 });
 
 test('[BUG-115] c2: an at-or-under-cap paragraph is returned BYTE-IDENTICAL', () => {
-  // The case BUG-116's criterion 8 missed: the marker must not fire for the case it does not
+  // The marker must not fire for the case it does not
   // apply to. Asserting byte-identity rather than "no ellipsis" — an author whose paragraph
   // genuinely ends in "…" must still come back untouched.
   for (const n of [1, 179, 279, PREVIEW_CAP]) {
@@ -88,8 +87,8 @@ test('[BUG-115] c4: a paragraph with no word boundary in range is still bounded'
   const out = capPreview(url);
   assert.ok(out.length <= PREVIEW_CAP, `no-boundary input came back ${out.length} chars`);
   assert.notEqual(out, url);
-  // Closes independent-battery survivor I7: making the ellipsis conditional on a word boundary
-  // left the no-boundary teaser silently truncated with no marker, and nothing redded.
+  // Making the ellipsis conditional on a word boundary would
+  // leave the no-boundary teaser silently truncated with no marker.
   assert.ok(out.endsWith('…'), 'a hard-cut teaser must still be marked as cut');
   // The sp === 0 edge: a leading space and no other boundary in range. firstParagraph collapses and
   // trims, so the WIRED path cannot produce this — but capPreview is exported, and "unreachable" is
@@ -109,21 +108,21 @@ test('[BUG-115] c5: no whitespace is left stranded before the ellipsis', () => {
     assert.ok(out.endsWith('…'), `n=${n} was not cut at all — the whitespace check below would be vacuous`);
     assert.ok(!/\s…$/.test(out), `n=${n} left whitespace before the ellipsis: ${JSON.stringify(out.slice(-12))}`);
   }
-  // MEASURED, not assumed: with SINGLE spaces the cut never lands on whitespace, so the loop above
-  // cannot reach the trailing-whitespace guard at all — mutation M8 survived it. Double spaces are
+  // With SINGLE spaces the cut never lands on whitespace, so the loop above
+  // cannot reach the trailing-whitespace guard at all. Double spaces are
   // what make the guard load-bearing, because lastIndexOf finds the second space of the pair and the
-  // slice then ends on the first. ([BUG-115] battery round 1.)
-  // Three spaces, not two: survivor I4 showed that /\s+$/ -> /\s$/ passes a doubled-space fixture,
+  // slice then ends on the first.
+  // Three spaces, not two: /\s+$/ -> /\s$/ passes a doubled-space fixture,
   // because stripping one space is enough there. Only a longer run distinguishes them.
-  // Every whitespace CLASS, not just the ASCII space: `/\s+$/` -> `/ +$/` survived a spaces-only
-  // fixture (independent battery, H4). firstParagraph collapses \s+ before this runs, so tabs and
+  // Every whitespace CLASS, not just the ASCII space: `/\s+$/` -> `/ +$/` passes a spaces-only
+  // fixture. firstParagraph collapses \s+ before this runs, so tabs and
   // newlines are unreachable through the wired path — but capPreview is exported, and c14 exists on
   // the stated principle that unreachable-through-the-wired-path is not a safety argument.
   // The separator must be a NON-SPACE whitespace char FOLLOWED BY a space. The cut lands just
   // before the last space, so it ends on whitespace only when whitespace precedes that space — a
   // tab-only fixture has no space at all, `lastIndexOf(' ')` returns -1, the boundary path never
-  // runs and the strip is never reached. (My first attempt at this got it wrong and M23 survived.)
-  // 'spaces' keeps a run of THREE: M14 narrows /\s+$/ to /\s$/, which strips one character, so a
+  // runs and the strip is never reached.
+  // 'spaces' keeps a run of THREE: narrowing /\s+$/ to /\s$/ strips one character, so a
   // two-space run is stripped clean and the mutation escapes. Three is the shortest run that pins it.
   for (const [label, ws] of [['spaces', '   '], ['tab+space', '\t '], ['newline+space', '\n '],
                              ['form feed+space', '\f '], ['NBSP+space', '\u00a0 ']]) {
@@ -156,12 +155,11 @@ test('[BUG-115] c7: existing preview behaviour is untouched', () => {
 });
 
 test('[BUG-115] c8: the cap runs on DECODED text, so no entity can be split', () => {
-  // REWRITTEN after an independent audit. The original assertion was
+  // An assertion of the form
   //     assert.ok(!/&(?!amp;|lt;|gt;|quot;)/.test(esc(out)))
-  // which CANNOT FAIL: esc() rewrites every bare "&" to "&amp;" first, so in esc(x) every "&" is
-  // by construction the start of a known entity. Measured — it passes on esc('Tom &am'), a
-  // deliberately half-cut entity, and on cap-after-esc, the very hazard it claimed to pin. That is
-  // the [BUG-091] shape: a non-vacuity guard that could not fail.
+  // CANNOT FAIL: esc() rewrites every bare "&" to "&amp;" first, so in esc(x) every "&" is
+  // by construction the start of a known entity. It passes on esc('Tom &am'), a
+  // deliberately half-cut entity, and on cap-after-esc, the very hazard it would claim to pin.
   const filler  = words(600);
   const source  = `Tom &amp; Jerry said &quot;hi&quot; about &lt;b&gt; tags. ${filler}`;
   const decoded = `Tom & Jerry said "hi" about <b> tags. ${filler}`;
@@ -188,7 +186,7 @@ test('[BUG-115] c8: the cap runs on DECODED text, so no entity can be split', ()
 
   // A SPACELESS fixture, because the two above are not enough. Capping the raw text at a word
   // BOUNDARY happens to be safe (the cut retreats to a space, before any entity), so a spaced
-  // fixture cannot catch cap-before-decode — mutation M16 survived exactly that way. With no space
+  // fixture cannot catch cap-before-decode. With no space
   // in range the cut is hard, and it can land inside "&amp;" leaving a dangling "&am".
   const tightSrc = 'a'.repeat(276) + '&amp; more prose follows here to exceed the cap comfortably';
   const tightDec = 'a'.repeat(276) + '& more prose follows here to exceed the cap comfortably';
@@ -198,25 +196,24 @@ test('[BUG-115] c8: the cap runs on DECODED text, so no entity can be split', ()
 });
 
 test('[BUG-115] c11: an EMPTY first paragraph is skipped, not returned as the teaser', () => {
-  // Closes independent-battery survivor I2: dropping the `t &&` term from firstParagraph's guard.
+  // Guards the `t &&` term in firstParagraph's guard.
   // Without it an empty leading <p> RETURNS '' and the loop never reaches the real opener, so a
-  // post silently loses its teaser. No empty-<p> fixture existed anywhere in the repo.
+  // post silently loses its teaser.
   assert.equal(previewOfRaw('<p></p><p>The real opener.</p>'), 'The real opener.');
   assert.equal(previewOfRaw('<p>   </p><p>The real opener.</p>'), 'The real opener.');
 });
 
-// ── Two gaps found by PREDICTING each mutation's killer before running the battery ────────────────
+// ── Constants and how much text is kept ────────────────
 
 test('[BUG-115] c9: PREVIEW_CAP is exactly 280 — the decided value, not whatever the constant says', () => {
-  // 280 is a product decision (Asli, 2026-09-09, chosen off the measured distribution); changing it
+  // 280 is a product decision (chosen off the measured distribution); changing it
   // is a decision, not a refactor.
   //
-  // An earlier version of this comment claimed raising PREVIEW_CAP to 2800 "would stay green
-  // everywhere". That is FALSE — c1, c3, c4, c5 and c10 kill it too, because a fixture LARGER than
-  // the raised cap comes back uncut and their absolute assertions fail. What is true, and why this
-  // test still earns its place, is narrower: those killers are fixture-size dependent and stop
-  // killing the moment a fixture is smaller than the raised cap. This one is not. (An independent
-  // battery measured 280 -> 279 killed by c9 ALONE.)
+  // Raising PREVIEW_CAP is also caught by c1, c3, c4, c5 and c10, because a fixture LARGER than
+  // the raised cap comes back uncut and their absolute assertions fail. But
+  // those killers are fixture-size dependent and stop
+  // killing the moment a fixture is smaller than the raised cap. This one is not: 280 -> 279
+  // is caught by c9 alone.
   assert.equal(PREVIEW_CAP, 280);
 });
 
@@ -230,7 +227,7 @@ test('[BUG-115] c10: the teaser is cut near the cap, not back at the first space
     `teaser collapsed to ${out.length} chars — the cut ran back too far`);
 });
 
-// ── Round 2: defects found by an INDEPENDENT correctness review, both confirmed by measurement ───
+// ── Starved teasers and split code points ───
 
 test('[BUG-115] c12: a far-back word boundary is REJECTED — the teaser is never starved', () => {
   // Measured on a live Chinese publication: lastIndexOf(' ') accepts ANY space in range, so a
@@ -251,8 +248,8 @@ test('[BUG-115] c12: a far-back word boundary is REJECTED — the teaser is neve
   }
   // THE MID-BAND CASE. The four fixtures above sit far below any plausible floor and the English
   // one far above it, so between them they pin only the extremes — lowering BOUNDARY_FLOOR from
-  // 0.6 to 0.3 starved this input to 112 characters with the whole suite green (found by an
-  // independent battery, H3). This is the hazard c9 closes for PREVIEW_CAP; the floor is a product
+  // 0.6 to 0.3 starves this input to 112 characters with every other test green.
+  // This is the hazard c9 closes for PREVIEW_CAP; the floor is a product
   // decision too, and needs the same treatment.
   const midBand = 'Quick housekeeping note before we begin, and then a link that runs on for ages ' +
                   'without any spaces at all in it. https://example.test/' + 'a'.repeat(500);

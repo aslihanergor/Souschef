@@ -1,10 +1,9 @@
-// Docs-drift guard (TASK-082).
+// Docs-drift guard.
 //
-// Why this exists: the 2026-07-17 audit found that docs describing *the system*
-// (README, architecture.md) had drifted five releases behind, while docs describing
-// *the work* (registry, CHANGELOG) stayed current — because updating the latter is
-// part of shipping and the former relied on someone remembering. CLAUDE.md's DoD
-// already said "docs updated"; the rule existed and was skipped anyway.
+// Why this exists: docs describing *the system*
+// (README, architecture.md) drift behind, while docs describing
+// *the work* (registry, CHANGELOG) stay current — because updating the latter is
+// part of shipping and the former relies on someone remembering.
 //
 // So: mechanise the mechanically-checkable part.
 //
@@ -13,8 +12,7 @@
 //
 // What this CANNOT catch: prose that is merely out of date ("recheck if analytics is
 // added" after analytics shipped), or a diagram whose parts all exist but describe the
-// wrong shape. Those still need a human. This guards the class that is checkable, which
-// is the class that produced 2 of the audit's findings.
+// wrong shape. Those still need a human. This guards the class that is checkable.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,7 +25,7 @@ const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 
 // Docs that describe the system. Recaps are excluded by design: they are point-in-time
 // records and are *supposed* to name things that no longer exist.
-// The public copy of this repo (CHR-080) carries no CLAUDE.md and no tasks/, so the checks that read
+// The public copy of this repo carries no CLAUDE.md and no tasks/, so the checks that read
 // them cannot run there. The skip keys on the files' ABSENCE, never on a flag someone could set, and
 // test/export-public.test.mjs (private, never exported) runs this file and fails if any of these
 // checks is skipped or missing HERE.
@@ -45,7 +43,7 @@ const NOT_REPO_FILES = new Set([
 ]);
 
 // Longest extension first: an ordered alternation would match `.js` inside `.json`.
-// `md` is here so task/recap pointers rot loudly (CHR-018) — the pitfalls section cites
+// `md` is here so pointers to task and session-note files rot loudly — the pitfalls section cites
 // its evidence rather than restating it, and an uncheckable citation is not evidence.
 const FILE_TOKEN = /[A-Za-z0-9_./[\]-]+\.(?:json|html|mjs|css|js|md)\b/g;
 
@@ -62,11 +60,11 @@ function repoFiles(dir = '.', acc = []) {
 }
 const FILES = repoFiles();
 // A leading slash means a URL route, not a path — and since both Vercel and dev-server
-// route by file (TASK-069), `/admin.html` resolves to the file `admin.html`.
+// route by file, `/admin.html` resolves to the file `admin.html`.
 // Three prefixes are punctuation, not part of the name:
 //   '['   markdown link syntax — `[CLAUDE.md](…)` tokenizes as `[CLAUDE.md`
 //   './'  a relative link target — `](./CLAUDE.md)` tokenizes as `./CLAUDE.md`
-//   '/'   a URL route, not a path (both Vercel and dev-server route by file, TASK-069)
+//   '/'   a URL route, not a path (both Vercel and dev-server route by file)
 // `[param].js` never reaches here — NOT_REPO_FILES filters it first, on the raw token.
 const isRealFile = (token) => {
   const p = token.replace(/^\[/, '').replace(/^\.?\//, '');
@@ -75,7 +73,7 @@ const isRealFile = (token) => {
 
 // --- forward: everything the docs name must exist -------------------------------
 
-// Extracted so the tokenizer is testable on its own (CHR-018). Reading the live docs
+// Extracted so the tokenizer is testable on its own. Reading the live docs
 // can only ever say "today's files happen to resolve"; it cannot say whether a rotted
 // pointer WOULD be caught, which is the property the pitfalls section now depends on.
 function ghostsIn(text) {
@@ -97,11 +95,11 @@ for (const doc of SYSTEM_DOCS) {
   });
 }
 
-// --- forward, continued: task and recap pointers must be checkable ---------------
+// --- forward, continued: task-file pointers must be checkable --------------------
 
-// CHR-018 rewrites Known Pitfalls so each rule carries its evidence as a `tasks/BUG-xxx.md`
+// The pitfalls section carries each rule's evidence as a `tasks/BUG-xxx.md`
 // pointer instead of an inline retelling. That trade is only safe if a rotted pointer fails
-// here — otherwise 3,192 words of self-contained story become 1,100 words of maybe-dangling
+// here — otherwise a self-contained story becomes maybe-dangling
 // references, which is strictly worse than what it replaced.
 
 test('a pointer to a nonexistent .md file is a ghost', () => {
@@ -114,9 +112,7 @@ test('a pointer to a real .md file is not a ghost', () => {
 
 // The two link punctuation forms get a test each, so a failure names the guard that
 // broke. One fixture covering both would still go red if either strip were removed,
-// but it could not say which — and a test that cannot name its guard is the shape
-// BUG-069 was caught by. Neither can be RED before the fix (no .md token is produced
-// at all yet); both are pinned by the mutation battery instead.
+// but it could not say which.
 test('a markdown link bracket is not a ghost', () => {
   assert.deepEqual(ghostsIn('See [README.md](README.md) for conventions'), []);
 });
@@ -125,8 +121,8 @@ test('a relative ./ link target is not a ghost', () => {
   assert.deepEqual(ghostsIn('See [the readme](./README.md) for the overview'), []);
 });
 
-// Bracketed ids are the form the pitfalls section actually cites in ([BUG-059], not
-// tasks/BUG-059.md), so the .md guard above cannot see them. This is the check that
+// Bracketed ids are the form the pitfalls section actually cites in ([BUG-nnn], not
+// tasks/BUG-nnn.md), so the .md guard above cannot see them. This is the check that
 // makes "cite the task instead of retelling the story" a safe trade.
 function unknownTaskIds(text) {
   return [...new Set([...text.matchAll(/\[((?:BUG|TASK|CHR)-\d+[a-z]?)\]/g)].map((m) => m[1]))]
@@ -142,8 +138,6 @@ test('CLAUDE.md: every bracketed task id has a task file', { skip: NO_RECORDS },
   );
 });
 
-// Neither fixture test can be RED before the fix — they pin a check that did not exist,
-// rather than a defect that did. The mutation battery is what proves they can fail.
 test('a bracketed id with no task file is flagged', () => {
   assert.deepEqual(unknownTaskIds('the long story is in [BUG-999]'), ['BUG-999']);
 });
@@ -155,7 +149,7 @@ test('a bracketed id with a task file is not flagged', { skip: NO_RECORDS }, () 
 // --- reverse: every routed endpoint must be documented ---------------------------
 
 // Vercel routes every api/**/*.js except underscore-prefixed helpers (which is also
-// what the 12-function Hobby cap counts — see CLAUDE.md "Known constraints").
+// what the 12-function Hobby cap counts).
 function routedEndpoints(dir = 'api', acc = []) {
   for (const entry of readdirSync(join(ROOT, dir))) {
     const full = join(dir, entry);
@@ -186,7 +180,7 @@ test('architecture.md documents every routed endpoint', { skip: NO_ARCH }, () =>
 });
 
 test('the 12-function Vercel cap is not silently exceeded', () => {
-  // CLAUDE.md: Hobby caps a deployment at 12 serverless functions and we sit at 12/12.
+  // Hobby caps a deployment at 12 serverless functions and we sit at 12/12.
   // A 13th fails the deploy at "Deploying outputs" while the build still succeeds — so
   // it reads as a code error when it isn't. Fail here instead, where it's legible.
   const n = routedEndpoints().length;
@@ -212,12 +206,10 @@ test('architecture.md documents every database table', { skip: NO_ARCH }, () => 
 });
 
 
-// ── Future-dated claims in code and batteries (TASK-099, 2026-08-27) ──────────
+// ── Future-dated claims in code and mutation specs ──────────
 //
-// CLAUDE.md already carried this rule — "date it to a day that has happened" — and it did not stop
-// six comments being stamped with the NEXT day's date across app.js, style.css, a test file and two
-// mutation specs, all in one session. A rule that is written down and broken anyway is CLAUDE.md's
-// own "mechanise, then retire" trigger, so here is the mechanism.
+// "Date it to a day that has happened" is a rule that gets broken when it is only written down:
+// a comment stamped with the NEXT day's date reads exactly like a real one. So here is the mechanism.
 //
 // ONE LIMITATION, and it applies to this very comment: the check cannot tell a date that is QUOTED
 // from one that is ASSERTED. So a comment in the scanned set must DESCRIBE such a mistake rather
@@ -225,7 +217,7 @@ test('architecture.md documents every database table', { skip: NO_ARCH }, () => 
 // it is cheaper than the class of error it closes.
 //
 // SCOPE, stated so nobody over-credits it. This checks CODE and MUTATION SPECS only, where a date is
-// always a claim about something that already happened ("measured 2026-08-27", "corrected in place").
+// always a claim about something that already happened ("measured <date>", "corrected in place").
 // It deliberately does NOT check tasks/, recaps/, CHANGELOG.md or README.md, because those carry
 // legitimate FORWARD references — a registered domain's expiry, a date on which stale Inbox tasks
 // age out — and flagging those would be a false positive that teaches people to ignore the test.
@@ -283,14 +275,13 @@ test('the future-date detector passes today and the past', () => {
 //
 // The check above deliberately skips tasks/, recaps/, CHANGELOG.md and README.md, because those
 // carry legitimate FORWARD references — a domain expiry, a go-stale date — and a check that flags
-// those teaches people to ignore it. That exemption was correct and it left a real gap, which then
-// fired: an "Asli requirement" was written into tasks/BUG-111.md attributed to the NEXT day —
-// the date is not reproduced here, because this file is scanned by the check above.
+// those teaches people to ignore it. That exemption is correct and it leaves a real gap:
+// a statement in a task file about something already decided can still be attributed to the NEXT day.
 //
 // What makes a subset mechanically separable is not the FILE but the PHRASE. A forecast is written
 // "expires <some date next year>", "goes stale by …". A retrospective marker — "Amendment — …",
 // "Closed …",
-// "Measured …", "(Asli, …)", a `logged:` header — describes something that ALREADY HAPPENED and
+// "Measured …", "(<name>, …)", a `logged:` header — describes something that ALREADY HAPPENED and
 // therefore cannot be in the future, whatever file it sits in. This checks only that phrase class.
 //
 // Narrow on purpose. The date must follow the marker directly, separated by nothing but a space, a
@@ -364,16 +355,16 @@ test('the retrospective-marker detector leaves forecasts and past markers alone'
   assert.deepEqual(retroFutureDatesIn('Amendment — 2024-01-01 today', '2024-01-01'), []);
 });
 
-// ── [TASK-101] / [BUG-095]: the reduced-motion tripwire ──────────────────────────────────────────
+// ── The reduced-motion tripwire ──────────────────────────────────────────────────────────────────
 //
-// A CSS assertion, which is unusual here and deliberate. [BUG-095] was ONE LINE —
+// A CSS assertion, which is unusual here and deliberate. The defect is ONE LINE —
 // `@media (prefers-reduced-motion: reduce) { .g-spinner { animation: none; } }` — written by someone
-// doing the obviously-right thing for an accessibility rule, and it left a ring that looks exactly
-// like a spinner sitting perfectly still on the slowest screen in the app. No unit test in this repo
-// can see CSS, so 874 tests stayed green over it and only a handset caught it.
+// doing the obviously-right thing for an accessibility rule, and it leaves a ring that looks exactly
+// like a spinner sitting perfectly still on the slowest screen in the app. No other unit test in this repo
+// can see CSS, so the suite stays green over it and only a handset catches it.
 //
 // This does NOT test that the pulse looks calm, or that it is visible against the appbar — only a
-// handset does that (task Verification step 6). It makes the one-line regression uncommittable,
+// handset does that. It makes the one-line regression uncommittable,
 // which is what the pre-commit hook then enforces.
 
 /** The declarations `selector` receives inside every `@media (prefers-reduced-motion: reduce)` block.
@@ -434,10 +425,8 @@ test('[BUG-095] the tripwire reads a nested block without stopping at the first 
 });
 
 test('[TASK-101] the "Gathering the topics" pill cannot render', () => {
-  // SCOPED TO MARKUP AND RULES, not to every mention of the string, and that is a correction rather
-  // than a convenience. Written first as "the string appears nowhere in app.js either", it failed on
-  // three COMMENTS that cite the pill as superseded history — which CLAUDE.md requires be rewritten
-  // and kept, not deleted. The criterion's content is that no reader ever sees the sentence; the
+  // SCOPED TO MARKUP AND RULES, not to every mention of the string: comments in app.js may still
+  // name the pill. The requirement is that no reader ever sees the sentence; the
   // copy lived in markup, so markup is where that guarantee is real. A comment cannot render.
   assert.doesNotMatch(read('app/index.html'), /Gathering the topics/,
     'the markup still tells the reader their posts are loading, under a feed that has already painted');
@@ -447,15 +436,15 @@ test('[TASK-101] the "Gathering the topics" pill cannot render', () => {
   assert.doesNotMatch(css, /^\.g-spinner\s*\{/m, 'and its spinner rule with it');
 });
 
-// ── [TASK-101] round 2 — what an independent mutation battery walked straight past ───────────────
+// ── Perceivable motion, not a declaration name ───────────────────────────────────────────────────
 //
-// The tripwire above asserts that the string `g-pulse` appears and the string `none` does not. An
-// independent battery (2026-08-27) found that is a DECLARATION NAME, not perceivable motion, and
-// defeated it with one token each:
+// The tripwire above asserts that the string `g-pulse` appears and the string `none` does not.
+// That is a DECLARATION NAME, not perceivable motion, and
+// is defeated with one token each:
 //   • `infinite` → `1`      — pulses once, then sits still for the rest of a 15-20s classify.
 //   • `@keyframes g-pulse` flattened to `opacity: 1` at every stop — visually IDENTICAL to
-//     `animation: none`, i.e. [BUG-095] verbatim, through a door the parser never opens.
-// CLAUDE.md: "a test can be green, correct, and measuring the wrong quantity." This was that.
+//     `animation: none`, through a door the parser never opens.
+// A test can be green, correct, and measuring the wrong quantity.
 
 /** The body of `@keyframes <name>`, brace-matched — the block nests, so a flat regex reads the first
  *  inner `}` as the end and returns a fragment that happens to look fine. */
@@ -492,9 +481,9 @@ test('[BUG-095] the g-pulse keyframes actually vary opacity', () => {
 });
 
 test('[BUG-095] the ring is levelled UP to --accent, never down to --accent-soft', () => {
-  // The defect this branch shipped and an accessibility review caught. Against `--bg`, `--accent-soft`
-  // is 1.05:1 in light — three quarters of the ring were never visible, and the ONLY perceivable part
-  // was the `--accent` top border at 3.69:1. Levelling down deleted exactly that: it turned "a ring
+  // An accessibility hazard. Against `--bg`, `--accent-soft`
+  // is 1.05:1 in light — three quarters of the ring are never visible, and the ONLY perceivable part
+  // is the `--accent` top border at 3.69:1. Levelling down deletes exactly that: it turns "a ring
   // that looks frozen" into "no ring at all", for the people the rule exists to serve.
   const decls = reducedMotionDecls(read('style.css'), '.g-busy');
   assert.doesNotMatch(decls, /border(-top)?-color:\s*var\(--accent-soft\)/,
@@ -503,9 +492,8 @@ test('[BUG-095] the ring is levelled UP to --accent, never down to --accent-soft
 });
 
 test('[TASK-101] the ready sentence still APPEARS under reduced motion', () => {
-  // Criterion 10: information, not decoration. `style.css` says so in a comment ("Nothing here may
-  // become `display: none`") and an independent mutation made it `display: none` with the whole
-  // suite green — a rule written down and enforced by nobody.
+  // Information, not decoration. `style.css` says so in a comment ("Nothing here may
+  // become `display: none`"), and without this test nothing enforces it.
   const decls = reducedMotionDecls(read('style.css'), '.toggle-note');
   assert.doesNotMatch(decls, /display:\s*none/,
     'reduced motion removes the ANIMATION, never the sentence — it is the only text in the app that '
@@ -538,8 +526,7 @@ test('[TASK-101] every id the harness seeds as hidden really ships hidden', asyn
   // The harness's `HIDDEN_IDS` is a hand-maintained mirror of app/index.html, and it cuts BOTH ways:
   // an UNSEEDED id makes "was it revealed" pass vacuously (the reason the set exists), and a SEEDED
   // id whose markup lost its `hidden` class makes every such assertion pass over an element that is
-  // permanently visible in a real browser. An independent battery removed `hidden` from the markup
-  // of both new elements and nothing failed. Imported from the harness, never hand-copied, so the
+  // permanently visible in a real browser. Imported from the harness, never hand-copied, so the
   // two cannot drift.
   const { HIDDEN_IDS } = await import('../test-helpers/app-harness.mjs');
   const html = read('app/index.html');
@@ -555,7 +542,7 @@ test('[TASK-101] every id the harness seeds as hidden really ships hidden', asyn
 });
 
 test('[BUG-051] the damaged-store notice is complete in the markup, on all three views', () => {
-  // Independent battery, P03/P05. The harness memoises a stub for ANY getElementById id and never
+  // The harness memoises a stub for ANY getElementById id and never
   // reads app/index.html, so renaming `#damaged-notice-setup-text` leaves every notice test green
   // while a browser shows an empty red box with an unexplained button in it. Same for the live
   // region: `role="status"` is what announces the state to a screen reader, and dropping it is
@@ -576,9 +563,9 @@ test('[BUG-051] the damaged-store notice is complete in the markup, on all three
 });
 
 test('[TASK-101] criterion 12 — both new signals are announced, not just drawn', () => {
-  // The deleted pill announced through `role="status"`. Independent mutations emptied the
-  // visually-hidden label and stripped the role, with the whole suite green — so a non-sighted
-  // reader could have been left with strictly less than before and nothing would have said so.
+  // The signals announce through `role="status"`. Emptying the
+  // visually-hidden label or stripping the role would otherwise leave the suite green — so a non-sighted
+  // reader could be left with nothing and no test would say so.
   const html = read('app/index.html');
   const busy = /<span[^>]*\sid="group-busy"[^>]*>([\s\S]*?)<\/span>\s*<\/span>/.exec(html)
     || /<span[^>]*\sid="group-busy"[^>]*>([\s\S]*?)<button/.exec(html);
@@ -594,11 +581,10 @@ test('[TASK-101] criterion 12 — both new signals are announced, not just drawn
 });
 
 test('[TASK-101] the appbar stays sticky — criterion 3 and the note anchor both rest on it', () => {
-  // One untouched line carrying two criteria. Make `.appbar` static and (a) the busy indicator
-  // scrolls away mid-classify, which is the ENTIRE argument for moving it out of the pill, and
+  // One line carrying two requirements. Make `.appbar` static and (a) the busy indicator
+  // scrolls away mid-classify, which defeats the point of putting it in the appbar, and
   // (b) `.toggle-note`'s `position: absolute` loses its containing block, so `top: 100%` resolves
   // against the initial containing block and the bubble lands a viewport down the page.
-  // Neither the CSS nor the markup said so until a review pointed it out.
   const css = read('style.css');
   const appbar = /^\.appbar\s*\{([^}]*)\}/m.exec(css);
   assert.ok(appbar, '.appbar rule must exist');
@@ -608,10 +594,10 @@ test('[TASK-101] the appbar stays sticky — criterion 3 and the note anchor bot
 });
 
 test('[TASK-101] criteria 8 and 9 — the sentence is tappable-through and not the toast surface', () => {
-  // Two more independent mutations that survived the whole suite: `pointer-events: auto` (the bubble
+  // Two mutations nothing else catches: `pointer-events: auto` (the bubble
   // swallows taps on the feed beneath it for six seconds after every classify) and swapping its
   // background to `--btn-strong-bg` — which is EXACTLY the solid toast surface a user named as "too
-  // black and solid", the one hard requirement he gave for this element.
+  // black and solid".
   const css = read('style.css');
   const rule = /^\.toggle-note\s*\{([^}]*)\}/m.exec(css);
   assert.ok(rule, '.toggle-note rule must exist');
@@ -624,10 +610,10 @@ test('[TASK-101] criteria 8 and 9 — the sentence is tappable-through and not t
 });
 
 test('[BUG-095] the reduced-motion ring is levelled on ALL FOUR sides, not just the top', () => {
-  // Independent survivor I14. Criterion 4 has two halves — "still moves" and "stops claiming to be a
-  // spinner" — and only the first was pinned. Reverting `border-color` to `border-top-color` leaves
+  // The requirement has two halves — "still moves" and "stops claiming to be a
+  // spinner" — and this pins the second. Reverting `border-color` to `border-top-color` leaves
   // the ring with one differently-coloured quarter: the exact shape that reads as a stopped spinner,
-  // which is what [BUG-095] is ABOUT. The pulse would still run, so every other assertion passes.
+  // which is the defect itself. The pulse would still run, so every other assertion passes.
   const decls = reducedMotionDecls(read('style.css'), '.g-busy');
   assert.match(decls, /border-color:\s*var\(--accent\)/,
     'all four sides must take the same colour — a single differently-coloured quarter is the spinner '
@@ -635,7 +621,7 @@ test('[BUG-095] the reduced-motion ring is levelled on ALL FOUR sides, not just 
 });
 
 test('[TASK-101] --note-bg is defined in BOTH themes', () => {
-  // Independent survivor I37. `rgb(var(--note-bg) / .93)` with the token missing is not a fallback,
+  // `rgb(var(--note-bg) / .93)` with the token missing is not a fallback,
   // it is an INVALID declaration: the background drops to transparent and the sentence lands on the
   // feed with a blur and a border and no surface — in dark mode only, which is the half a light-mode
   // check never sees.
@@ -657,17 +643,12 @@ test('[TASK-101] the two new CSS detectors flag their own defects', () => {
     'the both-themes detector must see a missing dark token');
 });
 
-// ── [BUG-104] Every analytics name app.js emits must be one the server will store ──────────────
+// ── Every analytics name app.js emits must be one the server will store ────────────────────────
 // `normalizeEvent` drops any name absent from `EVENT_NAMES`, which makes an unlisted event a SILENT
 // failure: the client emits it, the PUT carries it, the server bins it, and what is left is a metric
-// that measures nothing and looks perfectly healthy. `api/_events.js` already carries a comment
-// saying exactly that, written when `landing_view` was added for [TASK-084] — and two later events
-// were then added to `app.js` without the matching entry anyway.
-//
-// Found 2026-08-28: `group_classify` ([CHR-012]'s instrument, the whole point of which was to
-// measure a distribution nobody had ever measured) and `group_view_toggle` ([TASK-099]'s adoption
-// metric) had BOTH been recording nothing since they shipped. A comment did not prevent it twice;
-// this test is the mechanism that replaces the comment.
+// that measures nothing and looks perfectly healthy. `api/_events.js` carries a comment
+// saying exactly that, and a comment does not prevent an event being added to `app.js`
+// without the matching entry; this test is the mechanism.
 test('BUG-104: every track() name in app.js is in the server-side EVENT_NAMES allowlist', async () => {
   const { EVENT_NAMES } = await import('../api/_events.js');
   const emitted = [...read('app.js').matchAll(/\btrack\(\s*'([a-z_]+)'/g)].map(m => m[1]);
@@ -684,7 +665,7 @@ test('BUG-104: every track() name in app.js is in the server-side EVENT_NAMES al
     + 'add them to EVENT_NAMES in api/_events.js or stop emitting them');
 });
 
-// ── [TASK-092] The first-run tour: markup and CSS contracts ─────────────────────────────────────
+// ── The first-run tour: markup and CSS contracts ────────────────────────────────────────────────
 // The harness memoises a stub for any id and never reads app/index.html or style.css, so every tour
 // test in test/tour.test.mjs would stay green over a card with no dialog role, a layer nested inside a
 // view (and so hidden with it), or a reduced-motion rule that hides the card. These read the files.
@@ -706,8 +687,8 @@ test('[TASK-092] D2 the tour layer is body-level and its card is a labelled dial
   const cardEl = /<[^>]*\sid="tour-card"[^>]*>/.exec(html);
   assert.ok(cardEl, '#tour-card must exist');
   assert.match(cardEl[0], /role="dialog"/);
-  // NOT modal (Asli, 2026-09-15, accepting review round 1's L6): the highlighted control sits outside the card,
-  // and aria-modal would tell a screen reader it is inert. This asserted the opposite until that decision.
+  // NOT modal: the highlighted control sits outside the card,
+  // and aria-modal would tell a screen reader it is inert.
   assert.doesNotMatch(cardEl[0], /aria-modal/, 'the card must not hide the highlighted control from a screen reader');
   assert.match(cardEl[0], /aria-labelledby="tour-text"/, 'the dialog is labelled by its sentence');
   for (const id of ['tour-part', 'tour-text', 'tour-count']) {
@@ -765,7 +746,7 @@ function topLevelRule(css, selector) {
 }
 
 test('[TASK-092] D7 the cut-out takes taps and nothing else does — the layer, blockers, ring and card (Risks 1, 3)', () => {
-  // Author battery C2, C3, C6, C12, every one invisible to the harness. The layer passes taps through so
+  // Every one of these is invisible to the harness. The layer passes taps through so
   // the highlighted control works; the blockers catch the taps outside it; the ring sits ON the cut-out
   // and must not swallow the tap on the control; and the card must take taps or Close cannot be pressed
   // — on a phone, with no Escape key, that is a dim with no way out.
@@ -784,7 +765,7 @@ test('[TASK-092] D7 the cut-out takes taps and nothing else does — the layer, 
 });
 
 test('[TASK-092] D8 the ring, card and blockers are fixed to the viewport the positions are measured in (criterion 17)', () => {
-  // Author battery C4, C7, C13. app.js places them from getBoundingClientRect, which is viewport-relative;
+  // app.js places them from getBoundingClientRect, which is viewport-relative;
   // anything but `position: fixed` puts them somewhere else, and the harness answers zeros either way.
   const css = read('style.css');
   for (const sel of ['.tour-block', '.tour-ring', '.tour-card']) {
@@ -795,8 +776,8 @@ test('[TASK-092] D8 the ring, card and blockers are fixed to the viewport the po
 });
 
 test('[TASK-092] D9 the dim is drawn with and without a highlight (design B)', () => {
-  // Author battery C8, C9. The dim is the ring's shadow, so dropping that one value removes the backdrop
-  // Asli chose while every other check stays green.
+  // The dim is the ring's shadow, so dropping that one value removes the backdrop
+  // while every other check stays green.
   const css = read('style.css');
   assert.match(topLevelRule(css, '.tour-ring') || '', /box-shadow:[^;]*var\(--tour-scrim\)/, 'the ring\'s shadow is the dim');
   assert.match(topLevelRule(css, '.tour-ring.no-target') || '', /box-shadow:[^;]*var\(--tour-scrim\)/,
@@ -816,8 +797,8 @@ test('[TASK-092] D10 the card paints above the blockers and the ring, whatever t
   assert.ok(z('.tour-card') > z('.tour-block'), 'the card is above the blockers');
   assert.ok(z('.tour-card') > z('.tour-ring'), 'and above the ring');
   // The first top-level rule is not the cascade: a later rule, a media block or a more specific selector
-  // could sink the card with the three rules above untouched — the MED-4 trap again, measured by both
-  // round-2 reviewers. Every rule that sets a z-index on any of the three counts.
+  // could sink the card with the three rules above untouched.
+  // Every rule that sets a z-index on any of the three counts.
   const card = zOf(css, 'tour-card', ['tour-card']);
   const under = [...zOf(css, 'tour-block', TOUR_IDS.filter((id) => id.startsWith('tour-block-'))), ...zOf(css, 'tour-ring', ['tour-ring'])];
   assert.ok(Math.min(...card) > Math.max(...under),
@@ -848,8 +829,8 @@ test('[TASK-092] D11 the tour layer is a direct child of body, not merely later 
   assert.match(html, /<\/div>\s*<\/div>\s*<\/div>\s*<script type="module" src="\/app\.js"><\/script>/,
     'and closes right before the app script, so nothing wraps it');
   // The two patterns above read text shape, and a hidden wrapper followed by a comment passes both: the lazy
-  // comment group spans the wrapper's tag, and the last three </div>s match whatever wraps them (review round 2,
-  // Q37). So, as structure: with comments gone, the region between the bottom nav and the app script is ONE
+  // comment group spans the wrapper's tag, and the last three </div>s match whatever wraps them.
+  // So, as structure: with comments gone, the region between the bottom nav and the app script is ONE
   // element — #tour — and its own closing tag is the last </div> in it.
   const bare = html.replace(/<!--[\s\S]*?-->/g, '');
   const end = bare.indexOf('<script type="module" src="/app.js">');
@@ -899,8 +880,8 @@ function zOf(css, cls, ids) {
 
 test('[TASK-092] D12 no rule anywhere hides or disables the tour\'s card, its buttons or the layer — by class, by id or inside a longer selector (Risk 1; independent C1, C28, C29, C31, C36, C43; review round 2 Q35, Q36)', () => {
   // A contract that reads only the FIRST rule for a selector is beaten by a later one, and one that reads
-  // only top-level rules is beaten by a media block — both measured by the independent battery. This reads
-  // every rule in the file, including inside @media, and lets the cascade have no say. Round 2 measured the
+  // only top-level rules is beaten by a media block. This reads
+  // every rule in the file, including inside @media, and lets the cascade have no say. There is a
   // third way past it: an exact-selector list misses `#tour-close` and `:root[data-theme="dark"] .tour-card`,
   // so a rule counts whenever its SUBJECT (the last compound) names one of these elements by class or id.
   const rules = allRules(read('style.css'));

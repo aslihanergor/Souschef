@@ -1,11 +1,11 @@
-// The client↔server seam for BUG-066 (review round 1, H2).
+// The client↔server seam for topic `size`.
 //
 // `size` is PRODUCED in app.js and CONSUMED in api/_group.js, and the only thing joining them is
-// `const groups = body?.groups` in api/group.js — a line no test touched. A client-only test and a
+// `const groups = body?.groups` in api/group.js. A client-only test and a
 // server-only test can both pass while the two disagree, which is the failure test/push-intent.test.mjs
-// was written about. Proven here rather than assumed: rewriting that handler line to
+// was written about. For example, rewriting that handler line to
 // `(body?.groups || []).map(g => ({ id: g.id, label: g.label }))` — the exact shape a future hardening
-// pass would take — left the whole suite green while the fix was dead in production.
+// pass would take — would leave every other test green while the feature was dead in production.
 //
 // So this test drives the REAL handler with the REAL browser's request body, and the only fake is
 // Anthropic itself.
@@ -15,18 +15,17 @@ import { createApp } from '../test-helpers/app-harness.mjs';
 import { fakeReq, fakeRes } from '../test-helpers/handler.mjs';
 import { createGroupHandler } from '../api/group.js';
 
-// [BUG-130] made the endpoint signed-in only, so this file presents a confirmed session: these tests are
+// The endpoint is signed-in only, so this file presents a confirmed session: these tests are
 // about what a signed-in caller's request does, and the gate itself is covered in signed-in-gate.test.mjs.
-// Only how the handler is built changed (the import above and this block); no assertion did (Asli,
-// 2026-10-07: "yes to all three, go ahead"). The DEFAULT export, which these files used to run, is now
-// covered by test/group-default-export.test.mjs (review round 1, H1).
+// The DEFAULT export is
+// covered by test/group-default-export.test.mjs.
 const handler = createGroupHandler({
   db: () => ({}),
   sessionAccount: async () => ({ accountId: 'acct-test', email: 'test@example.com' }),
 });
 import { MAX_TOPIC_BULLETS } from '../api/_group.js';
 
-// Lever A ([BUG-077]): posts reach the model as positional INDICES, never their real ids, so a fake
+// Lever A: posts reach the model as positional INDICES, never their real ids, so a fake
 // reply must answer in the same language. Computed from the batch rather than hard-coded — a
 // hand-written index is lever A's own failure mode (a valid index pointing at the wrong post).
 const idOf = o => (typeof o === 'string' ? o : o.id);
@@ -91,7 +90,7 @@ test("the browser's own request body survives the handler and spares the singlet
   }
 });
 
-// ── BUG-067: the topic's own bullets cross the same seam, and same-label groups fold ──
+// ── The topic's own bullets cross the same seam, and same-label groups fold ──
 // The existing bullets are PRODUCED in app.js and CONSUMED in api/_group.js, joined only by
 // `const groups = body?.groups`. And the prompt asks the model to reuse existing labels, so one
 // response can legitimately hold TWO groups under one — which mergeGroups' loop would collapse onto
@@ -136,7 +135,7 @@ async function bootState(state, reply) {
   return { body, cached: JSON.parse(app.get('focus_groups')) };
 }
 
-// The BUG-066/067/068 tests below all use the one AI_STATE fixture.
+// The tests below all use the one AI_STATE fixture.
 const bootWithReply = reply => bootState(AI_STATE, reply);
 
 // Run the real endpoint against a stubbed Anthropic, capturing what it sent upstream.
@@ -160,11 +159,11 @@ async function runRealHandler(body, modelReply) {
   }
 }
 
-// REWRITTEN for [BUG-091] (Asli, 2026-08-17). The old assertion was that a cached bullet survives
-// the whole path into the Anthropic request body. That journey is exactly what makes the bullet
-// deletable, so the requirement is inverted — but the FIRST half is unchanged and deliberately kept:
-// the browser still sends its bullets, because the server still needs them to restore afterwards.
-// Only the last hop is gone. Pinning both halves is what distinguishes "the server withholds them"
+// A cached bullet must NOT travel the whole path into the Anthropic request body: that journey is
+// exactly what makes the bullet
+// deletable. But the FIRST half is deliberately pinned too:
+// the browser still sends its bullets, because the server needs them to restore afterwards.
+// Only the last hop is withheld. Pinning both halves is what distinguishes "the server withholds them"
 // from "the client stopped sending them", which would be a different change with the same symptom.
 test("the topic's own bullets are SENT by the browser and withheld from the model", async () => {
   const { body } = await bootWithReply({ groups: null });
@@ -174,12 +173,11 @@ test("the topic's own bullets are SENT by the browser and withheld from the mode
     !String(sentUpstream).includes('an established point'),
     'but the bullet stops at api/group.js — it never reaches the Anthropic request body',
   );
-  // Read the EXISTING-TOPICS BLOCK, not the raw body. The first version of this assertion was
-  // `String(sentUpstream).includes('AI news')`, which CANNOT FAIL: `sentUpstream` is the whole
+  // Read the EXISTING-TOPICS BLOCK, not the raw body. An assertion of the form
+  // `String(sentUpstream).includes('AI news')` CANNOT FAIL: `sentUpstream` is the whole
   // serialised request and `SYSTEM_PROMPT` itself contains "AI news" as an example label
-  // (`api/_group.js:150`). Proved by review, twice — with the entire existing-topics block removed,
-  // and with the label redacted to `- (redacted)`, this file still passed 8/0. It was added
-  // specifically to stop a vacuous pass and was itself vacuous. (CLAUDE.md §1.)
+  // (`api/_group.js:150`) — with the entire existing-topics block removed,
+  // or with the label redacted to `- (redacted)`, it would still pass.
   const block = JSON.parse(sentUpstream).messages[0].content
     .split('Existing topics')[1].split('\n\nposts = ')[0];
   assert.match(block, /^- AI news$/m,
@@ -192,7 +190,7 @@ test('two groups under one label reach the browser as one topic with BOTH bullet
   assert.equal(res.statusCode, 200);
   // Folded server-side, so the client never sees a duplicate label.
   assert.deepEqual(res.body.groups.map(g => g.label), ['AI news'], 'one group, not two');
-  // [BUG-091]: the cached bullet is now restored alongside the model's two, instead of being
+  // The cached bullet is now restored alongside the model's two, instead of being
   // superseded by them. The fold guard this test exists for is untouched — one group, both new
   // bullets present — and the third entry is the bug's fix showing through the same seam.
   assert.deepEqual(res.body.groups[0].summary, ['a model shipped', 'a lab raised money', 'an established point']);
@@ -205,17 +203,17 @@ test('two groups under one label reach the browser as one topic with BOTH bullet
   assert.equal(cached.assignments.new2, 'g_ai_news');
 });
 
-// ── BUG-068 (found in BUG-066 review round 2): the two sides disagree on what "same topic" MEANS ──
-// The server matched labels by exact string; the browser's `groupIdFor` (app.js:81) lowercases and
-// collapses every non-[a-z0-9] run to `_`. So "AI news" and "AI News" are TWO topics to the server
+// ── The two sides disagree on what "same topic" MEANS ──
+// If the server matches labels by exact string while the browser's `groupIdFor` (app.js:81) lowercases and
+// collapses every non-[a-z0-9] run to `_`, then "AI news" and "AI News" are TWO topics to the server
 // and ONE to the browser. An exact-string fold therefore lets both through, both key to g_ai_news,
 // and mergeGroups' loop lets the second overwrite the first — deleting a bullet about a post still
 // unread in the feed.
 //
-// This is a REGRESSION against main, not merely an unfixed gap, and only when a spared singleton is
-// one of the colliders. Measured 2026-08-06, real modules, same fixture, main vs this branch:
-//   main   -> the singleton is FOLDED, so its bullet is parked in "Everything else" and survives
-//   branch -> the singleton is SPARED under its label, where the second group overwrites it: GONE
+// It bites hardest when a spared singleton is
+// one of the colliders:
+//   folded -> the singleton's bullet is parked in "Everything else" and survives
+//   spared -> the singleton keeps its label, where the second group overwrites it: GONE
 const TWO_CASE_VARIANT_LABELS = {
   content: [{
     type: 'tool_use',
@@ -234,7 +232,7 @@ test('two labels differing only in CASE reach the browser as one topic with BOTH
   const { res } = await runRealHandler(body, TWO_CASE_VARIANT_LABELS);
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.groups.length, 1, 'folded server-side — the browser never sees the collision');
-  // [BUG-091]: the cached bullet is now restored alongside the model's two, instead of being
+  // The cached bullet is now restored alongside the model's two, instead of being
   // superseded by them. The fold guard this test exists for is untouched — one group, both new
   // bullets present — and the third entry is the bug's fix showing through the same seam.
   assert.deepEqual(res.body.groups[0].summary, ['a model shipped', 'a lab raised money', 'an established point']);
@@ -251,7 +249,7 @@ test('a singleton is spared when the model re-cases the existing topic label', a
   // The cached topic is "AI news" (2 unread). ONE new post arrives — so it is genuinely a singleton,
   // the only thing that can save it is the sparing term, and the model answers "AI NEWS". Same tile
   // to the browser, so it must join that topic rather than the bucket. This is the plain
-  // "BUG-066 silently does not apply" half of the same mismatch.
+  // "singleton sparing silently does not apply" half of the same mismatch.
   const app = createApp({ store: { focus_groups: JSON.stringify(AI_STATE) } });
   let body = null;
   app.setFetch(async (url, init) => {
@@ -277,19 +275,19 @@ test('a singleton is spared when the model re-cases the existing topic label', a
     'the post joined its topic instead of being bucketed');
 });
 
-// ── BUG-070 + BUG-073, end to end: the browser's cache is where the bullets die ───
+// ── End to end: the browser's cache is where the bullets die ───
 //
 // The server-only tests in test/group.test.mjs assert what /api/group RETURNS. That is not the
 // damage. The damage is `mergeGroups` (app.js:100) writing that response over the cache, replacing a
 // topic's whole summary — so the claim "a bullet describing an unread post was destroyed" can only
 // be proven by driving the REAL browser, through the REAL handler, and reading the cache after.
 //
-// app.js is deliberately NOT changed by this fix, which is exactly why it has to be exercised: the
+// app.js still replaces on merge, which is exactly why it has to be exercised: the
 // repair is server-side and must survive an unchanged, still-replacing client.
 
 // Three cached topics: one the model will answer for, one it will forget posts into, and one it
-// never mentions at all — the last is BUG-067's criterion 12, which until now was only ever asserted
-// against a hand-written response and never through the real endpoint.
+// never mentions at all — the last must be left untouched, asserted here
+// through the real endpoint rather than against a hand-written response.
 const BUCKET_STATE = {
   assignments: {
     a1: 'g_ai_news', a2: 'g_ai_news',
@@ -304,21 +302,19 @@ const BUCKET_STATE = {
   updatedAt: 1753000000000,
 };
 
-// REWRITTEN for [TASK-096] (requirement change confirmed by Asli in session, 2026-08-16 — see that
-// task's review disposition). This test used to assert `cached.assignments.new2 ===
-// 'g_everything_else'` — that the browser STORED the sweep. The client no longer stores anything for
-// the bucket, by design, so that assertion now states a requirement we deliberately removed.
+// The client stores nothing for the bucket, by design, so there is no
+// `cached.assignments.new2 === 'g_everything_else'` to assert.
 //
-// BUG-070's protection was always SERVER-side — `restoreCachedBullets` putting a topic's cached
-// bullets back on a group the model was never shown — and TASK-096 leaves it untouched. So the
-// assertion moves onto the RESPONSE, which is the layer that actually holds it.
+// The protection is SERVER-side — `restoreCachedBullets` putting a topic's cached
+// bullets back on a group the model was never shown. So the
+// assertion is on the RESPONSE, which is the layer that actually holds it.
 //
-// The old opening assertion ("the browser really sends the bucket bullets up") is GONE rather than
-// kept, and the reason matters. `updateGroupsForFeed` has exactly ONE call site — inside
+// There is deliberately no opening assertion that "the browser really sends the bucket bullets up",
+// and the reason matters. `updateGroupsForFeed` has exactly ONE call site — inside
 // `renderFeedResults`, after `dropCachedBucket` — so a current client can never put a bucket in that
-// request. `bootState` calls it directly and skips the sweep, so the assertion would have gone on
-// passing while describing a state production cannot reach, and would have survived deleting the
-// sweep outright. That is an assertion against its own fixture, the failure this file exists about.
+// request. `bootState` calls it directly and skips the sweep, so such an assertion would go on
+// passing while describing a state production cannot reach, and would still pass with the
+// sweep deleted outright. That is an assertion against its own fixture, the failure this file exists about.
 //
 // What the browser does send is asserted where it can be asserted honestly — render-driven, in
 // `test/group-unfiled.test.mjs` ("the cached bucket is never offered to the model again"). Here the
@@ -351,11 +347,11 @@ test('BUG-070 end to end: a forgotten id does not blank the bucket bullets in th
   assert.deepEqual(bucket.summary, ['a stray thought', 'another stray'],
     "and the topic's cached bullets were restored onto it, not blanked — BUG-070's actual protection");
 
-  // [TASK-096]: and the browser stores none of it.
+  // And the browser stores none of it.
   const { cached } = await bootState(BUCKET_STATE, res.body);
   assert.equal(Object.hasOwn(cached.assignments, 'new2'), false,
     'the client keeps no assignment for a bucketed post, so it is re-classified next time');
-  // BUG-067 criterion 12, through the real endpoint for the first time: a topic the model never
+  // Through the real endpoint: a topic the model never
   // mentioned is not in the response at all, so nothing may touch it.
   assert.deepEqual(cached.groups.g_us_politics.summary,
     ['the spending bill stalled', 'two senators retired'],
@@ -380,16 +376,16 @@ test('BUG-073 end to end: the cache keeps the bullets the model was never shown'
     }],
   };
   const { res, sentUpstream } = await runRealHandler(body, revision);
-  // REWRITTEN for [BUG-091]. The both-directions structure is KEPT, and keeping it mattered: the
-  // original's positive assertion ("the request carried the bullets inside the bound") existed only
-  // to prove `sentUpstream` was not null, so that the negative could not pass vacuously. Under D no
-  // bullet goes up at all, so that non-vacuity guard had to be replaced rather than deleted —
-  // dropping it would leave a test that passes just as happily against a request that never fired.
-  // The LABEL is the thing that still reaches the prompt, so it takes over the job — but read it
+  // Both directions are asserted, and that matters: a
+  // positive assertion is needed
+  // to prove `sentUpstream` is not null, so that the negative cannot pass vacuously. No
+  // bullet goes up at all, so the bullets cannot serve as that non-vacuity guard —
+  // and without one the test passes just as happily against a request that never fired.
+  // The LABEL is the thing that still reaches the prompt, so it does the job — but read it
   // out of the BLOCK, not the raw body. `String(sentUpstream).includes('AI news')` does prove
   // non-nullity (a null body stringifies to 'null'), yet it proves that and nothing else:
   // `SYSTEM_PROMPT` carries "AI news" as an example label, so the message it prints is a claim the
-  // assertion never checks. The sibling assertion in this file was vacuous for exactly that reason.
+  // assertion never checks.
   const block = JSON.parse(sentUpstream).messages[0].content
     .split('Existing topics')[1].split('\n\nposts = ')[0];
   assert.match(block, /^- AI news$/m,
@@ -405,8 +401,8 @@ test('BUG-073 end to end: the cache keeps the bullets the model was never shown'
 });
 
 
-// ── BUG-077 lever A: indices go upstream, real ids come back ─────────────────────
-// The lever is a SERVER-SIDE alias — the browser's request and the browser's response are unchanged,
+// ── Indices go upstream, real ids come back ─────────────────────
+// The index alias is SERVER-SIDE — the browser's request and the browser's response are unchanged,
 // and only the billed Anthropic prompt shrinks. That is a claim about two boundaries at once, so it
 // can only be proven where both are real: the browser's own request body, through the real handler,
 // with Anthropic the only fake. A mapping bug here files a post under the WRONG topic silently, so

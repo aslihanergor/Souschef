@@ -119,12 +119,12 @@ test('clientIp: first hop of x-forwarded-for, else "unknown"', () => {
   assert.equal(clientIp({}), 'unknown');
   assert.equal(clientIp(), 'unknown');
 });
-// BUG-022: the per-IP sign-in limit keys on clientIp. Any client can send x-forwarded-for, so Vercel's own
+// The per-IP sign-in limit keys on clientIp. Any client can send x-forwarded-for, so Vercel's own
 // x-vercel-forwarded-for is read first (documented as identical, except that x-forwarded-for can be overwritten by
 // a proxy on top). x-forwarded-for stays as the fallback so localhost, which has no Vercel header, keeps working.
 // Not covered here: api/auth/request.js has no test, so nothing in the suite notices if the per-IP count or the insert
-// stops keying on clientIp(req.headers) — BUG-022 review mutations I20/I21 and I7/I8 survive. It was checked once, live,
-// by a localhost cap check (11 requests with one x-vercel-forwarded-for stored 10 rows); see BUG-022, Risk 8.
+// stops keying on clientIp(req.headers). It was checked once, live,
+// by a localhost cap check (11 requests with one x-vercel-forwarded-for stored 10 rows).
 test('clientIp (BUG-022): x-vercel-forwarded-for wins over x-forwarded-for', () => {
   assert.equal(clientIp({ 'x-vercel-forwarded-for': '198.51.100.9', 'x-forwarded-for': '203.0.113.7' }), '198.51.100.9');
 });

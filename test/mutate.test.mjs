@@ -1,10 +1,10 @@
-// Tests for the mutation battery runner (CHR-010).
+// Tests for the mutation battery runner.
 //
 // This file exists because the runner's own failure modes are the defect class it
 // was built to catch. A runner that reports a false GREEN tells you your tests are
 // assertive when they are not — strictly worse than having no runner, because it
-// replaces "I don't know" with a wrong answer. One was measured doing exactly that
-// during BUG-077, which is why these are detection tests rather than happy paths.
+// replaces "I don't know" with a wrong answer.
+// That is why these are detection tests rather than happy paths.
 //
 // Every assertion here is on observable output — what the fake store holds, what
 // the result object says — never "was this function called".
@@ -75,8 +75,7 @@ test('preflight: a malformed find is reported as a SPEC bug, not an interrupted 
 
 test('applyMutation: an EMPTY find is rejected, not treated as absent', () => {
   // A retired mutation must be DELETED from the spec, never disabled by emptying `find` — and there
-  // is no `skip` flag to reach for either. Written after an entry in `mutations/BUG-092.mjs` was
-  // nearly retired that way during [BUG-113].
+  // is no `skip` flag to reach for either.
   //
   // Why it is worse than it looks: `''` is not "absent". `String.split('')` splits between EVERY
   // character, so `count` is the file's length rather than 0, the `absent` branch never fires,
@@ -180,7 +179,7 @@ test('runOne reports SURVIVED when nothing noticed', () => {
 })
 
 test('runOne restores the file byte-identically after the run', () => {
-  // BUG-068's scenario: the pre-run content is what comes back, whatever git
+  // The pre-run content is what comes back, whatever git
   // holds. An uncommitted fix on disk must survive a battery.
   const deps = fakeDeps({ 'lib/x.js': 'KEEP\n// uncommitted fix\n' }, redSuite('t'))
   runOne({ id: 'M1', file: 'lib/x.js', find: 'KEEP', with: 'GONE' }, deps)
@@ -188,7 +187,7 @@ test('runOne restores the file byte-identically after the run', () => {
 })
 
 test('runOne: a mutation that disappears during the run is an ERROR, not a GREEN', () => {
-  // The false GREEN measured in BUG-077 round 1: diff -q passed BEFORE the run
+  // A false GREEN: diff -q passed BEFORE the run
   // and the mutation was gone DURING it, so the suite ran against clean code and
   // its green was meaningless.
   const files = { 'lib/x.js': 'KEEP' }
@@ -346,7 +345,7 @@ test('runOne reports ERROR when the restore does not take', () => {
   assert.match(r.error, /restore/i)
 })
 
-// --- classifyRun: criterion 6's real derivation ------------------------------
+// --- classifyRun -------------------------------------------------------------
 
 test('classifyRun detects a timeout from spawnSync', () => {
   // spawnSync reports a timeout by killing the child: ETIMEDOUT, null status.
@@ -413,11 +412,10 @@ test('acquireLock refuses a second battery while one is running', () => {
     assert.equal(second.ok, false)
     // Specifically the "already running" message, not merely any failure: the
     // generic catch-all also says "lock", so a looser regex passed even with the
-    // EEXIST branch removed. The bootstrap battery caught that (M15 survived).
+    // EEXIST branch removed.
     //
-    // This asserted /stale/ until round 5. It no longer does, and that is the fix
-    // rather than a weakening: the holder here is THIS process, which is alive, so
-    // calling it stale was the old message guessing. It now names the pid instead,
+    // Not /stale/: the holder here is THIS process, which is alive, so
+    // calling it stale would be guessing. The message names the pid instead,
     // and only says "died without releasing" when the holder is really gone.
     assert.match(second.error, /already running/)
     assert.match(second.error, new RegExp(`pid ${process.pid}\\b`))
@@ -434,9 +432,8 @@ test('acquireLock refuses a second battery while one is running', () => {
 // The runner had no control. Nothing established the suite was green before a
 // mutation was applied, so it could not tell "my mutation killed a test" from "a
 // test was already failing" — and a mutation editing a COMMENT was measured being
-// reported KILLED, at exit 0, on a tree with one unrelated failure. That is
-// CLAUDE.md family 1 (an instrument must be shown able to detect the thing) broken
-// by the tool built to mechanise family 2.
+// reported KILLED, at exit 0, on a tree with one unrelated failure. An instrument
+// must be shown able to detect the thing before its reading counts.
 
 test('baseline refuses to start when the suite is already red', () => {
   const deps = fakeDeps({}, redSuite('a test that was already failing'))
